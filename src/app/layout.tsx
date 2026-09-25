@@ -3,8 +3,8 @@ import { Providers } from "./providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "Drinks on Chain", template: "%s · Drinks on Chain" },
-  description: "Plantilla de aplicación del ecosistema Drinks on Chain.",
+  title: { default: "ERP · Drinks on Chain", template: "%s · ERP · Drinks on Chain" },
+  description: "ERP de trazabilidad de las bodegas de Drinks on Chain.",
   robots: { index: false, follow: false },
 };
 

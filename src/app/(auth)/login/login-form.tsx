@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Alert, Button, Field, Input } from "@drinks-on-chain/ui";
 import { ApiError, errorMessage } from "@/lib/api/errors";
@@ -38,6 +39,11 @@ export function LoginForm() {
       <Button type="submit" size="lg" loading={loginMutation.isPending}>
         {loginMutation.isPending ? es.auth.submitting : es.auth.submit}
       </Button>
+      <p className="text-center text-sm">
+        <Link href="/recuperar" className="text-accent-text hover:underline">
+          ¿Olvidaste tu contraseña?
+        </Link>
+      </p>
     </form>
   );
 }
