@@ -106,7 +106,7 @@ export function TerroirForm({ mode, initial, terroirId }: Props) {
     <form
       noValidate
       onSubmit={onSubmit}
-      className="grid gap-8"
+      className="grid grid-cols-1 gap-8"
       aria-label={mode === "create" ? "Nuevo terroir" : "Editar terroir"}
     >
       <FormSection title="Parcela" columns={2}>

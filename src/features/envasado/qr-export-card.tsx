@@ -35,7 +35,7 @@ export function QrExportCard({
 
   if (!lotUrl || !origin) {
     return (
-      <Card className="grid gap-4">
+      <Card className="grid grid-cols-1 gap-4">
         <CardHeader title="Códigos QR" />
         <Alert tone="warning" title="Sin dirección del pasaporte">
           El backend no devolvió la URL del lote y NEXT_PUBLIC_URL_APP no está configurada. Configúrala para generar los
@@ -70,7 +70,7 @@ export function QrExportCard({
     });
 
   return (
-    <Card className="grid gap-5" aria-labelledby="qr-export-title">
+    <Card className="grid grid-cols-1 gap-5" aria-labelledby="qr-export-title">
       <CardHeader
         title={<span id="qr-export-title">Códigos QR</span>}
         description={
@@ -123,7 +123,7 @@ export function QrExportCard({
         </p>
       )}
 
-      <div className="grid gap-3">
+      <div className="grid grid-cols-1 gap-3">
         <h3 className="text-sm font-medium">
           Lote de códigos por botella · {fmtNumber(bottles)} {bottles === 1 ? "código" : "códigos"}
         </h3>

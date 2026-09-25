@@ -13,7 +13,7 @@ export function CutsSummary({ cuts, inputLiters }: { cuts: Cuts; inputLiters: nu
   const yieldPct = cuts.heart !== null && inputLiters ? (cuts.heart / inputLiters) * 100 : null;
 
   return (
-    <div className="grid gap-4">
+    <div className="grid grid-cols-1 gap-4">
       <dl className="m-0 grid grid-cols-3 gap-3">
         {items.map((i) => (
           <div

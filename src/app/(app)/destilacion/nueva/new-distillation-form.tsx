@@ -152,7 +152,7 @@ export function NewDistillationForm() {
   const ready = allowed && !loading && !failed && candidates.length > 0;
 
   const shell = (body: ReactNode) => (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       <PageChrome
         breadcrumbs={[{ label: "Destilación y reposo", href: "/destilacion" }, { label: "Registrar destilación" }]}
         actions={

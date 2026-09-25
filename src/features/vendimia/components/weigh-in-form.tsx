@@ -83,7 +83,7 @@ export function WeighInForm({ initialTerroirId }: { initialTerroirId?: string })
   }
 
   return (
-    <form noValidate onSubmit={onSubmit} aria-label="Registro de pesaje" className="grid gap-8">
+    <form noValidate onSubmit={onSubmit} aria-label="Registro de pesaje" className="grid grid-cols-1 gap-8">
       <div className="grid gap-8 xl:grid-cols-2">
         <section aria-labelledby="pesaje-bascula" className="grid content-start gap-5">
           <h2 id="pesaje-bascula" className="font-ui text-lg font-semibold">
@@ -179,7 +179,7 @@ export function WeighInForm({ initialTerroirId }: { initialTerroirId?: string })
         </section>
 
         <section aria-labelledby="pesaje-laboratorio" className="grid content-start gap-5">
-          <div className="grid gap-1">
+          <div className="grid grid-cols-1 gap-1">
             <h2 id="pesaje-laboratorio" className="font-ui text-lg font-semibold">
               Análisis preliminar
             </h2>

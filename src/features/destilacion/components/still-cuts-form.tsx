@@ -52,7 +52,7 @@ export function StillCutsForm({
   );
 
   return (
-    <div className="grid gap-3">
+    <div className="grid grid-cols-1 gap-3">
       <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {cut("headDiscardLiters", "Cabeza", "Descarte inicial.")}
         {cut("heartYieldLiters", "Corazón", "Rendimiento: el singani del lote.", true)}

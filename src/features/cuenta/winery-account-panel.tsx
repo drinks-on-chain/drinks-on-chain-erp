@@ -22,9 +22,9 @@ const NOT_EXPOSED = "Disponible cuando el backend exponga los activos";
 export function WineryAccountPanel({ winery }: { winery: WineryResponse & { stellarPublicKey: string } }) {
   const cert = CERTIFICATION_STATUS[winery.certificationStatus];
   return (
-    <Card className="grid gap-4" aria-label="Cuenta institucional">
+    <Card className="grid grid-cols-1 gap-4" aria-label="Cuenta institucional">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="grid gap-1">
+        <div className="grid grid-cols-1 gap-1">
           <span className="text-fg-muted text-xs font-medium tracking-label uppercase">
             Cuenta institucional · testnet
           </span>
@@ -83,7 +83,7 @@ export function AccountPage() {
 
   if (platform) {
     return (
-      <div className="grid gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={crumbs} />
         <EmptyState
           icon={<Wallet aria-hidden size={32} strokeWidth={1.5} />}
@@ -95,9 +95,9 @@ export function AccountPage() {
   }
 
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       <PageChrome breadcrumbs={crumbs} />
-      <header className="grid gap-1">
+      <header className="grid grid-cols-1 gap-1">
         <h1 className="font-display text-3xl">Cuenta Stellar</h1>
         <p className="text-fg-muted max-w-3xl">
           La cuenta la crea y custodia Drinks on Chain al aprobar la bodega. Aquí solo se consulta: dirección, registro
@@ -130,7 +130,7 @@ export function AccountPage() {
             <WineryAccountPanel winery={{ ...winery.data, stellarPublicKey: winery.data.stellarPublicKey }} />
           </div>
 
-          <section className="grid gap-3" aria-labelledby="anchoring-title">
+          <section className="grid grid-cols-1 gap-3" aria-labelledby="anchoring-title">
             <h2 id="anchoring-title" className="text-lg font-medium">
               Anclaje de lotes embotellados
             </h2>
@@ -206,7 +206,7 @@ export function AccountPage() {
             )}
           </section>
 
-          <section className="grid gap-3" aria-labelledby="assets-title">
+          <section className="grid grid-cols-1 gap-3" aria-labelledby="assets-title">
             <h2 id="assets-title" className="text-lg font-medium">
               Activos por lote
             </h2>

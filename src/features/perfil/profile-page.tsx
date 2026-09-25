@@ -60,9 +60,9 @@ function ProfileForm({ me }: { me: UserProfileResponse }) {
   };
 
   return (
-    <Card className="grid gap-4">
+    <Card className="grid grid-cols-1 gap-4">
       <CardHeader title="Datos personales" description="Así te ven tus compañeros en la bodega." />
-      <form noValidate onSubmit={submit} className="grid gap-4">
+      <form noValidate onSubmit={submit} className="grid grid-cols-1 gap-4">
         <Field label="Nombre completo" required error={errors.fullName}>
           <Input value={values.fullName} onChange={(e) => setValues((v) => ({ ...v, fullName: e.target.value }))} />
         </Field>
@@ -106,7 +106,7 @@ export function ProfilePage() {
   const crumbs = [{ label: "Perfil" }];
   if (me.isError) {
     return (
-      <div className="grid gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={crumbs} />
         <ErrorState description={errorMessage(me.error)} onRetry={() => me.refetch()} retrying={me.isFetching} />
       </div>
@@ -114,7 +114,7 @@ export function ProfilePage() {
   }
   if (!me.data) {
     return (
-      <div className="grid gap-6" aria-busy="true">
+      <div className="grid grid-cols-1 gap-6" aria-busy="true">
         <PageChrome breadcrumbs={crumbs} />
         <Skeleton className="h-10 w-64" />
         <div className="grid gap-6 lg:grid-cols-2">
@@ -128,16 +128,16 @@ export function ProfilePage() {
   const wallet = u.primaryWallet;
 
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       <PageChrome breadcrumbs={crumbs} />
-      <header className="grid gap-1">
+      <header className="grid grid-cols-1 gap-1">
         <h1 className="font-display text-3xl">{u.fullName}</h1>
         <p className="text-fg-muted">{roleLabel(u.userRole)}</p>
       </header>
       <div className="grid items-start gap-6 lg:grid-cols-2">
         <ProfileForm key={u.id + u.fullName + (u.phoneNumber ?? "") + u.preferredLocale} me={u} />
-        <div className="grid gap-6">
-          <Card className="grid gap-4">
+        <div className="grid grid-cols-1 gap-6">
+          <Card className="grid grid-cols-1 gap-4">
             <CardHeader title="Cuenta" />
             <KeyValueList
               items={[
@@ -151,7 +151,7 @@ export function ProfilePage() {
               ]}
             />
           </Card>
-          <Card className="grid gap-4">
+          <Card className="grid grid-cols-1 gap-4">
             <CardHeader title="Bodegas" description="Las bodegas en las que trabajas y tu rol en cada una." />
             {u.wineryMemberships.length === 0 ? (
               <p className="text-fg-muted text-sm">No perteneces a ninguna bodega.</p>
@@ -173,7 +173,7 @@ export function ProfilePage() {
               </ul>
             )}
           </Card>
-          <Card className="grid gap-4">
+          <Card className="grid grid-cols-1 gap-4">
             <CardHeader
               title="Billetera"
               description="La crea Drinks on Chain al registrarte. No tienes que guardar ninguna clave."

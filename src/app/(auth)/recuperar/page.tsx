@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "Recuperar contraseña" };
 export default function RecoverPage() {
   return (
     <AuthLayout variant="split" eyebrow="ERP de trazabilidad" title="Recuperar contraseña">
-      <div className="grid gap-4">
+      <div className="grid grid-cols-1 gap-4">
         <Alert tone="info">
           Pide a la persona que administra tu bodega en el ERP que restablezca tu acceso. Si eres tú, escribe al equipo
           de Drinks on Chain.

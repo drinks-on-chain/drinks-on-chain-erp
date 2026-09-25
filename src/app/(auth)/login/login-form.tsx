@@ -23,7 +23,7 @@ export function LoginForm() {
   const message = error instanceof ApiError && error.isUnauthorized ? es.auth.invalid : error && errorMessage(error);
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-4" noValidate>
+    <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4" noValidate>
       {message && <Alert tone="danger">{message}</Alert>}
       <Field label={es.auth.email} required>
         <Input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} />

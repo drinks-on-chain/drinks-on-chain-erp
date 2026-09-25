@@ -30,7 +30,7 @@ export function AgingDetail({ id }: { id: string }) {
   if (aging.isError) {
     const notFound = aging.error instanceof ApiError && (aging.error.isNotFound || aging.error.isForbidden);
     return (
-      <div className="grid gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={breadcrumbs} />
         {notFound ? (
           <EmptyState
@@ -55,7 +55,7 @@ export function AgingDetail({ id }: { id: string }) {
 
   if (!a) {
     return (
-      <div className="grid gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={breadcrumbs} />
         <Skeleton className="h-10 w-72" />
         <div className="grid gap-6 lg:grid-cols-2">
@@ -78,7 +78,7 @@ export function AgingDetail({ id }: { id: string }) {
         : undefined;
 
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       <PageChrome breadcrumbs={breadcrumbs} />
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="font-display text-3xl">{name ?? "Crianza"}</h1>

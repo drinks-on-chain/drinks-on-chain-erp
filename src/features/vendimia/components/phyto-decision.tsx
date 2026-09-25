@@ -92,7 +92,7 @@ export function PhytoDecisionPanel({ batch }: { batch: HarvestBatchResponse }) {
           </>
         }
       >
-        <div className="grid gap-4">
+        <div className="grid grid-cols-1 gap-4">
           {decision === "APPROVED" && outOfRange > 0 && (
             <Alert tone="warning" title="Lecturas fuera de objetivo">
               {outOfRange === 1 ? "Una lectura está" : `${outOfRange} lecturas están`} fuera del rango objetivo.

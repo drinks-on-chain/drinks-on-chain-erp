@@ -112,7 +112,7 @@ export function TreatmentForm({
         </>
       }
     >
-      <form id="tank-treatment-form" className="grid gap-5" onSubmit={submit} noValidate>
+      <form id="tank-treatment-form" className="grid grid-cols-1 gap-5" onSubmit={submit} noValidate>
         <Field label="Tipo de tratamiento" required error={errors.treatmentType}>
           <Select
             size="lg"

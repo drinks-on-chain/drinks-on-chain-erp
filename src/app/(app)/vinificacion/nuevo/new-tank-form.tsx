@@ -166,7 +166,7 @@ export function NewTankForm() {
 
   if (loading)
     return (
-      <div className="grid gap-6">
+      <div className="grid grid-cols-1 gap-6">
         {chrome}
         <Skeleton className="h-10 w-72" />
         <Skeleton shape="block" className="h-96" />
@@ -174,7 +174,7 @@ export function NewTankForm() {
     );
   if (failed)
     return (
-      <div className="grid gap-6">
+      <div className="grid grid-cols-1 gap-6">
         {chrome}
         <ErrorState
           description={errorMessage(harvest.error ?? terroirs.error ?? tanks.error)}
@@ -185,7 +185,7 @@ export function NewTankForm() {
     );
   if (!allowed)
     return (
-      <div className="grid gap-6">
+      <div className="grid grid-cols-1 gap-6">
         {chrome}
         <EmptyState
           title="Tu rol no puede llenar tanques"
@@ -200,7 +200,7 @@ export function NewTankForm() {
     );
   if (approved.length === 0)
     return (
-      <div className="grid gap-6">
+      <div className="grid grid-cols-1 gap-6">
         {chrome}
         <EmptyState
           title="No hay lotes aprobados para vinificar"
@@ -215,7 +215,7 @@ export function NewTankForm() {
     );
 
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       {chrome}
       <div>
         <h1 className="font-display text-3xl">Llenar tanque</h1>

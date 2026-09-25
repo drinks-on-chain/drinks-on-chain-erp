@@ -57,7 +57,7 @@ export function LabCertificateCard({ bottlingId, lotCode }: { bottlingId: string
   const canCreate = can(me.data, "lab.create");
 
   return (
-    <Card className="grid gap-4">
+    <Card className="grid grid-cols-1 gap-4">
       <CardHeader
         title="Certificado de laboratorio"
         description="Análisis del lote embotellado por un laboratorio acreditado (ISO 17025)."
@@ -178,7 +178,7 @@ function LabAnalysisSlideOver({
         </>
       }
     >
-      <form id="lab-form" noValidate onSubmit={submit} className="grid gap-6">
+      <form id="lab-form" noValidate onSubmit={submit} className="grid grid-cols-1 gap-6">
         <FormSection title="Laboratorio" columns={2}>
           <Field label="Laboratorio" required error={errors.certifiedLaboratoryName} className="md:col-span-2">
             <Input value={values.certifiedLaboratoryName} onChange={set("certifiedLaboratoryName")} />
@@ -201,7 +201,7 @@ function LabAnalysisSlideOver({
           ))}
         </FormSection>
         <FormSection title="Conformidad e informe">
-          <div className="grid gap-2">
+          <div className="grid grid-cols-1 gap-2">
             <Checkbox label="Conforme a normas SENASAG" {...check("conformsToSenasagStandards")} />
             <Checkbox label="Conforme a normas de la UE" {...check("conformsToEuStandards")} />
             <Checkbox label="Conforme a normas de EE. UU." {...check("conformsToUsaStandards")} />

@@ -15,7 +15,7 @@ export function BottlingSummary({ summary, className }: { summary: YieldSummary;
         title={<span id="bottling-summary-title">Conciliación de rendimiento</span>}
         description="De la uva a la botella, con los datos registrados en cada etapa."
       />
-      <ol className="grid gap-2" aria-label="Pasos de la conciliación">
+      <ol className="grid grid-cols-1 gap-2" aria-label="Pasos de la conciliación">
         {steps.map((s, i) => {
           const value = fmtStep(s.value, s.unit);
           return (

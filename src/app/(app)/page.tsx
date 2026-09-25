@@ -43,7 +43,7 @@ export default function DashboardPage() {
   const firstName = me.data?.fullName.replace(/^(Lic\.|Ing\.|Dr\.|Dra\.)\s+/, "").split(" ")[0];
 
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       <PageChrome
         breadcrumbs={[{ label: "Panel" }]}
         actions={

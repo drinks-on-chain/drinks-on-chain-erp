@@ -68,7 +68,7 @@ function WineryCard({ winery, editable }: { winery: WineryResponse; editable: bo
   };
 
   return (
-    <Card className="grid gap-4">
+    <Card className="grid grid-cols-1 gap-4">
       <CardHeader
         title="Datos de la bodega"
         description={editable ? undefined : "Solo la administración de la bodega puede editarlos."}
@@ -237,7 +237,7 @@ export function SettingsPage() {
 
   if (platform) {
     return (
-      <div className="grid gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={crumbs} />
         <EmptyState
           icon={<Building2 aria-hidden size={32} strokeWidth={1.5} />}
@@ -255,9 +255,9 @@ export function SettingsPage() {
   ) : undefined;
 
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       <PageChrome breadcrumbs={crumbs} actions={addAction} />
-      <header className="grid gap-1">
+      <header className="grid grid-cols-1 gap-1">
         <h1 className="font-display text-3xl">Ajustes de la bodega</h1>
         <p className="text-fg-muted">
           Datos de la bodega y su equipo.{" "}
@@ -286,7 +286,7 @@ export function SettingsPage() {
           <Skeleton className="h-96" />
         )}
 
-        <section className="grid gap-3" aria-labelledby="members-title">
+        <section className="grid grid-cols-1 gap-3" aria-labelledby="members-title">
           <h2 id="members-title" className="text-lg font-medium">
             Miembros
           </h2>

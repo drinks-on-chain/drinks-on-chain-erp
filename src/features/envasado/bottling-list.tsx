@@ -29,9 +29,9 @@ export function BottlingList() {
   ) : undefined;
 
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       <PageChrome breadcrumbs={[{ label: "Envasado y QR" }]} actions={newAction} />
-      <header className="grid gap-1">
+      <header className="grid grid-cols-1 gap-1">
         <h1 className="font-display text-3xl">Envasado y QR</h1>
         <p className="text-fg-muted">
           Cada embotellado cierra la producción de un lote, genera su código internacional y la huella que se ancla en

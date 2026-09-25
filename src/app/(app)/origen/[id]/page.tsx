@@ -50,7 +50,7 @@ export default function TerroirDetailPage({ params }: PageProps<"/origen/[id]">)
   const eligibility = t ? doEligibility(t) : null;
 
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       <PageChrome
         breadcrumbs={[{ label: "Origen y terroirs", href: "/origen" }, { label: t?.parcelName ?? "Terroir" }]}
         actions={
@@ -86,7 +86,7 @@ export default function TerroirDetailPage({ params }: PageProps<"/origen/[id]">)
           />
         )
       ) : !t || !eligibility ? (
-        <div className="grid gap-6" aria-busy="true">
+        <div className="grid grid-cols-1 gap-6" aria-busy="true">
           <Skeleton className="h-10 w-80" />
           <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
             <Skeleton shape="block" className="h-80" />
@@ -121,14 +121,14 @@ export default function TerroirDetailPage({ params }: PageProps<"/origen/[id]">)
             </Card>
 
             <div className="grid content-start gap-6">
-              <Card className="grid gap-3">
+              <Card className="grid grid-cols-1 gap-3">
                 <ParcelMap geometry={t.geographicPolygonGeojson} className="h-44" />
                 <p className="m-0 text-xs text-fg-subtle">
                   {t.geographicPolygonGeojson ? "Silueta del polígono GeoJSON registrado." : "Sin polígono registrado."}
                 </p>
               </Card>
 
-              <Card className="grid gap-3">
+              <Card className="grid grid-cols-1 gap-3">
                 <CardHeader title="Denominación de origen" />
                 <DoBadge {...t} explain className="justify-self-start" />
                 {!eligibility.eligible && (

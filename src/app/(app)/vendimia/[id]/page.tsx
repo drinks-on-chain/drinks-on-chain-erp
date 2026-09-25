@@ -52,7 +52,7 @@ export default function HarvestDetailPage({ params }: PageProps<"/vendimia/[id]"
   const notFound = batch.error instanceof ApiError && batch.error.isNotFound;
 
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       <PageChrome
         breadcrumbs={[{ label: "Vendimia y laboratorio", href: "/vendimia" }, { label: h?.harvestBatchCode ?? "Lote" }]}
         actions={fillAction}
@@ -77,7 +77,7 @@ export default function HarvestDetailPage({ params }: PageProps<"/vendimia/[id]"
           />
         )
       ) : !h ? (
-        <div className="grid gap-6" aria-busy="true">
+        <div className="grid grid-cols-1 gap-6" aria-busy="true">
           <Skeleton className="h-10 w-96" />
           <div className="grid gap-4 sm:grid-cols-3">
             {Array.from({ length: 3 }, (_, i) => (
@@ -88,7 +88,7 @@ export default function HarvestDetailPage({ params }: PageProps<"/vendimia/[id]"
         </div>
       ) : (
         <>
-          <header className="grid gap-2">
+          <header className="grid grid-cols-1 gap-2">
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="font-display text-3xl">{h.harvestBatchCode}</h1>
               <PhytoBadge status={h.phytosanitaryStatus} strong />
@@ -99,7 +99,7 @@ export default function HarvestDetailPage({ params }: PageProps<"/vendimia/[id]"
             </p>
           </header>
 
-          <section aria-labelledby="lab-title" className="grid gap-4">
+          <section aria-labelledby="lab-title" className="grid grid-cols-1 gap-4">
             <h2 id="lab-title" className="font-ui text-lg font-semibold">
               Análisis preliminar
             </h2>
@@ -110,7 +110,7 @@ export default function HarvestDetailPage({ params }: PageProps<"/vendimia/[id]"
             </div>
           </section>
 
-          <section aria-labelledby="phyto-title" className="grid gap-4">
+          <section aria-labelledby="phyto-title" className="grid grid-cols-1 gap-4">
             <h2 id="phyto-title" className="font-ui text-lg font-semibold">
               Dictamen fitosanitario
             </h2>

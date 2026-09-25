@@ -44,7 +44,7 @@ export function MocksPanel() {
 
   return (
     <main className="mx-auto grid max-w-(--doc-content-max) gap-6 p-6">
-      <header className="grid gap-1">
+      <header className="grid grid-cols-1 gap-1">
         <p className="text-2xs tracking-label text-fg-subtle uppercase">Solo desarrollo</p>
         <h1 className="font-display text-3xl">{es.mocks.title}</h1>
       </header>

@@ -54,7 +54,7 @@ export function UploadField({ label, folder, value, onChange, onBusyChange, help
 
   return (
     <Field label={label} help={help} error={error ?? undefined} htmlFor={id} disabled={disabled}>
-      <div className="grid gap-2">
+      <div className="grid grid-cols-1 gap-2">
         {value && (
           <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-bg-sunken px-3 py-2 text-sm">
             <FileText aria-hidden size={16} className="text-fg-muted" />

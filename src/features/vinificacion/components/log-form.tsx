@@ -105,7 +105,7 @@ export function LogForm({
         </>
       }
     >
-      <form id="tank-log-form" className="grid gap-5" onSubmit={submit} noValidate>
+      <form id="tank-log-form" className="grid grid-cols-1 gap-5" onSubmit={submit} noValidate>
         <Field
           label="Temperatura"
           required

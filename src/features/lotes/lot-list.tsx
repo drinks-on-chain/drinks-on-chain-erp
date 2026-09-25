@@ -42,9 +42,9 @@ export function LotList() {
   ) : undefined;
 
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       <PageChrome breadcrumbs={[{ label: "Lotes" }]} actions={register} />
-      <header className="grid gap-1">
+      <header className="grid grid-cols-1 gap-1">
         <h1 className="font-display text-3xl">Lotes</h1>
         <p className="text-fg-muted">
           Cada ingreso de uva, de la parcela a la botella: etapa actual, candados y código del lote embotellado.
@@ -55,7 +55,7 @@ export function LotList() {
         <ErrorState description={errorMessage(lots.error)} onRetry={() => lots.refetch()} retrying={lots.isFetching} />
       ) : (
         <>
-          <div className="grid gap-3">
+          <div className="grid grid-cols-1 gap-3">
             <PillGroup label="Filtrar por etapa" className="flex flex-wrap gap-2">
               <Pill
                 pressed={filters.stage === "todas"}

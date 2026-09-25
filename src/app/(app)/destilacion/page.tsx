@@ -69,7 +69,7 @@ export default function DestilacionPage() {
   ) : null;
 
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       <PageChrome breadcrumbs={[{ label: "Destilación y reposo" }]} actions={create} />
       <div>
         <h1 className="font-display text-3xl">Destilación y reposo</h1>

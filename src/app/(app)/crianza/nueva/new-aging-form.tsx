@@ -140,7 +140,7 @@ export function NewAgingForm() {
   );
 
   const shell = (body: ReactNode) => (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       {chrome}
       {body}
     </div>

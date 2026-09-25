@@ -108,7 +108,7 @@ export function BottlingForm({ preselect }: { preselect: SourcePreselect }) {
 
   if (me.data && !can(me.data, "bottling.create")) {
     return (
-      <div className="grid gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={CRUMBS} />
         <EmptyState
           title="Tu rol no puede cerrar producciones"
@@ -153,9 +153,9 @@ export function BottlingForm({ preselect }: { preselect: SourcePreselect }) {
   const serverDetails = Array.isArray(serverError?.details) ? (serverError.details as unknown[]).map(String) : [];
 
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       <PageChrome breadcrumbs={CRUMBS} />
-      <header className="grid gap-1">
+      <header className="grid grid-cols-1 gap-1">
         <h1 className="font-display text-3xl">Nuevo embotellado</h1>
         <p className="text-fg-muted">
           Cierra la producción de una crianza liberada o de un singani con el reposo cumplido y genera la identidad del

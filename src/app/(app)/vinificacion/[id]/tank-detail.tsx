@@ -57,7 +57,7 @@ export function TankDetail({ id }: { id: string }) {
   if (tank.isError) {
     const notFound = tank.error instanceof ApiError && tank.error.isNotFound;
     return (
-      <div className="grid gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={breadcrumbs} />
         {notFound ? (
           <EmptyState
@@ -82,7 +82,7 @@ export function TankDetail({ id }: { id: string }) {
 
   if (!t) {
     return (
-      <div className="grid gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={breadcrumbs} />
         <Skeleton className="h-10 w-64" />
         <div className="grid gap-6 lg:grid-cols-2">
@@ -121,7 +121,7 @@ export function TankDetail({ id }: { id: string }) {
   ) : null;
 
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       <PageChrome breadcrumbs={breadcrumbs} actions={primary} />
 
       <div className="flex flex-wrap items-center gap-3">
@@ -144,7 +144,7 @@ export function TankDetail({ id }: { id: string }) {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <Card className="grid gap-4 p-5">
           <CardHeader title="Tanque y lote" />
-          <div className="grid gap-1">
+          <div className="grid grid-cols-1 gap-1">
             <div className="flex justify-between text-sm text-fg-muted">
               <span>Llenado</span>
               <span className="tabular-nums">

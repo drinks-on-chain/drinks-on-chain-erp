@@ -59,7 +59,7 @@ export default function VinificacionPage() {
   ) : null;
 
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       <PageChrome breadcrumbs={[{ label: "Vinificación" }]} actions={newTank} />
 
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -95,7 +95,7 @@ export default function VinificacionPage() {
         />
       ) : (
         <>
-          <div className="grid gap-3">
+          <div className="grid grid-cols-1 gap-3">
             <PillGroup label="Filtrar por estado" className="flex flex-wrap gap-2">
               <Pill pressed={filter.status === "ALL"} onClick={() => setFilter((f) => ({ ...f, status: "ALL" }))}>
                 Todos · {count({ status: "ALL" })}

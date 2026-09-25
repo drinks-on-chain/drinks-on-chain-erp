@@ -11,11 +11,11 @@ import { WeighInForm } from "./weigh-in-form";
 export function WeighInScreen({ initialTerroirId }: { initialTerroirId?: string }) {
   const me = useMe();
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       <PageChrome
         breadcrumbs={[{ label: "Vendimia y laboratorio", href: "/vendimia" }, { label: "Registrar ingreso" }]}
       />
-      <header className="grid gap-1">
+      <header className="grid grid-cols-1 gap-1">
         <h1 className="font-display text-3xl">Registrar ingreso</h1>
         <p className="m-0 text-sm text-fg-muted">Pesaje y análisis preliminar de la uva que llega a la bodega.</p>
       </header>

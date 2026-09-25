@@ -43,7 +43,7 @@ export function DistillationDetail({ id }: { id: string }) {
     const notFound =
       production.error instanceof ApiError && (production.error.isNotFound || production.error.isForbidden);
     return (
-      <div className="grid gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={breadcrumbs} />
         {notFound ? (
           <EmptyState
@@ -68,7 +68,7 @@ export function DistillationDetail({ id }: { id: string }) {
 
   if (!p) {
     return (
-      <div className="grid gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={breadcrumbs} />
         <Skeleton className="h-10 w-72" />
         <div className="grid gap-6 lg:grid-cols-2">
@@ -91,7 +91,7 @@ export function DistillationDetail({ id }: { id: string }) {
         : undefined;
 
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       <PageChrome breadcrumbs={breadcrumbs} />
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="font-display text-3xl">{name ?? "Destilación"}</h1>

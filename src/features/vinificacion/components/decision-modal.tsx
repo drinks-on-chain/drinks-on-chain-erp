@@ -80,7 +80,7 @@ export function DecisionModal<V extends string>({
         </>
       }
     >
-      <div className="grid gap-4">
+      <div className="grid grid-cols-1 gap-4">
         <div role="group" aria-label="Opciones" className="grid gap-3 sm:grid-cols-2">
           {options.map((o) => {
             const selected = o.value === value;

@@ -60,7 +60,7 @@ export default function CrianzaPage() {
   ) : null;
 
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       <PageChrome breadcrumbs={[{ label: "Crianza" }]} actions={start} />
       <div>
         <h1 className="font-display text-3xl">Barricas y crianza</h1>

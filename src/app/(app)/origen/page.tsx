@@ -42,10 +42,10 @@ export default function TerroirDirectoryPage() {
   };
 
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       <PageChrome breadcrumbs={[{ label: "Origen y terroirs" }]} actions={newAction} />
 
-      <header className="grid gap-1">
+      <header className="grid grid-cols-1 gap-1">
         <h1 className="font-display text-3xl">Origen y terroirs</h1>
         {terroirs.data && (
           <p className="text-sm text-fg-muted">

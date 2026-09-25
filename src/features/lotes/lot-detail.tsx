@@ -39,7 +39,7 @@ export function LotDetail({ id }: { id: string }) {
 
   if (lots.isError) {
     return (
-      <div className="grid gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={crumbs} />
         <ErrorState description={errorMessage(lots.error)} onRetry={() => lots.refetch()} retrying={lots.isFetching} />
       </div>
@@ -47,7 +47,7 @@ export function LotDetail({ id }: { id: string }) {
   }
   if (lots.isPending || !lots.chain) {
     return (
-      <div className="grid gap-6" aria-busy="true">
+      <div className="grid grid-cols-1 gap-6" aria-busy="true">
         <PageChrome breadcrumbs={crumbs} />
         <Skeleton className="h-10 w-72" />
         <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
@@ -59,7 +59,7 @@ export function LotDetail({ id }: { id: string }) {
   }
   if (!lot) {
     return (
-      <div className="grid gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={crumbs} />
         <EmptyState
           title="Lote no encontrado"
@@ -86,7 +86,7 @@ export function LotDetail({ id }: { id: string }) {
   const canBottle = !!ready && can(me.data, "bottling.create");
 
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       <PageChrome
         breadcrumbs={crumbs}
         actions={
@@ -104,12 +104,12 @@ export function LotDetail({ id }: { id: string }) {
       </header>
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <Card className="grid gap-4">
+        <Card className="grid grid-cols-1 gap-4">
           <CardHeader title="Recorrido del lote" description="De la parcela a la botella." />
           <LotTimeline steps={steps} />
         </Card>
 
-        <div className="grid gap-6">
+        <div className="grid grid-cols-1 gap-6">
           {lock && !lock.released ? (
             <Card className="border-warning grid gap-2" aria-label="Candado del lote">
               <span className="text-warning inline-flex items-center gap-2 text-sm font-medium">
@@ -133,7 +133,7 @@ export function LotDetail({ id }: { id: string }) {
             </Alert>
           ) : null}
 
-          <Card className="grid gap-4">
+          <Card className="grid grid-cols-1 gap-4">
             <CardHeader title="Datos del lote" />
             <KeyValueList
               items={[

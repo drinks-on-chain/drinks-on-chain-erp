@@ -78,7 +78,7 @@ function TraceabilityCard({ b }: { b: BottlingBatchResponse }) {
   });
 
   return (
-    <Card className="grid gap-4">
+    <Card className="grid grid-cols-1 gap-4">
       <CardHeader title="Trazabilidad del lote" description="De la parcela a la botella." />
       {dag.isPending ? (
         <Skeleton className="h-56" />
@@ -104,7 +104,7 @@ export function BottlingDetail({ id, justCreated }: { id: string; justCreated: b
   if (bottling.isError) {
     const notFound = bottling.error instanceof ApiError && bottling.error.isNotFound;
     return (
-      <div className="grid gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={crumbs} />
         {notFound ? (
           <EmptyState
@@ -129,7 +129,7 @@ export function BottlingDetail({ id, justCreated }: { id: string; justCreated: b
 
   if (!b) {
     return (
-      <div className="grid gap-6" aria-busy="true">
+      <div className="grid grid-cols-1 gap-6" aria-busy="true">
         <PageChrome breadcrumbs={crumbs} />
         <Skeleton className="h-10 w-80" />
         <div className="grid gap-6 lg:grid-cols-2">
@@ -147,7 +147,7 @@ export function BottlingDetail({ id, justCreated }: { id: string; justCreated: b
       : null;
 
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       <PageChrome breadcrumbs={crumbs} />
       {justCreated ? (
         <SealHeader b={b} />
@@ -159,8 +159,8 @@ export function BottlingDetail({ id, justCreated }: { id: string; justCreated: b
       )}
 
       <div className="grid items-start gap-6 lg:grid-cols-2">
-        <div className="grid gap-6">
-          <Card className="grid gap-4">
+        <div className="grid grid-cols-1 gap-6">
+          <Card className="grid grid-cols-1 gap-4">
             <CardHeader title="Embotellado" />
             <KeyValueList
               items={[
@@ -192,7 +192,7 @@ export function BottlingDetail({ id, justCreated }: { id: string; justCreated: b
             />
           </Card>
 
-          <Card className="grid gap-4">
+          <Card className="grid grid-cols-1 gap-4">
             <CardHeader
               title="Identidad en cadena"
               description="La huella de los datos del lote se ancla en Stellar (testnet)."
@@ -228,7 +228,7 @@ export function BottlingDetail({ id, justCreated }: { id: string; justCreated: b
           <LabCertificateCard bottlingId={b.id} lotCode={b.internationalLotCode} />
         </div>
 
-        <div className="grid gap-6">
+        <div className="grid grid-cols-1 gap-6">
           <QrExportCard lotCode={b.internationalLotCode} qrBatchUrl={b.qrBatchUrl} bottles={b.totalBottlesPackaged} />
           <TraceabilityCard b={b} />
         </div>
