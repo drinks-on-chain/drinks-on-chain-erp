@@ -2,19 +2,10 @@
 // Las cifras se escriben en es-BO ("22,4") o con punto ("22.4"); las fechas se tratan en UTC,
 // igual que las muestra src/lib/format.ts.
 
-/**
- * Convierte lo que escribe la persona en un número. Acepta coma o punto decimal y puntos de
- * miles ("12.100,5"). Devuelve null si está vacío o no es un número.
- */
-export function parseDecimal(input: string): number | null {
-  let s = input.trim().replace(/\s/g, "");
-  if (s === "") return null;
-  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
-  else if ((s.match(/\./g) ?? []).length > 1) s = s.replace(/\./g, "");
-  if (!/^-?\d+(\.\d+)?$/.test(s) && !/^-?\.\d+$/.test(s)) return null;
-  const n = Number(s);
-  return Number.isFinite(n) ? n : null;
-}
+// Una sola lectura de cifras para todo el ERP (miles con punto en es-BO: "12.100" = 12100).
+import { parseDecimal } from "@/lib/format";
+
+export { parseDecimal };
 
 /** "2026-09-25" (UTC) para un `<input type="date">`. */
 export const toDateInput = (d: Date) => d.toISOString().slice(0, 10);

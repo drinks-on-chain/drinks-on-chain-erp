@@ -62,7 +62,7 @@ export function LogForm({
         id: tankId,
         body: {
           temperatureCelsius: temp,
-          specificGravity: parseDecimal(values.specificGravity),
+          specificGravity: parseDecimal(values.specificGravity, { grouping: false }),
           phValue: parseDecimal(values.phValue),
           co2Observations: values.co2Observations.trim() || null,
           recordedAt: dateTimeInputToIso(values.recordedAt),

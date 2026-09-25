@@ -17,18 +17,10 @@ export type BottlingFormValues = {
 export type BottlingField = keyof BottlingFormValues | "source";
 export type BottlingErrors = Partial<Record<BottlingField, string>>;
 
-/**
- * Cifra escrita a mano: admite "1.500" o "1 500" (miles) y "40,5" (decimal es-BO) además
- * de "40.5". Devuelve null si está vacía o no es un número.
- */
-export function parseDecimal(raw: string): number | null {
-  let s = raw.trim().replace(/\s+/g, "");
-  if (!s) return null;
-  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
-  else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
-  const n = Number(s);
-  return Number.isFinite(n) ? n : null;
-}
+// Una sola lectura de cifras para todo el ERP (miles con punto en es-BO).
+import { parseDecimal } from "@/lib/format";
+
+export { parseDecimal };
 
 /** Mensaje del candado de una fuente (ámbar, con motivo y fecha: 01-erp §11). */
 export function lockMessage(source: BottlingSource): string {
