@@ -1,3 +1,8 @@
+import {
+  DO_MIN_ALTITUDE_MASL as DO_MIN,
+  DO_VARIETY as DO_VARIETY_NAME,
+  doEligibility as baseDoEligibility,
+} from "@/features/origen/do-eligibility";
 import type {
   DestinationType,
   FermentationLog,
@@ -157,28 +162,25 @@ export function filterTanks<T extends { status: TankStatus; destination: Destina
 
 // ---------- Aptitud D.O. Singani ----------
 
-export const DO_VARIETY = "Moscatel de Alejandría";
-export const DO_MIN_ALTITUDE_M = 1600;
+// La regla vive en features/origen/do-eligibility (≥ 1.600 m, como el backend y 09 §4);
+// aquí solo se traduce a frases para explicar por qué no se ofrece la destilación.
+export { DO_VARIETY, DO_MIN_ALTITUDE_MASL as DO_MIN_ALTITUDE_M } from "@/features/origen/do-eligibility";
 
 export type DoEligibility = { eligible: boolean; reasons: string[] };
 
-/**
- * Aptitud de la parcela para Singani D.O. (03 §4, 1B; 09 §4): Moscatel de Alejandría,
- * más de 1.600 m s. n. m. y parcela certificada como apta (`isDoEligible`).
- */
 export function doEligibility(
   t: Pick<TerroirResponse, "varietyName" | "altitudeMasl" | "isDoEligible"> | undefined,
 ): DoEligibility {
   if (!t) return { eligible: false, reasons: ["No se encontró la parcela de origen del lote."] };
-  const reasons: string[] = [];
-  if (t.varietyName.trim().toLowerCase() !== DO_VARIETY.toLowerCase())
-    reasons.push(`La D.O. Singani exige ${DO_VARIETY}; este lote es ${t.varietyName}.`);
-  if (!(t.altitudeMasl > DO_MIN_ALTITUDE_M))
-    reasons.push(
-      `La parcela está a ${t.altitudeMasl.toLocaleString("es-BO")} m; la D.O. exige más de ${DO_MIN_ALTITUDE_M.toLocaleString("es-BO")} m s. n. m.`,
-    );
-  if (!t.isDoEligible) reasons.push("La parcela no está certificada como apta para la D.O.");
-  return { eligible: reasons.length === 0, reasons };
+  const result = baseDoEligibility(t);
+  const reasons = result.reasons.map((r) =>
+    r === "variety"
+      ? `La D.O. Singani exige ${DO_VARIETY_NAME}; este lote es ${t.varietyName}.`
+      : r === "altitude"
+        ? `La parcela está a ${t.altitudeMasl.toLocaleString("es-BO")} m; la D.O. exige al menos ${DO_MIN.toLocaleString("es-BO")} m s. n. m.`
+        : "La parcela no está certificada como apta para la D.O.",
+  );
+  return { eligible: result.eligible, reasons };
 }
 
 // ---------- Siguiente paso tras la fermentación ----------
