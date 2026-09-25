@@ -16,6 +16,16 @@ Entra con `enologa@cintiviejo.test` / `demo1234` o elige usuario en `/__mocks`.
 
 Contra el backend de desarrollo: `NEXT_PUBLIC_MOCKS=0` y `NEXT_PUBLIC_API_URL=https://136.243.223.39.sslip.io`.
 
+Prueba de integración contra el backend real (no corre en CI):
+
+```bash
+E2E_REAL_API=https://136.243.223.39.sslip.io E2E_PORT=3150 pnpm e2e --project=escritorio
+```
+
+Con `E2E_REAL_EMAIL` y `E2E_REAL_PASSWORD` (usuario de bodega del backend) prueba también el login y el directorio de terroirs.
+
+Publicado en Vercel (con datos de prueba): https://drinks-on-chain-erp.vercel.app · panel de usuarios de demo en `/__mocks`.
+
 ## Estructura
 
 | Carpeta                      | Qué hay                                                                                                  |
