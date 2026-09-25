@@ -299,7 +299,7 @@ export function NewAgingForm() {
               <>
                 <div className="flex items-center gap-3">
                   <Lock aria-hidden size={28} strokeWidth={1.5} className="text-warning" />
-                  <span className="font-display text-3xl text-warning" data-testid="unlock-preview">
+                  <span className="font-display text-3xl text-warning-text" data-testid="unlock-preview">
                     {fmtDate(unlock.toISOString())}
                   </span>
                 </div>

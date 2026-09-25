@@ -116,7 +116,7 @@ export function LotDetail({ id }: { id: string }) {
         <div className="grid grid-cols-1 gap-6">
           {lock && !lock.released ? (
             <Card className="border-warning grid gap-2" aria-label="Candado del lote">
-              <span className="text-warning inline-flex items-center gap-2 text-sm font-medium">
+              <span className="text-warning-text inline-flex items-center gap-2 text-sm font-medium">
                 <Lock aria-hidden size={16} />
                 {lock.kind === "crianza" ? "Candado de crianza" : "Reposo obligatorio de 180 días"}
               </span>
