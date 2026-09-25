@@ -21,7 +21,9 @@ function trackErrors(page: Page, expected: RegExp[] = []) {
 }
 
 // Un embotellado sin certificado responde 404 en su certificado: es el estado "sin certificado".
-const NO_LAB = /^404 \/v1\/lab-analyses\/batch\async function login(page: Page, email: string) {
+const NO_LAB = /^404 \/v1\/lab-analyses\/batch\//;
+
+async function login(page: Page, email: string) {
   await page.goto("/login");
   await page.getByLabel("Correo electrónico").fill(email);
   await page.getByLabel("Contraseña").fill("demo1234");
