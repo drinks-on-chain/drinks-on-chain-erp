@@ -29,6 +29,7 @@ export function TrendSparkline({
   alert?: boolean;
   className?: string;
 }) {
+  const u = unit ? ` ${unit}` : "";
   const data = [...points].sort((a, b) => a.at.localeCompare(b.at));
   const last = data.at(-1);
   const values = data.map((p) => p.value).concat(threshold !== undefined ? [threshold] : []);
@@ -40,7 +41,7 @@ export function TrendSparkline({
   const path = data.map((p, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(" ");
   const first = data[0];
   const summary = last
-    ? `${label}: última ${fmtNumber(last.value, digits)} ${unit}${first && first !== last ? `, desde ${fmtNumber(first.value, digits)} ${unit}` : ""}`
+    ? `${label}: última ${fmtNumber(last.value, digits)}${u}${first && first !== last ? `, desde ${fmtNumber(first.value, digits)}${u}` : ""}`
     : `${label}: sin lecturas`;
 
   return (
@@ -48,7 +49,7 @@ export function TrendSparkline({
       <figcaption className="flex items-baseline justify-between gap-2 text-sm text-fg-muted">
         <span>{label}</span>
         <span className={cn("text-lg font-medium tabular-nums", alert ? "text-warning" : "text-fg")}>
-          {last ? `${fmtNumber(last.value, digits)} ${unit}` : "—"}
+          {last ? `${fmtNumber(last.value, digits)}${u}` : "—"}
         </span>
       </figcaption>
       <svg viewBox={`0 0 ${W} ${H}`} className="h-14 w-full" role="img" aria-label={summary} preserveAspectRatio="none">
