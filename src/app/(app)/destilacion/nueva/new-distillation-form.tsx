@@ -163,6 +163,10 @@ export function NewDistillationForm() {
           ) : null
         }
       />
+      <div>
+        <h1 className="font-display text-3xl">Registrar destilación</h1>
+        <p className="m-0 text-fg-muted">Cortes del alambique y datos del proceso. Al guardar empieza el reposo.</p>
+      </div>
       {body}
     </div>
   );
@@ -203,10 +207,6 @@ export function NewDistillationForm() {
 
   return shell(
     <>
-      <div>
-        <h1 className="font-display text-3xl">Registrar destilación</h1>
-        <p className="m-0 text-fg-muted">Cortes del alambique y datos del proceso. Al guardar empieza el reposo.</p>
-      </div>
       {preselectedInvalid && (
         <Alert tone="warning" title="Ese tanque no puede ir al alambique">
           Su destino no es destilación (singani). Elige otro tanque.

@@ -6,6 +6,7 @@ import { Alert, Button, Field, Modal, ModalClose, Textarea, toast } from "@drink
 import { UploadField } from "@/features/origen/components/upload-field";
 import { errorMessage } from "@/lib/api/errors";
 import { useUpdatePhytoStatus } from "@/lib/erp/hooks";
+import { useReturnFocus } from "@/lib/use-return-focus";
 import { outOfRangeCount } from "../lab-targets";
 import { availableDecisions, PHYTO_DECISIONS, type PhytoDecision } from "../phyto";
 
@@ -20,6 +21,7 @@ export function PhytoDecisionPanel({ batch }: { batch: HarvestBatchResponse }) {
   const [notes, setNotes] = useState("");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useReturnFocus(decision !== null);
 
   const decisions = availableDecisions(batch.phytosanitaryStatus);
   const outOfRange = outOfRangeCount(batch);

@@ -306,7 +306,8 @@ export function validateLog(v: LogValues, today: Date): FieldErrors<LogField> {
   else if (temp < -10 || temp > 50) e.temperatureCelsius = "Revisa la temperatura: debe estar entre −10 y 50 °C.";
 
   if (v.specificGravity.trim()) {
-    const sg = parseDecimal(v.specificGravity);
+    // La densidad lleva tres decimales: "1.048" es 1,048, no mil cuarenta y ocho.
+    const sg = parseDecimal(v.specificGravity, { grouping: false });
     if (sg === null || sg < 0.9 || sg > 1.2) e.specificGravity = "La densidad va de 0,900 a 1,200 (p. ej. 1,048).";
   }
   if (v.phValue.trim()) {

@@ -5,6 +5,7 @@ import { Wallet } from "lucide-react";
 import type { BottlingBatchResponse, WineryResponse } from "@drinks-on-chain/mocks";
 import { Alert, Badge, Card, DataTable, EmptyState, ErrorState, KeyValueList, Skeleton } from "@drinks-on-chain/ui";
 import { PageChrome } from "@/components/page-chrome";
+import { ScreenTitle } from "@/components/screen-title";
 import { errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
 import { useBottlings, useWinery } from "@/lib/erp/hooks";
@@ -85,6 +86,7 @@ export function AccountPage() {
     return (
       <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={crumbs} />
+        <ScreenTitle>Cuenta Stellar</ScreenTitle>
         <EmptyState
           icon={<Wallet aria-hidden size={32} strokeWidth={1.5} />}
           title="Sin bodega activa"

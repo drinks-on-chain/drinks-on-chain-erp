@@ -16,6 +16,7 @@ import {
 } from "@drinks-on-chain/ui";
 import { LotStatusBadge } from "@/components/lot-status-badge";
 import { PageChrome } from "@/components/page-chrome";
+import { ScreenTitle } from "@/components/screen-title";
 import { errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
 import { useLotViews } from "@/lib/erp/hooks";
@@ -41,6 +42,7 @@ export function LotDetail({ id }: { id: string }) {
     return (
       <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={crumbs} />
+        <ScreenTitle>Lote</ScreenTitle>
         <ErrorState description={errorMessage(lots.error)} onRetry={() => lots.refetch()} retrying={lots.isFetching} />
       </div>
     );
@@ -49,6 +51,7 @@ export function LotDetail({ id }: { id: string }) {
     return (
       <div className="grid grid-cols-1 gap-6" aria-busy="true">
         <PageChrome breadcrumbs={crumbs} />
+        <ScreenTitle busy>Lote</ScreenTitle>
         <Skeleton className="h-10 w-72" />
         <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
           <Skeleton className="h-96" />
@@ -61,6 +64,7 @@ export function LotDetail({ id }: { id: string }) {
     return (
       <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={crumbs} />
+        <ScreenTitle>Lote</ScreenTitle>
         <EmptyState
           title="Lote no encontrado"
           description="No existe o pertenece a otra bodega."

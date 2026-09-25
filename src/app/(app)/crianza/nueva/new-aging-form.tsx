@@ -142,6 +142,12 @@ export function NewAgingForm() {
   const shell = (body: ReactNode) => (
     <div className="grid grid-cols-1 gap-6">
       {chrome}
+      <div>
+        <h1 className="font-display text-3xl">Iniciar crianza</h1>
+        <p className="m-0 text-fg-muted">
+          El vino queda bloqueado hasta la fecha de liberación; no se podrá embotellar antes.
+        </p>
+      </div>
       {body}
     </div>
   );
@@ -182,12 +188,6 @@ export function NewAgingForm() {
 
   return shell(
     <>
-      <div>
-        <h1 className="font-display text-3xl">Iniciar crianza</h1>
-        <p className="m-0 text-fg-muted">
-          El vino queda bloqueado hasta la fecha de liberación; no se podrá embotellar antes.
-        </p>
-      </div>
       {preselectedInvalid && (
         <Alert tone="warning" title="Ese tanque no puede pasar a crianza">
           No tiene destino crianza (vino) o ya inició su crianza. Elige otro tanque.

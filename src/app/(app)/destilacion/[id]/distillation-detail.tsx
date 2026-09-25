@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Badge, Button, Card, CardHeader, EmptyState, ErrorState, KeyValueList, Skeleton } from "@drinks-on-chain/ui";
 import { PageChrome } from "@/components/page-chrome";
+import { ScreenTitle } from "@/components/screen-title";
 import { CountdownLock } from "@/features/crianza/components/countdown-lock";
 import { CutsSummary } from "@/features/destilacion/components/cuts-summary";
 import {
@@ -45,6 +46,7 @@ export function DistillationDetail({ id }: { id: string }) {
     return (
       <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={breadcrumbs} />
+        <ScreenTitle>Destilación</ScreenTitle>
         {notFound ? (
           <EmptyState
             title="Destilación no disponible"
@@ -70,6 +72,7 @@ export function DistillationDetail({ id }: { id: string }) {
     return (
       <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={breadcrumbs} />
+        <ScreenTitle busy>Destilación</ScreenTitle>
         <Skeleton className="h-10 w-72" />
         <div className="grid gap-6 lg:grid-cols-2">
           <Skeleton shape="block" className="h-80" />

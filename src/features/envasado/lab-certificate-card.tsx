@@ -24,6 +24,7 @@ import { useMe } from "@/lib/auth/hooks";
 import { useCreateLabAnalysis, useLabAnalysis, useUpload } from "@/lib/erp/hooks";
 import { can } from "@/lib/erp/permissions";
 import { fmtDate, fmtNumber } from "@/lib/format";
+import { useReturnFocus } from "@/lib/use-return-focus";
 import { ExternalLink } from "@/features/cuenta/stellar";
 import { FileInput, fileTooBig } from "./file-input";
 import { emptyLabForm, LAB_NUMBER_FIELDS, validateLab, type LabErrors, type LabFormValues } from "./lab-form-model";
@@ -53,6 +54,7 @@ export function LabCertificateCard({ bottlingId, lotCode }: { bottlingId: string
   const me = useMe();
   const lab = useLabAnalysis(bottlingId);
   const [open, setOpen] = useState(false);
+  useReturnFocus(open);
   const missing = lab.error instanceof ApiError && lab.error.isNotFound;
   const canCreate = can(me.data, "lab.create");
 

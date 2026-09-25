@@ -24,7 +24,11 @@ const mine = <T extends { wineryId: string }>(xs: T[]) => xs.filter((x) => x.win
 describe("parseDecimal", () => {
   it("acepta coma, punto y miles", () => {
     expect(parseDecimal("22,4")).toBe(22.4);
-    expect(parseDecimal("1.048")).toBe(1.048);
+    // En es-BO el punto separa miles: "12.100" L son doce mil cien.
+    expect(parseDecimal("12.100")).toBe(12100);
+    expect(parseDecimal("1.048")).toBe(1048);
+    // Las densidades (tres decimales) se leen sin agrupar.
+    expect(parseDecimal("1.048", { grouping: false })).toBe(1.048);
     expect(parseDecimal("12.100,5")).toBe(12100.5);
     expect(parseDecimal("1.200.000")).toBe(1200000);
     expect(parseDecimal(" 8300 ")).toBe(8300);
