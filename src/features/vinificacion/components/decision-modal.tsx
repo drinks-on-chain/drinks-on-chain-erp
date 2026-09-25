@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { Button, Checkbox, Modal, cn, focusRing } from "@drinks-on-chain/ui";
+import { useReturnFocus } from "@/lib/use-return-focus";
 
 export type DecisionOption<V extends string> = {
   value: V;
@@ -45,6 +46,7 @@ export function DecisionModal<V extends string>({
   error,
 }: DecisionModalProps<V>) {
   const [value, setValue] = useState<V | null>(null);
+  useReturnFocus(open);
   const [acknowledged, setAcknowledged] = useState(false);
   const chosen = options.find((o) => o.value === value && !o.disabled);
 

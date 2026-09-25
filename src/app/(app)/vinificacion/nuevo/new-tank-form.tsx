@@ -164,10 +164,20 @@ export function NewTankForm() {
     />
   );
 
+  const header = (
+    <div>
+      <h1 className="font-display text-3xl">Llenar tanque</h1>
+      <p className="m-0 text-fg-muted">
+        Registra el tanque y su destino técnico. El destino se fija aquí y no se puede cambiar después.
+      </p>
+    </div>
+  );
+
   if (loading)
     return (
       <div className="grid grid-cols-1 gap-6">
         {chrome}
+        {header}
         <Skeleton className="h-10 w-72" />
         <Skeleton shape="block" className="h-96" />
       </div>
@@ -176,6 +186,7 @@ export function NewTankForm() {
     return (
       <div className="grid grid-cols-1 gap-6">
         {chrome}
+        {header}
         <ErrorState
           description={errorMessage(harvest.error ?? terroirs.error ?? tanks.error)}
           onRetry={() => Promise.all([harvest.refetch(), terroirs.refetch(), tanks.refetch()])}
@@ -187,6 +198,7 @@ export function NewTankForm() {
     return (
       <div className="grid grid-cols-1 gap-6">
         {chrome}
+        {header}
         <EmptyState
           title="Tu rol no puede llenar tanques"
           description="Llenar un tanque y fijar su destino es tarea de enología o de la administración de la bodega."
@@ -202,6 +214,7 @@ export function NewTankForm() {
     return (
       <div className="grid grid-cols-1 gap-6">
         {chrome}
+        {header}
         <EmptyState
           title="No hay lotes aprobados para vinificar"
           description="Solo entran al tanque los lotes de vendimia con dictamen fitosanitario aprobado."
@@ -217,12 +230,7 @@ export function NewTankForm() {
   return (
     <div className="grid grid-cols-1 gap-6">
       {chrome}
-      <div>
-        <h1 className="font-display text-3xl">Llenar tanque</h1>
-        <p className="m-0 text-fg-muted">
-          Registra el tanque y su destino técnico. El destino se fija aquí y no se puede cambiar después.
-        </p>
-      </div>
+      {header}
 
       {preselectedNotApproved && (
         <Alert tone="warning" title="Ese lote no se puede vinificar">

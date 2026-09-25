@@ -24,6 +24,7 @@ import {
   toast,
 } from "@drinks-on-chain/ui";
 import { PageChrome } from "@/components/page-chrome";
+import { ScreenTitle } from "@/components/screen-title";
 import { ApiError, errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
 import { useCreateBottling, useLotViews, useUpload } from "@/lib/erp/hooks";
@@ -31,6 +32,7 @@ import { PRODUCT_TYPE } from "@/lib/erp/labels";
 import { can } from "@/lib/erp/permissions";
 import { today } from "@/lib/erp/today";
 import { fmtDate, fmtNumber } from "@/lib/format";
+import { useReturnFocus } from "@/lib/use-return-focus";
 import {
   lockMessage,
   parseDecimal,
@@ -76,6 +78,7 @@ export function BottlingForm({ preselect }: { preselect: SourcePreselect }) {
   const [errors, setErrors] = useState<BottlingErrors>({});
   const [serverError, setServerError] = useState<ApiError | null>(null);
   const [confirming, setConfirming] = useState(false);
+  useReturnFocus(confirming);
   const [done, setDone] = useState(false);
   const [labelError, setLabelError] = useState<string | null>(null);
 
@@ -101,6 +104,7 @@ export function BottlingForm({ preselect }: { preselect: SourcePreselect }) {
     return (
       <div className="grid min-h-80 place-items-center" aria-busy="true">
         <PageChrome breadcrumbs={CRUMBS} />
+        <ScreenTitle>Nuevo embotellado</ScreenTitle>
         <Spinner label="Generando la identidad del lote…" />
       </div>
     );
@@ -110,6 +114,7 @@ export function BottlingForm({ preselect }: { preselect: SourcePreselect }) {
     return (
       <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={CRUMBS} />
+        <ScreenTitle>Nuevo embotellado</ScreenTitle>
         <EmptyState
           title="Tu rol no puede cerrar producciones"
           description="El embotellado lo registran la administración y la enología de la bodega."

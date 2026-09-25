@@ -37,7 +37,8 @@ export function useDashboard() {
     isPending: lots.isPending || details.some((d) => d.isPending),
     isError: lots.isError || details.some((d) => d.isError),
     error: lots.error ?? details.find((d) => d.error)?.error ?? null,
-    isFetching: lots.isFetching,
-    refetch: lots.refetch,
+    isFetching: lots.isFetching || details.some((d) => d.isFetching),
+    // Reintenta también el detalle de los tanques: si solo fallaba ese, el panel no salía del error.
+    refetch: () => Promise.all([lots.refetch(), ...details.map((d) => d.refetch())]),
   };
 }

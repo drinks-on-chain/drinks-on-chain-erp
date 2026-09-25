@@ -19,15 +19,18 @@ import {
   Modal,
   Select,
   Skeleton,
+  TextLink,
   toast,
 } from "@drinks-on-chain/ui";
 import { PageChrome } from "@/components/page-chrome";
+import { ScreenTitle } from "@/components/screen-title";
 import { ApiError, errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
 import { useCreateMember, useMembers, useUpdateWinery, useWinery } from "@/lib/erp/hooks";
 import { BEVERAGE_CATEGORY, CERTIFICATION_STATUS } from "@/lib/erp/labels";
 import { can, roleLabel } from "@/lib/erp/permissions";
 import { fmtDate } from "@/lib/format";
+import { useReturnFocus } from "@/lib/use-return-focus";
 import {
   MEMBER_ROLE_OPTIONS,
   MIN_PASSWORD,
@@ -140,6 +143,7 @@ function WineryCard({ winery, editable }: { winery: WineryResponse; editable: bo
 
 function AddMemberModal({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const create = useCreateMember();
+  useReturnFocus(open);
   const [values, setValues] = useState<MemberValues>(emptyMember);
   const [errors, setErrors] = useState<MemberErrors>({});
   const field = (k: Exclude<keyof MemberValues, "memberRole">) => ({
@@ -239,6 +243,7 @@ export function SettingsPage() {
     return (
       <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={crumbs} />
+        <ScreenTitle>Ajustes de la bodega</ScreenTitle>
         <EmptyState
           icon={<Building2 aria-hidden size={32} strokeWidth={1.5} />}
           title="Sin bodega activa"
@@ -261,9 +266,9 @@ export function SettingsPage() {
         <h1 className="font-display text-3xl">Ajustes de la bodega</h1>
         <p className="text-fg-muted">
           Datos de la bodega y su equipo.{" "}
-          <Link href="/cuenta" className="text-accent-text hover:underline">
-            Ver la cuenta Stellar
-          </Link>
+          <TextLink asChild variant="inline">
+            <Link href="/cuenta">Ver la cuenta Stellar</Link>
+          </TextLink>
         </p>
       </header>
 

@@ -39,6 +39,8 @@ export default function HarvestListPage() {
     [items, status, year],
   );
   const canPhyto = can(me.data, "harvest.phyto");
+  // Sin terroirs la tabla perdería las parcelas: se trata como error de la pantalla.
+  const failed = harvests.isError ? harvests : terroirs.isError ? terroirs : null;
 
   const newAction = can(me.data, "harvest.create") ? (
     <Button asChild iconStart={<Plus aria-hidden size={18} />}>
@@ -62,11 +64,14 @@ export default function HarvestListPage() {
         )}
       </header>
 
-      {harvests.isError ? (
+      {failed ? (
         <ErrorState
-          description={errorMessage(harvests.error)}
-          onRetry={() => harvests.refetch()}
-          retrying={harvests.isFetching}
+          description={errorMessage(failed.error)}
+          onRetry={() => {
+            if (harvests.isError) harvests.refetch();
+            if (terroirs.isError) terroirs.refetch();
+          }}
+          retrying={harvests.isFetching || terroirs.isFetching}
         />
       ) : (
         <>

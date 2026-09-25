@@ -15,7 +15,8 @@ import {
   Wallet,
   Wine,
 } from "lucide-react";
-import { AppShell, Button, EmptyState, Spinner, type NavGroup } from "@drinks-on-chain/ui";
+import { AppShell, Button, EmptyState, ErrorState, Spinner, type NavGroup } from "@drinks-on-chain/ui";
+import { errorMessage } from "@/lib/api/errors";
 import { useIsAuthenticated, useLogout, useMe } from "@/lib/auth/hooks";
 import { useWinery } from "@/lib/erp/hooks";
 import { canUseErp, roleLabel } from "@/lib/erp/permissions";
@@ -89,6 +90,26 @@ function ErpShell({ children }: { children: ReactNode }) {
 
   if (me.isPending) return <FullScreenSpinner />;
 
+  // Sin perfil no se sabe el rol ni la bodega: se pide reintentar en vez de montar las pantallas
+  // (cada una volvería a pedir `me` al montarse y el fallo entraría en bucle).
+  if (me.isError && !me.data) {
+    return (
+      <main className="grid min-h-dvh place-items-center p-6">
+        <h1 className="sr-only">ERP de Drinks on Chain</h1>
+        <div className="grid justify-items-center gap-3">
+          <ErrorState
+            title="No se pudo cargar tu sesión"
+            description={errorMessage(me.error)}
+            onRetry={() => me.refetch()}
+          />
+          <Button variant="tertiary" onClick={signOut}>
+            {es.auth.logout}
+          </Button>
+        </div>
+      </main>
+    );
+  }
+
   if (allowed === false) {
     return (
       <main className="grid min-h-dvh place-items-center p-6">
@@ -109,20 +130,31 @@ function ErpShell({ children }: { children: ReactNode }) {
   const role = roleLabel(membership?.memberRole ?? me.data?.userRole);
 
   return (
-    <AppShell
-      navigation={navigation}
-      currentPath={pathname}
-      linkComponent={Link}
-      user={me.data ? { name: me.data.fullName, role: wineryName ? `${role} · ${wineryName}` : role } : undefined}
-      userMenu={[
-        { label: "Perfil", href: "/perfil" },
-        { type: "separator" },
-        { label: es.auth.logout, onSelect: signOut },
-      ]}
-      breadcrumbs={[{ label: wineryName || "ERP", href: "/" }, ...(chrome.breadcrumbs ?? [])]}
-      topbarActions={chrome.actions}
-    >
-      {children}
-    </AppShell>
+    <>
+      {/* Salta la barra lateral y la superior (WCAG 2.4.1). */}
+      <a
+        href="#contenido"
+        className="sr-only rounded-md bg-bg px-4 py-2 font-medium text-fg shadow-overlay focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:outline-2 focus:outline-offset-2 focus:outline-focus"
+      >
+        Saltar al contenido
+      </a>
+      <AppShell
+        navigation={navigation}
+        currentPath={pathname}
+        linkComponent={Link}
+        user={me.data ? { name: me.data.fullName, role: wineryName ? `${role} · ${wineryName}` : role } : undefined}
+        userMenu={[
+          { label: "Perfil", href: "/perfil" },
+          { type: "separator" },
+          { label: es.auth.logout, onSelect: signOut },
+        ]}
+        breadcrumbs={[{ label: wineryName || "ERP", href: "/" }, ...(chrome.breadcrumbs ?? [])]}
+        topbarActions={chrome.actions}
+      >
+        <div id="contenido" tabIndex={-1} className="outline-none">
+          {children}
+        </div>
+      </AppShell>
+    </>
   );
 }
