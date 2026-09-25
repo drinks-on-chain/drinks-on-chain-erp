@@ -1,5 +1,5 @@
-import { PendingModule } from "@/components/pending-module";
+import { ProfilePage } from "@/features/perfil/profile-page";
 
 export default function Page() {
-  return <PendingModule title="Perfil" stage="1A" />;
+  return <ProfilePage />;
 }

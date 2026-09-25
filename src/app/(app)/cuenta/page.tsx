@@ -1,5 +1,5 @@
-import { PendingModule } from "@/components/pending-module";
+import { AccountPage } from "@/features/cuenta/winery-account-panel";
 
 export default function Page() {
-  return <PendingModule title="Cuenta Stellar" stage="1F" />;
+  return <AccountPage />;
 }

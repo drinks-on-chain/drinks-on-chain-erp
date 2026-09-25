@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { deriveLotViews, type LotChain, type LotView } from "@drinks-on-chain/mocks";
+import { ApiError } from "@/lib/api/errors";
 import { erpKeys } from "./keys";
 import { erpApi, type HarvestQuery, type ProductionQuery, type TankQuery, type TerroirQuery } from "./resources";
 import { today } from "./today";
@@ -120,6 +121,24 @@ export function useLotViews() {
 export const useHarvestBatchesIf = (q: HarvestQuery, enabled: boolean) =>
   useQuery({ queryKey: erpKeys.harvestBatches(q), queryFn: ({ signal }) => erpApi.harvestBatches(q, signal), enabled });
 
+/**
+ * Certificado de laboratorio de varios embotellados (no hay endpoint de lista). `null` si el
+ * embotellado aún no tiene certificado (el backend responde 404).
+ */
+export function useLabAnalysesOf(bottlingIds: string[]) {
+  const results = useQueries({
+    queries: bottlingIds.map((id) => ({
+      queryKey: [...erpKeys.lab(id), "optional"] as const,
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        erpApi.labAnalysis(id, signal).catch((e: unknown) => {
+          if (e instanceof ApiError && e.isNotFound) return null;
+          throw e;
+        }),
+    })),
+  });
+  return new Map(bottlingIds.map((id, i) => [id, results[i]]));
+}
+
 // ---------- Escrituras ----------
 
 /** Mutación que invalida todo el ERP al terminar (la cadena está enlazada). */
@@ -153,5 +172,6 @@ export const useCreateDistillation = () => useErpMutation(erpApi.createDistillat
 export const useCreateBottling = () => useErpMutation(erpApi.createBottling);
 export const useCreateLabAnalysis = () => useErpMutation(erpApi.createLabAnalysis);
 export const useUpdateWinery = () => useErpMutation(erpApi.updateWinery);
+export const useCreateMember = () => useErpMutation(erpApi.createMember);
 export const useUpload = () =>
   useMutation({ mutationFn: (v: Parameters<typeof erpApi.upload>) => erpApi.upload(...v) });

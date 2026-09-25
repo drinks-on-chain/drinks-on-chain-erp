@@ -19,6 +19,7 @@
     "@drinks-on-chain/mocks": "https://github.com/drinks-on-chain/drinks-on-chain-mocks/releases/download/v0.1.0/drinks-on-chain-mocks-0.1.0.tgz",
     "@drinks-on-chain/ui": "https://github.com/drinks-on-chain/drinks-on-chain-design-system/releases/download/v0.1.0/drinks-on-chain-ui-0.1.0.tgz",
     "@tanstack/react-query": "^5.103.2",
+    "fflate": "^0.8.3",
     "lucide-react": "^1.48.0",
     "msw": "^2.15.0",
     "next": "16.3.6",

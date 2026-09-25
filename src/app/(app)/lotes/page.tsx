@@ -1,5 +1,5 @@
-import { PendingModule } from "@/components/pending-module";
+import { LotList } from "@/features/lotes/lot-list";
 
 export default function Page() {
-  return <PendingModule title="Lotes" stage="1G" />;
+  return <LotList />;
 }

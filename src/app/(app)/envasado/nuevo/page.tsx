@@ -1,5 +1,9 @@
-import { PendingModule } from "@/components/pending-module";
+import { BottlingForm } from "@/features/envasado/bottling-form";
 
-export default function Page() {
-  return <PendingModule title="Nuevo embotellado" stage="1E" />;
+const one = (v: string | string[] | undefined) => (typeof v === "string" && v ? v : undefined);
+
+export default async function Page({ searchParams }: PageProps<"/envasado/nuevo">) {
+  const sp = await searchParams;
+  const preselect = { crianza: one(sp.crianza), destilacion: one(sp.destilacion), lote: one(sp.lote) };
+  return <BottlingForm key={JSON.stringify(preselect)} preselect={preselect} />;
 }

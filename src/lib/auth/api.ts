@@ -1,4 +1,9 @@
-import { AuthResponseSchema, UserProfileResponseSchema, type LoginDto } from "@drinks-on-chain/mocks";
+import {
+  AuthResponseSchema,
+  UserProfileResponseSchema,
+  type LoginDto,
+  type UpdateUserDto,
+} from "@drinks-on-chain/mocks";
 import { api } from "@/lib/api/client";
 import { clearTokens, setTokens } from "@/lib/api/session";
 
@@ -19,4 +24,8 @@ export function logout() {
 
 export function fetchMe(signal?: AbortSignal) {
   return api("/v1/users/me", { schema: UserProfileResponseSchema, signal });
+}
+
+export function updateMe(body: UpdateUserDto) {
+  return api("/v1/users/me", { method: "PATCH", body, schema: UserProfileResponseSchema });
 }

@@ -1,5 +1,7 @@
 import type {
   AgingStatus,
+  BeverageCategory,
+  CertificationStatus,
   DestinationType,
   LotKind,
   LotStage,
@@ -88,4 +90,18 @@ export const TREATMENT_TYPE: Record<TreatmentType, string> = {
   FINING_AGENT: "Clarificante",
   STABILIZATION: "Estabilización",
   OTHER: "Otro",
+};
+
+export const CERTIFICATION_STATUS: Record<CertificationStatus, Label> = {
+  PENDING: { label: "Pendiente de aprobación", tone: "warning" },
+  ACTIVE: { label: "Activa", tone: "success" },
+  SUSPENDED: { label: "Suspendida", tone: "danger" },
+  REVOKED: { label: "Revocada", tone: "danger" },
+};
+
+export const BEVERAGE_CATEGORY: Record<BeverageCategory, string> = {
+  WINERY: "Bodega de vinos",
+  BREWERY: "Cervecería",
+  DISTILLERY: "Destilería",
+  OTHER: "Otra",
 };

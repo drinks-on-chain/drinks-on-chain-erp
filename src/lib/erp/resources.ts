@@ -23,6 +23,7 @@ import {
   type CreateFermentationLogDto,
   type CreateFermentationTankDto,
   type CreateHarvestBatchDto,
+  type CreateMemberDto,
   type CreateTerroirDto,
   type CreateWineAgingBatchDto,
   type UpdatePhytoStatusDto,
@@ -120,6 +121,8 @@ export const erpApi = {
     api("/v1/wineries/my", { method: "PATCH", body, schema: WineryResponseSchema }),
   members: (signal?: AbortSignal) =>
     api("/v1/wineries/my/members", { signal }).then((d) => toPage(d, WineryMemberItemSchema).items),
+  createMember: (body: CreateMemberDto) =>
+    api("/v1/wineries/my/members/create", { method: "POST", body, schema: WineryMemberItemSchema }),
 
   // Archivos: devuelve la URL que luego se pasa en los DTO
   upload: (file: File, folder: UploadFolder) => {
