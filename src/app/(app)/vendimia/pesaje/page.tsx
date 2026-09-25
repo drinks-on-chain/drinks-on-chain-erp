@@ -1,5 +1,7 @@
-import { PendingModule } from "@/components/pending-module";
+import { WeighInScreen } from "@/features/vendimia/components/weigh-in-screen";
 
-export default function Page() {
-  return <PendingModule title="Pesaje" stage="1C" />;
+// 3.1 Pesaje. `?terroir=<id>` preselecciona la parcela (enlace desde la ficha del terroir).
+export default async function WeighInPage({ searchParams }: PageProps<"/vendimia/pesaje">) {
+  const { terroir } = await searchParams;
+  return <WeighInScreen initialTerroirId={typeof terroir === "string" ? terroir : undefined} />;
 }

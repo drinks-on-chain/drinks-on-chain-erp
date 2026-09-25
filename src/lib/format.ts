@@ -34,3 +34,26 @@ export const fmtDaysLeft = (days: number) =>
 /** Dirección o hash abreviado: "GDQ4…7KXV". */
 export const shortHash = (s: string, head = 4, tail = 4) =>
   s.length <= head + tail + 1 ? s : `${s.slice(0, head)}…${s.slice(-tail)}`;
+
+/**
+ * Lee una cifra escrita a mano: "4,2" y "4.2" son 4,2; "2.350" y "18.400" (miles es-BO) son
+ * 2350 y 18400. Con `grouping: false` el punto siempre es decimal (coordenadas).
+ * Devuelve null si está vacía o no es un número.
+ */
+export function parseDecimal(
+  input: string | number | null | undefined,
+  { grouping = true }: { grouping?: boolean } = {},
+): number | null {
+  if (input == null) return null;
+  if (typeof input === "number") return Number.isFinite(input) ? input : null;
+  let s = input.replace(/[\s ]/g, "");
+  if (!s) return null;
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  else if (grouping && /^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
+  if (!/^-?\d*\.?\d+$/.test(s)) return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Cifra para un campo editable, con coma decimal y sin separador de miles ("4,2"). */
+export const numberToInput = (n: number | null | undefined) => (n == null ? "" : String(n).replace(".", ","));

@@ -116,6 +116,10 @@ export function useLotViews() {
   };
 }
 
+/** Como useHarvestBatches, pero solo consulta si `enabled` (p. ej. cuando el detalle del terroir no trae sus lotes). */
+export const useHarvestBatchesIf = (q: HarvestQuery, enabled: boolean) =>
+  useQuery({ queryKey: erpKeys.harvestBatches(q), queryFn: ({ signal }) => erpApi.harvestBatches(q, signal), enabled });
+
 // ---------- Escrituras ----------
 
 /** Mutación que invalida todo el ERP al terminar (la cadena está enlazada). */
