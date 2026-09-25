@@ -17,6 +17,9 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.103.2
         version: 5.103.2(react@19.2.8)
+      lucide-react:
+        specifier: ^1.48.0
+        version: 1.48.0(react@19.2.8)
       msw:
         specifier: ^2.15.0
         version: 2.15.0(@types/node@20.19.43)(typescript@5.9.3)
