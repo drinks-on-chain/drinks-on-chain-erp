@@ -29,6 +29,7 @@ import { useCreateMember, useMembers, useUpdateWinery, useWinery } from "@/lib/e
 import { BEVERAGE_CATEGORY, CERTIFICATION_STATUS } from "@/lib/erp/labels";
 import { can, roleLabel } from "@/lib/erp/permissions";
 import { fmtDate } from "@/lib/format";
+import { useReturnFocus } from "@/lib/use-return-focus";
 import {
   MEMBER_ROLE_OPTIONS,
   MIN_PASSWORD,
@@ -141,6 +142,7 @@ function WineryCard({ winery, editable }: { winery: WineryResponse; editable: bo
 
 function AddMemberModal({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const create = useCreateMember();
+  useReturnFocus(open);
   const [values, setValues] = useState<MemberValues>(emptyMember);
   const [errors, setErrors] = useState<MemberErrors>({});
   const field = (k: Exclude<keyof MemberValues, "memberRole">) => ({

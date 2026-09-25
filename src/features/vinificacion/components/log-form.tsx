@@ -7,6 +7,7 @@ import { today } from "@/lib/erp/today";
 import { dateTimeInputToIso, hasErrors, parseDecimal, toDateTimeInput } from "../form-utils";
 import { TEMP_ALERT_C, validateLog, type LogField, type LogValues } from "../tank-model";
 import { FormErrorAlert } from "./form-error";
+import { useReturnFocus } from "@/lib/use-return-focus";
 
 const empty = (): LogValues => ({
   temperatureCelsius: "",
@@ -33,6 +34,7 @@ export function LogForm({
   onOpenChange: (open: boolean) => void;
 }) {
   const addLog = useAddTankLog();
+  useReturnFocus(open);
   const [values, setValues] = useState<LogValues>(empty);
   const [errors, setErrors] = useState<Partial<Record<LogField, string>>>({});
 

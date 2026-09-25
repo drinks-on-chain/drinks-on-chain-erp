@@ -32,6 +32,7 @@ import { PRODUCT_TYPE } from "@/lib/erp/labels";
 import { can } from "@/lib/erp/permissions";
 import { today } from "@/lib/erp/today";
 import { fmtDate, fmtNumber } from "@/lib/format";
+import { useReturnFocus } from "@/lib/use-return-focus";
 import {
   lockMessage,
   parseDecimal,
@@ -77,6 +78,7 @@ export function BottlingForm({ preselect }: { preselect: SourcePreselect }) {
   const [errors, setErrors] = useState<BottlingErrors>({});
   const [serverError, setServerError] = useState<ApiError | null>(null);
   const [confirming, setConfirming] = useState(false);
+  useReturnFocus(confirming);
   const [done, setDone] = useState(false);
   const [labelError, setLabelError] = useState<string | null>(null);
 

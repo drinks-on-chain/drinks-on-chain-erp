@@ -10,6 +10,7 @@ import { fmtNumber } from "@/lib/format";
 import { hasErrors, parseDecimal, toDateInput } from "../form-utils";
 import { suggestedTotalG, validateTreatment, type TreatmentField, type TreatmentValues } from "../tank-model";
 import { FormErrorAlert } from "./form-error";
+import { useReturnFocus } from "@/lib/use-return-focus";
 
 const empty = (): TreatmentValues => ({
   treatmentType: "",
@@ -40,6 +41,7 @@ export function TreatmentForm({
 }) {
   const addTreatment = useAddTreatment();
   const [values, setValues] = useState<TreatmentValues>(empty);
+  useReturnFocus(open);
   const [errors, setErrors] = useState<Partial<Record<TreatmentField, string>>>({});
 
   const setValue = (k: TreatmentField, value: string) => {
