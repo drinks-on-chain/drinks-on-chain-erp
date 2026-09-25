@@ -82,6 +82,7 @@ export function MocksPanel() {
       <Card className="grid gap-4 p-6">
         <CardHeader title={es.mocks.users} description={`Contraseña de todos: ${DEMO_PASSWORD}`} />
         <DataTable
+          caption="Usuarios de demo"
           density="compact"
           getRowId={(u) => u.key}
           data={demoUsers}

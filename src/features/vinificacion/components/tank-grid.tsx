@@ -38,7 +38,11 @@ export function TankCard({ tank, className }: { tank: TankCardModel; className?:
       <div
         className="relative h-16 overflow-hidden rounded-sm border border-border-strong bg-bg"
         role="img"
-        aria-label={`Llenado ${fmtNumber(tank.fillPct)} %`}
+        aria-label={
+          tank.volumeLiters !== null && tank.capacityLiters !== null
+            ? `Llenado ${fmtNumber(tank.fillPct)} %: ${fmtNumber(tank.volumeLiters)} de ${fmtLiters(tank.capacityLiters)}`
+            : `Llenado ${fmtNumber(tank.fillPct)} %`
+        }
       >
         <span
           className="absolute inset-x-0 bottom-0 bg-accent-soft"

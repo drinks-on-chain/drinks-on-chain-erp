@@ -113,6 +113,7 @@ export default function DashboardPage() {
             <Card>
               <CardHeader title="Tareas pendientes" divided className="px-5 pt-5" />
               <DataTable
+                caption="Tareas por hacer en la bodega"
                 data={d?.tasks ?? []}
                 loading={!d}
                 getRowId={(t) => t.id}

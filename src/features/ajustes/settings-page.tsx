@@ -19,6 +19,7 @@ import {
   Modal,
   Select,
   Skeleton,
+  TextLink,
   toast,
 } from "@drinks-on-chain/ui";
 import { PageChrome } from "@/components/page-chrome";
@@ -265,9 +266,9 @@ export function SettingsPage() {
         <h1 className="font-display text-3xl">Ajustes de la bodega</h1>
         <p className="text-fg-muted">
           Datos de la bodega y su equipo.{" "}
-          <Link href="/cuenta" className="text-accent-text hover:underline">
-            Ver la cuenta Stellar
-          </Link>
+          <TextLink asChild variant="inline">
+            <Link href="/cuenta">Ver la cuenta Stellar</Link>
+          </TextLink>
         </p>
       </header>
 
