@@ -14,13 +14,13 @@ Detalle de `docs/03-roadmap-frontend.md` §4. Se marca con fecha cuando la sub-e
 
 ## 1B · Origen
 
-- [ ] Directorio de terroirs con búsqueda, pills por cepa y DoBadge
-- [ ] Ficha, alta y edición de terroir (certificado D.O. vía uploads)
+- [x] Directorio de terroirs con búsqueda, pills por cepa y DoBadge · 2026-09-25
+- [x] Ficha, alta y edición de terroir (certificado D.O. vía uploads) · 2026-09-25
 
 ## 1C · Vendimia y vinificación
 
-- [ ] Pesaje con BigNumberInput (Brix, pH y acidez obligatorios)
-- [ ] Análisis y dictamen fitosanitario
+- [x] Pesaje con BigNumberInput (Brix, pH y acidez obligatorios) · 2026-09-25
+- [x] Análisis y dictamen fitosanitario · 2026-09-25
 - [ ] TankGrid, bitácora, tratamientos y decisión de destino al crear el tanque
 
 ## 1D · Crianza y destilación
