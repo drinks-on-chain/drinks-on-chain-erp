@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getTokens, subscribeSession } from "@/lib/api/session";
-import { fetchMe, login, logout } from "./api";
+import { fetchMe, login, logout, updateMe } from "./api";
 
 /** true / false en el cliente; null durante el render del servidor (sesión desconocida). */
 export function useIsAuthenticated(): boolean | null {
@@ -34,4 +34,16 @@ export function useLogout() {
     logout();
     client.clear();
   };
+}
+
+/** PATCH /v1/users/me: guarda el perfil y refresca `me` (nombre en el shell, etc.). */
+export function useUpdateMe() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: updateMe,
+    onSuccess: (user) => {
+      client.setQueryData(meQueryKey, user);
+      return client.invalidateQueries({ queryKey: meQueryKey });
+    },
+  });
 }
