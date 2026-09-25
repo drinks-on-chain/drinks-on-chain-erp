@@ -21,6 +21,7 @@ import { PhytoDecisionPanel } from "@/features/vendimia/components/phyto-decisio
 import { harvestReadings } from "@/features/vendimia/lab-targets";
 import { canDecidePhyto } from "@/features/vendimia/phyto";
 import { PageChrome } from "@/components/page-chrome";
+import { ScreenTitle } from "@/components/screen-title";
 import { ApiError, errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
 import { useHarvestBatch, useTerroirs } from "@/lib/erp/hooks";
@@ -58,6 +59,7 @@ export default function HarvestDetailPage({ params }: PageProps<"/vendimia/[id]"
         actions={fillAction}
       />
 
+      {(batch.isError || !h) && <ScreenTitle busy={!batch.isError}>Lote de vendimia</ScreenTitle>}
       {batch.isError ? (
         notFound ? (
           <EmptyState

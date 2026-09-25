@@ -15,6 +15,7 @@ import {
   type TimelineItem,
 } from "@drinks-on-chain/ui";
 import { PageChrome } from "@/components/page-chrome";
+import { ScreenTitle } from "@/components/screen-title";
 import { ApiError, errorMessage } from "@/lib/api/errors";
 import { useBottling, useTraceabilityDag } from "@/lib/erp/hooks";
 import { PRODUCT_TYPE } from "@/lib/erp/labels";
@@ -106,6 +107,7 @@ export function BottlingDetail({ id, justCreated }: { id: string; justCreated: b
     return (
       <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={crumbs} />
+        <ScreenTitle>Embotellado</ScreenTitle>
         {notFound ? (
           <EmptyState
             title="Embotellado no encontrado"
@@ -131,6 +133,7 @@ export function BottlingDetail({ id, justCreated }: { id: string; justCreated: b
     return (
       <div className="grid grid-cols-1 gap-6" aria-busy="true">
         <PageChrome breadcrumbs={crumbs} />
+        <ScreenTitle busy>Embotellado</ScreenTitle>
         <Skeleton className="h-10 w-80" />
         <div className="grid gap-6 lg:grid-cols-2">
           <Skeleton className="h-80" />

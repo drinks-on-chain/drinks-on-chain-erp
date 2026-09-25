@@ -24,6 +24,7 @@ import {
   toast,
 } from "@drinks-on-chain/ui";
 import { PageChrome } from "@/components/page-chrome";
+import { ScreenTitle } from "@/components/screen-title";
 import { ApiError, errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
 import { useCreateBottling, useLotViews, useUpload } from "@/lib/erp/hooks";
@@ -101,6 +102,7 @@ export function BottlingForm({ preselect }: { preselect: SourcePreselect }) {
     return (
       <div className="grid min-h-80 place-items-center" aria-busy="true">
         <PageChrome breadcrumbs={CRUMBS} />
+        <ScreenTitle>Nuevo embotellado</ScreenTitle>
         <Spinner label="Generando la identidad del lote…" />
       </div>
     );
@@ -110,6 +112,7 @@ export function BottlingForm({ preselect }: { preselect: SourcePreselect }) {
     return (
       <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={CRUMBS} />
+        <ScreenTitle>Nuevo embotellado</ScreenTitle>
         <EmptyState
           title="Tu rol no puede cerrar producciones"
           description="El embotellado lo registran la administración y la enología de la bodega."

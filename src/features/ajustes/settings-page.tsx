@@ -22,6 +22,7 @@ import {
   toast,
 } from "@drinks-on-chain/ui";
 import { PageChrome } from "@/components/page-chrome";
+import { ScreenTitle } from "@/components/screen-title";
 import { ApiError, errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
 import { useCreateMember, useMembers, useUpdateWinery, useWinery } from "@/lib/erp/hooks";
@@ -239,6 +240,7 @@ export function SettingsPage() {
     return (
       <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={crumbs} />
+        <ScreenTitle>Ajustes de la bodega</ScreenTitle>
         <EmptyState
           icon={<Building2 aria-hidden size={32} strokeWidth={1.5} />}
           title="Sin bodega activa"

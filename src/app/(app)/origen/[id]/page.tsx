@@ -15,6 +15,7 @@ import {
   TextLink,
 } from "@drinks-on-chain/ui";
 import { PageChrome } from "@/components/page-chrome";
+import { ScreenTitle } from "@/components/screen-title";
 import { DoBadge } from "@/features/origen/components/do-badge";
 import { ParcelMap } from "@/features/origen/components/parcel-map";
 import { doEligibility, doReasonText } from "@/features/origen/do-eligibility";
@@ -67,6 +68,7 @@ export default function TerroirDetailPage({ params }: PageProps<"/origen/[id]">)
         }
       />
 
+      {(terroir.isError || !t) && <ScreenTitle busy={!terroir.isError}>Terroir</ScreenTitle>}
       {terroir.isError ? (
         notFound ? (
           <EmptyState

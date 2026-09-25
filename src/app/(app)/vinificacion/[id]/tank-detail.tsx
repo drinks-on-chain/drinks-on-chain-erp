@@ -17,6 +17,7 @@ import {
   Skeleton,
 } from "@drinks-on-chain/ui";
 import { PageChrome } from "@/components/page-chrome";
+import { ScreenTitle } from "@/components/screen-title";
 import { LogForm } from "@/features/vinificacion/components/log-form";
 import { TreatmentForm } from "@/features/vinificacion/components/treatment-form";
 import { TrendSparkline } from "@/features/vinificacion/components/trend-sparkline";
@@ -59,6 +60,7 @@ export function TankDetail({ id }: { id: string }) {
     return (
       <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={breadcrumbs} />
+        <ScreenTitle>Tanque</ScreenTitle>
         {notFound ? (
           <EmptyState
             title="Tanque no encontrado"
@@ -84,6 +86,7 @@ export function TankDetail({ id }: { id: string }) {
     return (
       <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={breadcrumbs} />
+        <ScreenTitle busy>Tanque</ScreenTitle>
         <Skeleton className="h-10 w-64" />
         <div className="grid gap-6 lg:grid-cols-2">
           <Skeleton shape="block" className="h-64" />

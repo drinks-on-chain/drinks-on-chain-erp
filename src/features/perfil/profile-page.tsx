@@ -16,6 +16,7 @@ import {
   toast,
 } from "@drinks-on-chain/ui";
 import { PageChrome } from "@/components/page-chrome";
+import { ScreenTitle } from "@/components/screen-title";
 import { ApiError, errorMessage } from "@/lib/api/errors";
 import { useMe, useUpdateMe } from "@/lib/auth/hooks";
 import { roleLabel } from "@/lib/erp/permissions";
@@ -108,6 +109,7 @@ export function ProfilePage() {
     return (
       <div className="grid grid-cols-1 gap-6">
         <PageChrome breadcrumbs={crumbs} />
+        <ScreenTitle>Mi perfil</ScreenTitle>
         <ErrorState description={errorMessage(me.error)} onRetry={() => me.refetch()} retrying={me.isFetching} />
       </div>
     );
@@ -116,6 +118,7 @@ export function ProfilePage() {
     return (
       <div className="grid grid-cols-1 gap-6" aria-busy="true">
         <PageChrome breadcrumbs={crumbs} />
+        <ScreenTitle busy>Mi perfil</ScreenTitle>
         <Skeleton className="h-10 w-64" />
         <div className="grid gap-6 lg:grid-cols-2">
           <Skeleton className="h-96" />
