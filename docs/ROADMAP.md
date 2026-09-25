@@ -1,14 +1,44 @@
-# Roadmap de la plantilla (Etapa 0.3)
+# Roadmap del ERP (Etapa 1)
 
-Paso 0.3 de `docs/03-roadmap-frontend.md`: "Crear el ERP desde la plantilla lleva menos de una hora".
+Detalle de `docs/03-roadmap-frontend.md` §4. Se marca con fecha cuando la sub-etapa cumple lo previsto y está en `dev`.
 
-- [x] Next.js 16, TypeScript estricto, Tailwind 4, ESLint, Prettier, LF · 2026-09-25
-- [x] Cliente de API tipado con envoltorio, renovación de token y listas en las dos formas · 2026-09-25
-- [x] Sesión y hooks de autenticación (`useLogin`, `useMe`, `useLogout`) · 2026-09-25
-- [x] `@drinks-on-chain/ui` 0.1.0 y `@drinks-on-chain/mocks` 0.1.0 desde GitHub Releases · 2026-09-25
-- [x] MSW en el navegador con `NEXT_PUBLIC_MOCKS=1` y panel `/__mocks` · 2026-09-25
-- [x] Login, zona privada con AppShell y página de ejemplo con estados · 2026-09-25
-- [x] Vitest, Playwright (escritorio y tablet) y CI · 2026-09-25
-- [x] README con los pasos para crear una app · 2026-09-25
-- [ ] Marcar el repo como plantilla de GitHub
-- [ ] Proyecto en Vercel con preview de `dev`
+## 1A · Acceso y panel
+
+- [x] Proyecto desde la plantilla (puerto 3002, capa de datos de las 45 operaciones, permisos por rol) · 2026-09-25
+- [x] Login dividido y recuperación de acceso (informativa: el backend no tiene endpoint) · 2026-09-25
+- [x] AppShell con módulos, bodega activa, usuario y control de acceso por rol · 2026-09-25
+- [x] Panel: cifras, tareas pendientes derivadas y candados activos · 2026-09-25
+- [ ] Perfil (`GET/PATCH /v1/users/me`)
+- [ ] Ajustes de la bodega y miembros (`/v1/wineries/my`, `/members`)
+- [ ] Selector de bodega: sin endpoint para cambiar de bodega activa (punto nuevo de alineación con backend)
+
+## 1B · Origen
+
+- [ ] Directorio de terroirs con búsqueda, pills por cepa y DoBadge
+- [ ] Ficha, alta y edición de terroir (certificado D.O. vía uploads)
+
+## 1C · Vendimia y vinificación
+
+- [ ] Pesaje con BigNumberInput (Brix, pH y acidez obligatorios)
+- [ ] Análisis y dictamen fitosanitario
+- [ ] TankGrid, bitácora, tratamientos y decisión de destino al crear el tanque
+
+## 1D · Crianza y destilación
+
+- [ ] Barricas con CountdownLock
+- [ ] Cortes del alambique y candado de reposo de 180 días
+
+## 1E · Envasado y QR
+
+- [ ] Embotellado con conciliación y bloqueo por candado (422)
+- [ ] Éxito con sello, certificado de laboratorio y exportación de QR
+
+## 1F · Cuenta de la bodega
+
+- [ ] Panel de solo lectura de la cuenta Stellar
+
+## 1G · Calidad
+
+- [ ] Estados en todas las pantallas, teclado, lector de pantalla
+- [ ] Playwright del flujo "Singani Gran Reserva 2026" de origen a QR
+- [ ] Integración temprana: login y origen contra el backend real
