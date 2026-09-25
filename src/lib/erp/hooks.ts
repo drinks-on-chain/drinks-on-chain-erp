@@ -26,6 +26,24 @@ export const useTanks = (q: TankQuery = {}) =>
 export const useTank = (id: string) =>
   useQuery({ queryKey: erpKeys.tank(id), queryFn: ({ signal }) => erpApi.tank(id, signal) });
 
+type TankDetailResult = ReturnType<typeof useTank>;
+const combineTankDetails = (rs: TankDetailResult[]) => ({
+  data: rs.flatMap((r) => (r.data ? [r.data] : [])),
+  isPending: rs.some((r) => r.isPending),
+  isError: rs.some((r) => r.isError),
+  error: rs.find((r) => r.error)?.error ?? null,
+  refetch: () => Promise.all(rs.map((r) => r.refetch())),
+});
+/** Detalle (con lecturas y tratamientos) de varios tanques: temperatura en el mapa de tanques. */
+export const useTankDetails = (ids: readonly string[]) =>
+  useQueries({
+    queries: ids.map((id) => ({
+      queryKey: erpKeys.tank(id),
+      queryFn: ({ signal }: { signal: AbortSignal }) => erpApi.tank(id, signal),
+    })),
+    combine: combineTankDetails,
+  });
+
 export const useAgings = () =>
   useQuery({ queryKey: erpKeys.agings(), queryFn: ({ signal }) => erpApi.agings({}, signal) });
 export const useAging = (id: string) =>
