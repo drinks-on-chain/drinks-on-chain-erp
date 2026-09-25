@@ -43,5 +43,5 @@ Detalle de `docs/03-roadmap-frontend.md` §4. Se marca con fecha cuando la sub-e
 ## 1G · Calidad
 
 - [ ] Estados en todas las pantallas, teclado, lector de pantalla
-- [ ] Playwright del flujo "Singani Gran Reserva 2026" de origen a QR
+- [x] Playwright del flujo "Singani Gran Reserva 2026" de origen a QR (lote nuevo hasta el reposo + embotellado de un reposo cumplido y exportación de QR) · 2026-09-25
 - [ ] Integración temprana: login y origen contra el backend real
