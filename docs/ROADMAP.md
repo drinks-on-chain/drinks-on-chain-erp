@@ -21,12 +21,12 @@ Detalle de `docs/03-roadmap-frontend.md` §4. Se marca con fecha cuando la sub-e
 
 - [ ] Pesaje con BigNumberInput (Brix, pH y acidez obligatorios)
 - [ ] Análisis y dictamen fitosanitario
-- [ ] TankGrid, bitácora, tratamientos y decisión de destino al crear el tanque
+- [x] TankGrid, bitácora, tratamientos y decisión de destino al crear el tanque · 2026-09-25
 
 ## 1D · Crianza y destilación
 
-- [ ] Barricas con CountdownLock
-- [ ] Cortes del alambique y candado de reposo de 180 días
+- [x] Barricas con CountdownLock · 2026-09-25
+- [x] Cortes del alambique y candado de reposo de 180 días · 2026-09-25
 
 ## 1E · Envasado y QR
 
