@@ -1,5 +1,5 @@
-import { PendingModule } from "@/components/pending-module";
+import { SettingsPage } from "@/features/ajustes/settings-page";
 
 export default function Page() {
-  return <PendingModule title="Ajustes" stage="1A" />;
+  return <SettingsPage />;
 }
