@@ -8,8 +8,8 @@ Detalle de `docs/03-roadmap-frontend.md` §4. Se marca con fecha cuando la sub-e
 - [x] Login dividido y recuperación de acceso (informativa: el backend no tiene endpoint) · 2026-09-25
 - [x] AppShell con módulos, bodega activa, usuario y control de acceso por rol · 2026-09-25
 - [x] Panel: cifras, tareas pendientes derivadas y candados activos · 2026-09-25
-- [ ] Perfil (`GET/PATCH /v1/users/me`)
-- [ ] Ajustes de la bodega y miembros (`/v1/wineries/my`, `/members`)
+- [x] Perfil (`GET/PATCH /v1/users/me`) · 2026-09-25
+- [x] Ajustes de la bodega y miembros (`/v1/wineries/my`, `/members`, alta con `/members/create`) · 2026-09-25
 - [ ] Selector de bodega: sin endpoint para cambiar de bodega activa (punto nuevo de alineación con backend)
 
 ## 1B · Origen
@@ -30,12 +30,15 @@ Detalle de `docs/03-roadmap-frontend.md` §4. Se marca con fecha cuando la sub-e
 
 ## 1E · Envasado y QR
 
-- [ ] Embotellado con conciliación y bloqueo por candado (422)
-- [ ] Éxito con sello, certificado de laboratorio y exportación de QR
+- [x] Embotellado con conciliación y bloqueo por candado (422) · 2026-09-25
+- [x] Éxito con sello, certificado de laboratorio y exportación de QR · 2026-09-25
+- [x] Lotes: listado con filtros y línea de tiempo del lote (vista derivada `LotView`) · 2026-09-25
+- [ ] Códigos QR individuales por botella: hoy son provisionales (el backend emite uno por lote, 09 §8 punto 10)
 
 ## 1F · Cuenta de la bodega
 
-- [ ] Panel de solo lectura de la cuenta Stellar
+- [x] Panel de solo lectura de la cuenta Stellar · 2026-09-25
+- [ ] Activos por lote (emitidas, en circulación, quemadas): pendiente de que el backend los exponga
 
 ## 1G · Calidad
 
