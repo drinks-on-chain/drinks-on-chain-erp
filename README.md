@@ -16,11 +16,11 @@ Entra con `enologa@cintiviejo.test` / `demo1234` o elige usuario en `/__mocks`.
 
 ## Variables de entorno
 
-| Variable | Uso |
-| --- | --- |
-| `NEXT_PUBLIC_MOCKS` | `1` arranca MSW en el navegador (intercepta `/api/v1/*` con `@drinks-on-chain/mocks`) y habilita `/__mocks` en producción. Es lo que usa hoy Vercel |
-| `API_ORIGIN` | **Solo servidor.** Origen del backend: Next reescribe `/api/v1/*` a `${API_ORIGIN}/v1/*` (P-1, contrato de la Ola 0 §7), así la cookie de renovación `doc_rt` es de primera parte. Obligatoria sin mocks y **al construir** (las reescrituras se fijan en el build). Desarrollo: `https://136.243.223.39.sslip.io` |
-| `NEXT_PUBLIC_URL_LANDING`, `NEXT_PUBLIC_URL_BODEGAS`, `NEXT_PUBLIC_URL_APP` | Enlaces a los otros sitios |
+| Variable                                                                    | Uso                                                                                                                                                                                                                                                                                                                |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `NEXT_PUBLIC_MOCKS`                                                         | `1` arranca MSW en el navegador (intercepta `/api/v1/*` con `@drinks-on-chain/mocks`) y habilita `/__mocks` en producción. Es lo que usa hoy Vercel                                                                                                                                                                |
+| `API_ORIGIN`                                                                | **Solo servidor.** Origen del backend: Next reescribe `/api/v1/*` a `${API_ORIGIN}/v1/*` (P-1, contrato de la Ola 0 §7), así la cookie de renovación `doc_rt` es de primera parte. Obligatoria sin mocks y **al construir** (las reescrituras se fijan en el build). Desarrollo: `https://136.243.223.39.sslip.io` |
+| `NEXT_PUBLIC_URL_LANDING`, `NEXT_PUBLIC_URL_BODEGAS`, `NEXT_PUBLIC_URL_APP` | Enlaces a los otros sitios                                                                                                                                                                                                                                                                                         |
 
 Contra el backend de desarrollo: `NEXT_PUBLIC_MOCKS=0` y `API_ORIGIN=https://136.243.223.39.sslip.io`. `NEXT_PUBLIC_API_URL` ya no existe: el navegador nunca llama al backend directamente.
 
