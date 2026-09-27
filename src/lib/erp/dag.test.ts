@@ -42,7 +42,14 @@ const chainDag = {
       stageName: "Bottling",
       parents: ["0xbb02"],
       timestamp: "2026-03-01T00:00:00.000Z",
-      details: { internationalLotCode: "CVJ-2026-SINGANI-001" },
+      details: {
+        internationalLotCode: "CVJ-2026-SINGANI-001",
+        labAnalysis: {
+          certifiedLaboratoryName: "Laboratorio ISO 17025",
+          accreditedLabCertificationCode: "LAB-CVJ-2026-001",
+          actualAlcoholAbv: 40,
+        },
+      },
     },
     { batchId: "0xzz", stage: 9, stageName: "Desconocida", parents: [], timestamp: null, details: null },
   ],
@@ -58,9 +65,19 @@ describe("DagResponseSchema", () => {
       ["HARVEST_BATCH", "HARV-2025-VIEJO-02"],
       ["PRODUCTION_BATCH", "Alambique de cobre Charentais AL-01"],
       ["BOTTLING_BATCH", "CVJ-2026-SINGANI-001"],
+      ["LAB_ANALYSIS", "LAB-CVJ-2026-001"],
     ]);
     expect(dag.nodes[0]!.date).toBe("2026-02-07T11:00:00.000Z");
     expect(dag.edges).toContainEqual({ from: "0xaa01", to: "0xbb02" });
+    expect(dag.edges).toContainEqual({ from: "0x36cb", to: "0x36cb:lab" });
+  });
+
+  it("sin certificado (labAnalysis null) no añade el nodo de laboratorio", () => {
+    const bottlingOnly = {
+      ...chainDag,
+      nodes: [{ ...chainDag.nodes[3]!, details: { internationalLotCode: "CVJ-2026-SINGANI-001", labAnalysis: null } }],
+    };
+    expect(DagResponseSchema.parse(bottlingOnly).nodes.map((n) => n.type)).toEqual(["BOTTLING_BATCH"]);
   });
 
   it("acepta también la forma de los mocks tal cual", () => {

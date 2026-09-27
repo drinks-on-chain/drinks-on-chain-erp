@@ -1,14 +1,15 @@
 import { z } from "zod";
 import { TraceabilityDagSchema, type DagNodeType, type TraceabilityDag } from "@drinks-on-chain/mocks";
 
-// Grafo de `GET /v1/traceability/dag/:bottlingBatchId`. El OpenAPI del backend no declara su forma
-// y los mocks 0.3.0-rc.2 proponen otra (`{ bottlingBatchId, lotCode, nodes[{ id, type, label,
-// date, data }], edges }`). El backend real (O0-ERP-2, 27-09-2026) devuelve la del contrato de la
-// cadena: `{ rootBatchId, internationalLotCode, productType, nodes[{ batchId, stage, stageName,
-// parents, timestamp, details, … }] }`, con ids que son hashes de la cadena y no ids de la base.
-// Se aceptan las dos y se normalizan a la de los mocks hasta que el contrato fije una.
+// Grafo de `GET /v1/traceability/dag/:bottlingBatchId`. El OpenAPI del backend (`DagGraphResponseDto`,
+// desde b9e8b68) fija la forma de la cadena: `{ rootBatchId, internationalLotCode, productType,
+// nodes[{ batchId, stage, stageName, parents, timestamp, details, … }] }`, con ids que son hashes
+// de la cadena y no ids de la base; el certificado de laboratorio va en `details.labAnalysis` del
+// embotellado (o `null`). Los mocks 0.3.0-rc.2 aún sirven su propuesta (`{ bottlingBatchId,
+// lotCode, nodes[{ id, type, label, date, data }], edges }`): se aceptan las dos y se normalizan a
+// la de los mocks, que es la que usa la línea de tiempo, hasta que los mocks se alineen.
 
-/** `stageName` del backend → tipo de nodo del ERP. Lo que no se reconoce se descarta. */
+/** `stageName` del backend (enumeración del OpenAPI) → tipo de nodo del ERP. Otro valor se descarta. */
 const STAGE_TYPE: Record<string, DagNodeType> = {
   Plot: "TERROIR",
   Harvest: "HARVEST_BATCH",
@@ -16,8 +17,6 @@ const STAGE_TYPE: Record<string, DagNodeType> = {
   Aging: "WINE_AGING",
   Distillation: "PRODUCTION_BATCH",
   Bottling: "BOTTLING_BATCH",
-  LabAnalysis: "LAB_ANALYSIS",
-  Lab: "LAB_ANALYSIS",
 };
 
 /** Campo de `details` que nombra el nodo en cada etapa (como `label` en los mocks). */
@@ -70,6 +69,21 @@ export function fromChainDag(dag: ChainDag): TraceabilityDag {
       data: details,
     });
     for (const parent of n.parents) edges.push({ from: parent, to: n.batchId });
+    // Certificado de laboratorio del embotellado: un nodo más de la línea de tiempo.
+    const lab = type === "BOTTLING_BATCH" ? details.labAnalysis : null;
+    if (lab && typeof lab === "object") {
+      const data = lab as Record<string, unknown>;
+      const id = `${n.batchId}:lab`;
+      const at = data.testPerformedAt;
+      nodes.push({
+        id,
+        type: "LAB_ANALYSIS",
+        label: labelOf("LAB_ANALYSIS", data, "Certificado de laboratorio"),
+        date: typeof at === "string" ? at : null,
+        data,
+      });
+      edges.push({ from: n.batchId, to: id });
+    }
   }
   const bottling = dag.nodes.find((n) => STAGE_TYPE[n.stageName] === "BOTTLING_BATCH");
   return {
