@@ -132,8 +132,7 @@ function ErpShell({ children }: { children: ReactNode }) {
   }
 
   const active = activeMembership(me.data);
-  const wineryName =
-    (platform ? "Todas las bodegas" : (winery.data?.commercialName ?? active?.organizationName)) ?? "";
+  const wineryName = (platform ? "Todas las bodegas" : (winery.data?.commercialName ?? active?.organizationName)) ?? "";
   const role = roleLabel(active?.role);
 
   return (
@@ -149,7 +148,9 @@ function ErpShell({ children }: { children: ReactNode }) {
         navigation={navigation}
         currentPath={pathname}
         linkComponent={Link}
-        user={me.data ? { name: me.data.user.fullName, role: wineryName ? `${role} · ${wineryName}` : role } : undefined}
+        user={
+          me.data ? { name: me.data.user.fullName, role: wineryName ? `${role} · ${wineryName}` : role } : undefined
+        }
         userMenu={[
           { label: "Perfil", href: "/perfil" },
           { type: "separator" },
