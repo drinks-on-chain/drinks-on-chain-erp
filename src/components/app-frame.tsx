@@ -11,45 +11,72 @@ import {
   LayoutGrid,
   Mountain,
   QrCode,
+  ScrollText,
   Settings,
+  ShieldAlert,
+  Users,
   Wallet,
   Wine,
 } from "lucide-react";
-import { AppShell, Button, EmptyState, ErrorState, Spinner, type NavGroup } from "@drinks-on-chain/ui";
+import type { MeResponse } from "@drinks-on-chain/mocks";
+import { AppShell, Button, EmptyState, ErrorState, Spinner, type NavGroup, type NavItem } from "@drinks-on-chain/ui";
 import { errorMessage } from "@/lib/api/errors";
-import { useIsAuthenticated, useLogout, useMe } from "@/lib/auth/hooks";
+import { useIsAuthenticated, useLogout, useMe, useOrgInactiveFlag } from "@/lib/auth/hooks";
+import { canReadAuditWhileInactive, inactiveOrganization, type InactiveOrganization } from "@/lib/auth/org-status";
 import { activeMembership } from "@/lib/auth/organization";
 import { useWinery } from "@/lib/erp/hooks";
-import { canUseErp, isPlatform, roleLabel } from "@/lib/erp/permissions";
+import { can, canUseErp, isPlatform, roleLabel, type ErpAction } from "@/lib/erp/permissions";
 import { es } from "@/lib/i18n/es";
+import { InactiveOrganizationPanel, InactiveOrganizationScreen } from "./inactive-organization";
 import { OrganizationSwitcher } from "./organization-switcher";
 import { PageChromeProvider, usePageChromeValue } from "./page-chrome";
 
 const icon = (I: typeof Grape) => <I aria-hidden size={20} strokeWidth={1.5} />;
 
-// Módulos del ERP (03 §4 y 01-erp.html).
-const navigation: NavGroup[] = [
-  { items: [{ label: "Panel", href: "/", exact: true, icon: icon(LayoutGrid) }] },
-  {
-    label: "Trazabilidad",
-    items: [
-      { label: "Lotes", href: "/lotes", icon: icon(Layers) },
-      { label: "Origen y terroirs", href: "/origen", icon: icon(Mountain) },
-      { label: "Vendimia y laboratorio", href: "/vendimia", icon: icon(Grape) },
-      { label: "Vinificación", href: "/vinificacion", icon: icon(Cylinder) },
-      { label: "Crianza", href: "/crianza", icon: icon(Wine) },
-      { label: "Destilación y reposo", href: "/destilacion", icon: icon(FlaskConical) },
-      { label: "Envasado y QR", href: "/envasado", icon: icon(QrCode) },
-    ],
-  },
-  {
-    label: "Bodega",
-    items: [
-      { label: "Cuenta Stellar", href: "/cuenta", icon: icon(Wallet) },
-      { label: "Ajustes", href: "/ajustes", icon: icon(Settings) },
-    ],
-  },
+// Módulos del ERP (03 §4 y 01-erp.html). Cada módulo aparece si el rol de la membresía activa
+// puede leerlo (matriz del backend); "Bitácora" solo para la dirección de la bodega.
+function navigationFor(me: MeResponse | undefined): NavGroup[] {
+  const show = (action: ErpAction) => can(me, action);
+  const trace = (
+    [
+      // "Lotes" une toda la cadena: solo para quien lee crianza, destilación y embotellado.
+      show("aging.read") && { label: "Lotes", href: "/lotes", icon: icon(Layers) },
+      show("terroir.read") && { label: "Origen y terroirs", href: "/origen", icon: icon(Mountain) },
+      show("harvest.read") && { label: "Vendimia y laboratorio", href: "/vendimia", icon: icon(Grape) },
+      show("tank.read") && { label: "Vinificación", href: "/vinificacion", icon: icon(Cylinder) },
+      show("aging.read") && { label: "Crianza", href: "/crianza", icon: icon(Wine) },
+      show("distillation.read") && { label: "Destilación y reposo", href: "/destilacion", icon: icon(FlaskConical) },
+      show("bottling.read") && { label: "Envasado y QR", href: "/envasado", icon: icon(QrCode) },
+    ] as (NavItem | false)[]
+  ).filter((item): item is NavItem => Boolean(item));
+  const winery = (
+    [
+      show("bottling.read") && { label: "Cuenta Stellar", href: "/cuenta", icon: icon(Wallet) },
+      { label: "Equipo", href: "/equipo", icon: icon(Users) },
+      { label: "Ajustes", href: "/ajustes", exact: true, icon: icon(Settings) },
+      show("winery.manage") && { label: "Bitácora", href: "/ajustes/bitacora", icon: icon(ScrollText) },
+    ] as (NavItem | false)[]
+  ).filter((item): item is NavItem => Boolean(item));
+  return [
+    { items: [{ label: "Panel", href: "/", exact: true, icon: icon(LayoutGrid) }] },
+    { label: "Trazabilidad", items: trace },
+    { label: "Bodega", items: winery },
+  ];
+}
+
+/** Con la bodega no activa: el estado y, en `SUSPENDED`, la bitácora de la dirección. */
+const inactiveNavigation = (org: InactiveOrganization): NavGroup[] => [
+  { items: [{ label: "Estado de la bodega", href: "/", exact: true, icon: icon(ShieldAlert) }] },
+  ...(canReadAuditWhileInactive(org)
+    ? [{ label: "Bodega", items: [{ label: "Bitácora", href: "/ajustes/bitacora", icon: icon(ScrollText) }] }]
+    : []),
 ];
+
+/** Rutas que siguen abiertas con la bodega no activa (perfil propio y, en `SUSPENDED`, la bitácora). */
+function openWhileInactive(pathname: string, org: InactiveOrganization): boolean {
+  if (pathname === "/perfil") return true;
+  return pathname === "/ajustes/bitacora" && canReadAuditWhileInactive(org);
+}
 
 function FullScreenSpinner() {
   return (
@@ -84,9 +111,13 @@ function ErpShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const logout = useLogout();
   const me = useMe();
+  const flag = useOrgInactiveFlag();
+  // Un 403 ORG_NOT_ACTIVE manda solo si es más reciente que `me` (que se vuelve a leer al recibirlo).
+  const inactive = inactiveOrganization(me.data, flag && flag.at > me.dataUpdatedAt ? flag.status : null);
   const allowed = me.data ? canUseErp(me.data) : undefined;
   const platform = isPlatform(me.data);
-  const winery = useWinery(allowed === true && !platform);
+  // El perfil de la bodega se sigue leyendo en SUSPENDED; en INVITED y REVOKED el backend lo niega.
+  const winery = useWinery(allowed === true && !platform && (!inactive || inactive.status === "SUSPENDED"));
   const chrome = usePageChromeValue();
 
   const signOut = async () => {
@@ -108,6 +139,15 @@ function ErpShell({ children }: { children: ReactNode }) {
             {es.auth.logout}
           </Button>
         </div>
+      </main>
+    );
+  }
+
+  // Sin organización activa por culpa de la bodega (p. ej. revocada): se explica, sin shell.
+  if (me.data && inactive && inactive.organizationId !== me.data.activeOrganizationId) {
+    return (
+      <main id="contenido" className="grid min-h-dvh place-items-center p-6">
+        <InactiveOrganizationPanel org={inactive} me={me.data} onSignOut={() => void signOut()} />
       </main>
     );
   }
@@ -145,7 +185,7 @@ function ErpShell({ children }: { children: ReactNode }) {
         Saltar al contenido
       </a>
       <AppShell
-        navigation={navigation}
+        navigation={inactive ? inactiveNavigation(inactive) : navigationFor(me.data)}
         currentPath={pathname}
         linkComponent={Link}
         user={
@@ -165,7 +205,11 @@ function ErpShell({ children }: { children: ReactNode }) {
         }
       >
         <div id="contenido" tabIndex={-1} className="outline-none">
-          {children}
+          {inactive && me.data && !openWhileInactive(pathname, inactive) ? (
+            <InactiveOrganizationScreen org={inactive} me={me.data} onSignOut={() => void signOut()} />
+          ) : (
+            children
+          )}
         </div>
       </AppShell>
     </>
