@@ -1,5 +1,6 @@
 import type { FermentationTankResponse, WineAgingResponse } from "@drinks-on-chain/mocks";
-import { isAfter, parseDecimal, type FieldErrors } from "@/features/vinificacion/form-utils";
+import { isAfter, type FieldErrors } from "@/features/vinificacion/form-utils";
+import { parseDecimal } from "@/lib/format";
 import { lotName, terroirOfHarvest, type LotLookup } from "@/features/vinificacion/tank-model";
 
 // Cálculos puros de crianza (03 §4, 1D; 09 §3 fila 5.1A): candado hasta `lockUntilDate`.

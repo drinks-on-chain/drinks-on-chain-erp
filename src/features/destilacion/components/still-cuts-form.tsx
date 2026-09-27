@@ -1,8 +1,7 @@
 "use client";
 
 import { Field, Input, cn } from "@drinks-on-chain/ui";
-import { parseDecimal } from "@/features/vinificacion/form-utils";
-import { fmtNumber } from "@/lib/format";
+import { parseDecimal, fmtNumber } from "@/lib/format";
 
 export type CutsField = "headDiscardLiters" | "heartYieldLiters" | "tailDiscardLiters" | "initialAlcoholPercentage";
 export type CutsValues = Record<CutsField, string>;
