@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { api, bootstrapSession, logoutSession, setSessionEndedHandler } from "./client";
 import { ApiError, ContractError, NetworkError, errorMessage } from "./errors";
-import { toPage } from "./envelope";
+import { pageSchema, toPage } from "./envelope";
 import { fetchAllPages } from "./pagination";
 import { CLIENT_APP } from "@/lib/client-app";
 import {
@@ -294,6 +294,32 @@ describe("toPage", () => {
       limit: 1,
       offset: 3,
     });
+  });
+});
+
+describe("pageSchema en api()", () => {
+  const fetchMock = vi.fn<typeof fetch>();
+  beforeEach(() => {
+    vi.stubGlobal("fetch", fetchMock);
+    resetSessionForTests();
+    clearSession();
+  });
+  afterEach(() => {
+    fetchMock.mockReset();
+    vi.unstubAllGlobals();
+  });
+
+  it("una lista que no cumple el contrato es un ContractError (no un ZodError suelto)", async () => {
+    // Backend de desarrollo, 27-09-2026: decimales como texto donde el OpenAPI dice number.
+    fetchMock.mockResolvedValueOnce(ok({ items: [{ id: "a", n: "4.5" }], total: 1, limit: 100, offset: 0 }));
+    const item = z.object({ id: z.string(), n: z.number() });
+    const req = api("/v1/x", { auth: false, schema: pageSchema(item, { limit: 100, offset: 0 }) });
+    await expect(req).rejects.toBeInstanceOf(ContractError);
+  });
+  it("devuelve la página normalizada", async () => {
+    fetchMock.mockResolvedValueOnce(ok({ items: [{ id: "a" }], total: 3, limit: 1, offset: 2 }));
+    const page = await api("/v1/x", { auth: false, schema: pageSchema(z.object({ id: z.string() })) });
+    expect(page).toEqual({ items: [{ id: "a" }], total: 3, limit: 1, offset: 2 });
   });
 });
 

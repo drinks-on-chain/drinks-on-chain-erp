@@ -1,8 +1,8 @@
 import type { DagNodeType, TraceabilityDag } from "@drinks-on-chain/mocks";
 
 // Línea de tiempo del lote a partir del grafo de trazabilidad (GET /v1/traceability/dag/:id).
-// La forma del grafo es una propuesta de los mocks (el OpenAPI no la declara): se ordena por
-// etapa y no por la posición en la respuesta.
+// El grafo llega normalizado a la forma de los mocks (`src/lib/erp/dag.ts` acepta también la del
+// backend): se ordena por etapa y no por la posición en la respuesta.
 
 const ORDER: DagNodeType[] = [
   "TERROIR",
@@ -33,6 +33,8 @@ const HREF: Partial<Record<DagNodeType, string>> = {
   BOTTLING_BATCH: "/envasado",
 };
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export type TraceStep = {
   id: string;
   type: DagNodeType;
@@ -51,6 +53,7 @@ export function dagSteps(dag: TraceabilityDag): TraceStep[] {
       stage: DAG_NODE_LABEL[n.type],
       label: n.label,
       date: n.date,
-      href: HREF[n.type] ? `${HREF[n.type]}/${n.id}` : null,
+      // El grafo del backend identifica los nodos con hashes de la cadena: sin enlace.
+      href: HREF[n.type] && UUID.test(n.id) ? `${HREF[n.type]}/${n.id}` : null,
     }));
 }

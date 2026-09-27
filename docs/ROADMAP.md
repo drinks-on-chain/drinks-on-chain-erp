@@ -10,7 +10,7 @@ Detalle de `docs/03-roadmap-frontend.md` §4. Se marca con fecha cuando la sub-e
 - [x] Panel: cifras, tareas pendientes derivadas y candados activos · 2026-09-25
 - [x] Perfil (`GET/PATCH /v1/users/me`) · 2026-09-25
 - [x] Ajustes de la bodega y miembros (`/v1/wineries/my`, `/members`, alta con `/members/create`) · 2026-09-25 (el equipo pasa a `/equipo` con invitaciones en la Ola 1)
-- [x] Selector de organización en la cabecera con varias membresías (`POST /v1/auth/switch-organization`), probado con mocks 0.2 (`sofia@aramayo.test`) · 2026-09-27. Contra el backend real, pendiente de O0-BE-4
+- [x] Selector de organización en la cabecera con varias membresías (`POST /v1/auth/switch-organization`), probado con mocks 0.2 (`sofia@aramayo.test`) · 2026-09-27. Contra el backend real (Sofía, Casa Uriondo suspendida ↔ Altos, con recarga) · 2026-09-27
 
 ## 1B · Origen
 
@@ -44,7 +44,8 @@ Detalle de `docs/03-roadmap-frontend.md` §4. Se marca con fecha cuando la sub-e
 
 - [x] Estados en todas las pantallas, teclado, lector de pantalla · 2026-09-25
 - [x] Playwright del flujo "Singani Gran Reserva 2026" de origen a QR (lote nuevo hasta el reposo + embotellado de un reposo cumplido y exportación de QR) · 2026-09-25
-- [ ] Integración temprana: login y origen contra el backend real. Preparado: `E2E_REAL_API=… pnpm e2e` (`e2e/backend-real.spec.ts`); verificado el 2026-09-25 que el backend responde el 401 con el envoltorio esperado y que el CORS admite `localhost:3002` y `drinks-on-chain-erp.vercel.app`. Falta un usuario de bodega con datos en el servidor (10 §2.1)
+- [x] Integración temprana contra el backend real: `e2e/backend-real.spec.ts` (manual, `E2E_REAL_API=1`, job `workflow_dispatch`) con las personas de la semilla · 2026-09-27 (pasa entera solo cuando el backend sirva los decimales como números: ver Ola 0)
+- [ ] Recorrido real en verde sin parches: pendiente de que el backend corrija los `Decimal` como texto
 
 ## Ola 0 · Sesiones y estándares (O0-ERP-1)
 
@@ -59,7 +60,9 @@ Contrato: `plan/contratos/o0-sesiones-y-estandares.md` del plan maestro. La base
 - [x] `details[].field` marca el campo exacto en login, origen, pesaje, tanque, bitácora, tratamiento, crianza, destilación, ajustes y perfil (`fieldErrorsFrom`) · 2026-09-27
 - [x] Login con `BrandSeal` (`feat/login-marca`, necesita `ui` 0.2.0) · 2026-09-27
 - [x] Pruebas unitarias y todas las E2E con mocks en verde (humo con recarga, cambio de organización, cierre de sesión y error por campo) · 2026-09-27
-- [ ] Integración real: login, cambio de organización y parcelas contra el backend de desarrollo (`e2e/backend-real.spec.ts`, excluida por defecto) — pendiente de O0-BE-4 (O0-ERP-2)
+- [x] Integración real (O0-ERP-2): login y cookie `doc_rt` por la reescritura, recarga, cambio de organización, cierre que revoca, permisos de operario, 422 con `details[].field`, 429 con `Retry-After`, alta de parcela `E2E-…` · 2026-09-27
+  - Corregido en el ERP: listas validadas como `ContractError` y sin reintentos ante un contrato roto (antes, 3 peticiones y ~4,5 s por pantalla); grafo de trazabilidad del backend normalizado (`src/lib/erp/dag.ts`); las altas no envían `null` en campos opcionales no anulables (`omitNulls`); el operario no pide parcelas (403); certificados del listado de envasado solo de la página visible
+  - Bloqueado por el backend: los campos `Decimal` llegan como texto (`"4.50"`) donde el OpenAPI dice `number`; con la conversión aplicada solo en local, todo el recorrido pasa y las pantallas cargan en 0,2–1 s
 
 ## Ola 1 · Cuenta, organización y equipo (O1-ERP-1, sub-etapa 1I)
 

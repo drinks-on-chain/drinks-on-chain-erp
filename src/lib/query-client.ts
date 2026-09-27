@@ -1,5 +1,5 @@
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
-import { ApiError } from "@/lib/api/errors";
+import { ApiError, ContractError } from "@/lib/api/errors";
 import { meQueryKey } from "@/lib/auth/keys";
 import { flagOrgInactive } from "@/lib/auth/org-status";
 
@@ -15,9 +15,11 @@ export function makeQueryClient() {
     defaultOptions: {
       queries: {
         staleTime: 30_000,
-        // No se reintenta lo que no va a cambiar (4xx); sí los fallos de red y 5xx.
+        // No se reintenta lo que no va a cambiar (4xx, o una respuesta que no cumple el contrato);
+        // sí los fallos de red y 5xx.
         retry: (count, error) => {
           if (error instanceof ApiError && error.status < 500) return false;
+          if (error instanceof ContractError) return false;
           return count < 2;
         },
         refetchOnWindowFocus: false,
