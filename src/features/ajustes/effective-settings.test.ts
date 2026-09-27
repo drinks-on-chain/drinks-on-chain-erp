@@ -24,6 +24,10 @@ describe("configuración efectiva", () => {
     expect(settingGroup("equipo.maxColaboradoresPorBodega")).toBe("Equipo");
     expect(settingGroup("nuevo.parametro")).toBe("Otros");
     expect(settingUnit("invitacion.caducidadHoras")).toBe("h");
+    expect(settingUnit("canje.ventanaVencida.diasAviso")).toBe("días");
+    expect(settingUnit("compra.minutosReserva")).toBe("min");
+    expect(settingUnit("compra.maxBotellasPorCompra")).toBe("botellas");
+    expect(settingUnit("canje.entregaAsistida.maxPorClienteMes")).toBeNull();
     const s = (key: string): EffectiveSetting => ({
       key,
       description: key,

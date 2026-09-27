@@ -8,11 +8,12 @@ import { fmtNumber } from "@/lib/format";
 /** Unidad a partir del nombre del parámetro (la respuesta de la bodega no trae el tipo ni la unidad). */
 const UNITS: [RegExp, string][] = [
   [/Msnm$/, "m s. n. m."],
-  [/Dias$|\.dias$/i, "días"],
-  [/Meses$/, "meses"],
-  [/Horas$/, "h"],
-  [/Minutos/, "min"],
   [/Porcentaje$/, "%"],
+  [/dias/i, "días"],
+  [/Meses$/, "meses"],
+  [/horas/i, "h"],
+  [/minutos/i, "min"],
+  [/Botellas/, "botellas"],
 ];
 
 const ENUM_LABELS: Record<string, string> = {

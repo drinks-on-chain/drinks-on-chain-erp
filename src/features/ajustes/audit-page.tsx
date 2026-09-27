@@ -247,12 +247,20 @@ export function AuditPage() {
               );
             },
           },
-          { id: "source", header: "Desde", hideBelow: "lg", cell: (e) => auditSourceLabel(e.source.app) },
+          { id: "source", header: "Desde", hideBelow: "xl", cell: (e) => auditSourceLabel(e.source.app) },
           {
             id: "reason",
             header: "Motivo",
             hideBelow: "md",
-            cell: (e) => e.reason ?? <span className="text-fg-subtle">—</span>,
+            // El motivo completo está en el detalle; en la tabla, dos líneas como máximo.
+            cell: (e) =>
+              e.reason ? (
+                <span className="line-clamp-2 min-w-48" title={e.reason}>
+                  {e.reason}
+                </span>
+              ) : (
+                <span className="text-fg-subtle">—</span>
+              ),
           },
         ]}
         rowActions={(e) => (
