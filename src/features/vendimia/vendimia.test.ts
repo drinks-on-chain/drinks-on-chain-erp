@@ -1,3 +1,4 @@
+import { ApiError } from "@/lib/api/errors";
 import { describe, expect, it } from "vitest";
 import { erpFixtures } from "@drinks-on-chain/mocks/fixtures";
 import type { HarvestBatchResponse } from "@drinks-on-chain/mocks";
@@ -87,10 +88,17 @@ describe("pesaje", () => {
   });
 
   it("lleva los details del 422 a los campos", () => {
-    expect(weighInFieldErrors(["brixDegrees es obligatorio", "initialPh es obligatorio", "otra cosa"])).toEqual({
-      brixDegrees: "es obligatorio",
-      initialPh: "es obligatorio",
+    const error = new ApiError({
+      status: 422,
+      code: "VALIDATION_ERROR",
+      message: "Validation failed",
+      details: [
+        { field: "brixDegrees", message: "es obligatorio" },
+        { field: "initialPh", message: "es obligatorio" },
+        { field: null, message: "otra cosa" },
+      ],
     });
+    expect(weighInFieldErrors(error)).toEqual({ brixDegrees: "es obligatorio", initialPh: "es obligatorio" });
   });
 });
 

@@ -18,7 +18,9 @@ import {
 import { PageChrome } from "@/components/page-chrome";
 import { ScreenTitle } from "@/components/screen-title";
 import { ApiError, errorMessage } from "@/lib/api/errors";
+import { fieldErrorsFrom } from "@/lib/api/field-errors";
 import { useMe, useUpdateMe } from "@/lib/auth/hooks";
+import { activeMembership } from "@/lib/auth/organization";
 import { roleLabel } from "@/lib/erp/permissions";
 import { fmtDate, fmtDateTime } from "@/lib/format";
 import { ExternalLink, HashText, explorerAccountUrl } from "@/features/cuenta/stellar";
@@ -55,8 +57,11 @@ function ProfileForm({ me }: { me: UserProfileResponse }) {
       await update.mutateAsync(dto);
       toast({ title: "Perfil actualizado", tone: "success" });
     } catch (err) {
-      if (err instanceof ApiError && err.isValidation) setErrors({ fullName: err.message });
-      else toast({ title: "No se pudo guardar el perfil", description: errorMessage(err), tone: "danger" });
+      if (err instanceof ApiError && err.isValidation) {
+        // 422: cada mensaje en su campo (details[].field).
+        const { fieldErrors, formErrors } = fieldErrorsFrom(err, ["fullName", "phoneNumber", "preferredLocale"]);
+        setErrors(Object.keys(fieldErrors).length ? fieldErrors : { fullName: formErrors[0] ?? err.message });
+      } else toast({ title: "No se pudo guardar el perfil", description: errorMessage(err), tone: "danger" });
     }
   };
 
@@ -127,15 +132,18 @@ export function ProfilePage() {
       </div>
     );
   }
-  const u = me.data;
+  const u = me.data.user;
   const wallet = u.primaryWallet;
+  const active = activeMembership(me.data);
+  const license = (organizationId: string) =>
+    u.wineryMemberships.find((m) => m.wineryId === organizationId)?.professionalLicenseNumber;
 
   return (
     <div className="grid grid-cols-1 gap-6">
       <PageChrome breadcrumbs={crumbs} />
       <header className="grid grid-cols-1 gap-1">
         <h1 className="font-display text-3xl">{u.fullName}</h1>
-        <p className="text-fg-muted">{roleLabel(u.userRole)}</p>
+        <p className="text-fg-muted">{active ? `${roleLabel(active.role)} · ${active.organizationName}` : "—"}</p>
       </header>
       <div className="grid items-start gap-6 lg:grid-cols-2">
         <ProfileForm key={u.id + u.fullName + (u.phoneNumber ?? "") + u.preferredLocale} me={u} />
@@ -144,7 +152,7 @@ export function ProfilePage() {
             <CardHeader title="Cuenta" />
             <KeyValueList
               items={[
-                { term: "Rol", value: roleLabel(u.userRole) },
+                { term: "Rol en la organización activa", value: roleLabel(active?.role) },
                 {
                   term: "Estado",
                   value: u.isActive ? <Badge tone="success">Activa</Badge> : <Badge tone="danger">Inactiva</Badge>,
@@ -155,22 +163,30 @@ export function ProfilePage() {
             />
           </Card>
           <Card className="grid grid-cols-1 gap-4">
-            <CardHeader title="Bodegas" description="Las bodegas en las que trabajas y tu rol en cada una." />
-            {u.wineryMemberships.length === 0 ? (
-              <p className="text-fg-muted text-sm">No perteneces a ninguna bodega.</p>
+            <CardHeader
+              title="Organizaciones"
+              description="Las organizaciones en las que trabajas y tu rol en cada una. Cambia de organización desde la cabecera."
+            />
+            {me.data.memberships.length === 0 ? (
+              <p className="text-fg-muted text-sm">No perteneces a ninguna organización.</p>
             ) : (
               <ul className="divide-border grid divide-y">
-                {u.wineryMemberships.map((m) => (
-                  <li key={m.wineryId} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                {me.data.memberships.map((m) => (
+                  <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                     <span>
-                      <span className="font-medium">{m.wineryName}</span>
+                      <span className="font-medium">{m.organizationName}</span>
                       <span className="text-fg-muted text-sm">
                         {" "}
-                        · {roleLabel(m.memberRole)}
-                        {m.professionalLicenseNumber ? ` · Matrícula ${m.professionalLicenseNumber}` : ""}
+                        · {roleLabel(m.role)}
+                        {license(m.organizationId) ? ` · Matrícula ${license(m.organizationId)}` : ""}
                       </span>
                     </span>
-                    <Badge tone={m.isActive ? "success" : "neutral"}>{m.isActive ? "Activa" : "Inactiva"}</Badge>
+                    <span className="flex flex-wrap gap-1.5">
+                      {m.organizationId === me.data.activeOrganizationId && <Badge tone="accent">Activa ahora</Badge>}
+                      <Badge tone={m.status === "ACTIVE" ? "success" : "neutral"}>
+                        {m.status === "ACTIVE" ? "Activa" : "Bloqueada"}
+                      </Badge>
+                    </span>
                   </li>
                 ))}
               </ul>

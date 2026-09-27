@@ -1,16 +1,19 @@
 import { Alert } from "@drinks-on-chain/ui";
-import { ApiError, errorMessage } from "@/lib/api/errors";
-import { detailMessages } from "../form-utils";
+import { errorMessage } from "@/lib/api/errors";
+import { fieldErrorsFrom } from "@/lib/api/field-errors";
 
-/** Error del backend al guardar: mensaje y, si es de validación (400/422), sus detalles. */
-export function FormErrorAlert({ error }: { error: unknown }) {
+/**
+ * Error del backend al guardar: el mensaje y, si es un 422, los detalles que no se muestran ya
+ * junto a su campo (`fields` son los campos que el formulario marca con `details[].field`).
+ */
+export function FormErrorAlert({ error, fields = [] }: { error: unknown; fields?: readonly string[] }) {
   if (!error) return null;
-  const details = error instanceof ApiError && error.isValidation ? detailMessages(error.details) : [];
+  const { formErrors } = fieldErrorsFrom(error, fields);
   return (
     <Alert tone="danger" title={errorMessage(error)}>
-      {details.length > 0 && (
+      {formErrors.length > 0 && (
         <ul className="m-0 pl-4">
-          {details.map((m) => (
+          {formErrors.map((m) => (
             <li key={m}>{m}</li>
           ))}
         </ul>

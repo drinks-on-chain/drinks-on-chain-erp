@@ -32,17 +32,29 @@ import {
   type DistillationValues,
 } from "@/features/destilacion/distillation-model";
 import { FormErrorAlert } from "@/features/vinificacion/components/form-error";
-import { hasErrors, parseDecimal, toDateInput } from "@/features/vinificacion/form-utils";
+import { hasErrors, toDateInput } from "@/features/vinificacion/form-utils";
+import { parseDecimal, fmtDate, fmtLiters, fmtNumber } from "@/lib/format";
 import { doEligibility, lotLookup, lotName, terroirOfHarvest } from "@/features/vinificacion/tank-model";
+import { fieldErrorsFrom } from "@/lib/api/field-errors";
 import { errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
 import { useCreateDistillation, useHarvestBatches, useProductions, useTanks, useTerroirs } from "@/lib/erp/hooks";
 import { TANK_STATUS } from "@/lib/erp/labels";
 import { can } from "@/lib/erp/permissions";
 import { today } from "@/lib/erp/today";
-import { fmtDate, fmtLiters, fmtNumber } from "@/lib/format";
 
 const FORM_ID = "new-distillation-form";
+
+/** Campos del formulario que el backend puede marcar en un 422. */
+const SERVER_FIELDS: readonly DistillationField[] = [
+  "fermentationTankId",
+  "equipmentIdentifier",
+  "inputVolumeLiters",
+  "processStartDate",
+  "processEndDate",
+  "outputVolumeLiters",
+  "wasteVolumeLiters",
+];
 
 export function NewDistillationForm() {
   const router = useRouter();
@@ -53,6 +65,8 @@ export function NewDistillationForm() {
   const harvest = useHarvestBatches();
   const terroirs = useTerroirs();
   const createDistillation = useCreateDistillation();
+  // 422 del backend: cada mensaje junto a su campo (details[].field).
+  const server = fieldErrorsFrom(createDistillation.error, SERVER_FIELDS).fieldErrors;
 
   const [values, setValues] = useState<DistillationValues>(() => ({
     fermentationTankId: params.get("tanque") ?? "",
@@ -216,7 +230,12 @@ export function NewDistillationForm() {
       <form id={FORM_ID} onSubmit={submit} noValidate className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Card className="grid gap-8 p-5 md:p-6">
           <FormSection title="Vino base" columns={1}>
-            <Field label="Tanque" required error={errors.fermentationTankId} help="Tanques con destino destilación.">
+            <Field
+              label="Tanque"
+              required
+              error={errors.fermentationTankId ?? server.fermentationTankId}
+              help="Tanques con destino destilación."
+            >
               <Select
                 size="lg"
                 placeholder="Elige el tanque"
@@ -240,7 +259,7 @@ export function NewDistillationForm() {
             <Field
               label="Alambique"
               required
-              error={errors.equipmentIdentifier}
+              error={errors.equipmentIdentifier ?? server.equipmentIdentifier}
               help="P. ej. «Alambique de cobre AL-01»."
             >
               <Input
@@ -249,7 +268,12 @@ export function NewDistillationForm() {
                 onChange={(e) => set("equipmentIdentifier", e.target.value)}
               />
             </Field>
-            <Field label="Volumen de entrada" required error={errors.inputVolumeLiters} help="Vino base que entra.">
+            <Field
+              label="Volumen de entrada"
+              required
+              error={errors.inputVolumeLiters ?? server.inputVolumeLiters}
+              help="Vino base que entra."
+            >
               <Input
                 size="lg"
                 numeric
@@ -259,7 +283,7 @@ export function NewDistillationForm() {
                 onChange={(e) => set("inputVolumeLiters", e.target.value)}
               />
             </Field>
-            <Field label="Inicio" required error={errors.processStartDate}>
+            <Field label="Inicio" required error={errors.processStartDate ?? server.processStartDate}>
               <Input
                 size="lg"
                 type="date"
@@ -267,7 +291,11 @@ export function NewDistillationForm() {
                 onChange={(e) => set("processStartDate", e.target.value)}
               />
             </Field>
-            <Field label="Fin" error={errors.processEndDate} help="El reposo cuenta desde el fin.">
+            <Field
+              label="Fin"
+              error={errors.processEndDate ?? server.processEndDate}
+              help="El reposo cuenta desde el fin."
+            >
               <Input
                 size="lg"
                 type="date"
@@ -287,7 +315,11 @@ export function NewDistillationForm() {
           </FormSection>
 
           <FormSection title="Balance" columns={2}>
-            <Field label="Volumen de salida" error={errors.outputVolumeLiters} help="Por defecto, el corazón.">
+            <Field
+              label="Volumen de salida"
+              error={errors.outputVolumeLiters ?? server.outputVolumeLiters}
+              help="Por defecto, el corazón."
+            >
               <Input
                 size="lg"
                 numeric
@@ -297,7 +329,11 @@ export function NewDistillationForm() {
                 onChange={(e) => set("outputVolumeLiters", e.target.value)}
               />
             </Field>
-            <Field label="Merma" error={errors.wasteVolumeLiters} help="Por defecto, cabeza + cola.">
+            <Field
+              label="Merma"
+              error={errors.wasteVolumeLiters ?? server.wasteVolumeLiters}
+              help="Por defecto, cabeza + cola."
+            >
               <Input
                 size="lg"
                 numeric
@@ -312,7 +348,7 @@ export function NewDistillationForm() {
           <Field label="Notas">
             <Textarea value={values.notes} onChange={(e) => set("notes", e.target.value)} rows={2} />
           </Field>
-          <FormErrorAlert error={createDistillation.error} />
+          <FormErrorAlert error={createDistillation.error} fields={SERVER_FIELDS} />
         </Card>
 
         <aside className="grid content-start gap-4">

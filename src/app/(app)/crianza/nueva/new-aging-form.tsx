@@ -28,18 +28,29 @@ import {
   type AgingValues,
 } from "@/features/crianza/aging-model";
 import { FormErrorAlert } from "@/features/vinificacion/components/form-error";
-import { hasErrors, parseDecimal, toDateInput } from "@/features/vinificacion/form-utils";
+import { hasErrors, toDateInput } from "@/features/vinificacion/form-utils";
+import { parseDecimal, fmtDate, fmtDaysLeft, fmtLiters } from "@/lib/format";
 import { lotLookup, lotName } from "@/features/vinificacion/tank-model";
+import { fieldErrorsFrom } from "@/lib/api/field-errors";
 import { errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
 import { useAgings, useCreateAging, useHarvestBatches, useTanks, useTerroirs } from "@/lib/erp/hooks";
 import { TANK_STATUS } from "@/lib/erp/labels";
 import { can } from "@/lib/erp/permissions";
 import { today } from "@/lib/erp/today";
-import { fmtDate, fmtDaysLeft, fmtLiters } from "@/lib/format";
 
 const FORM_ID = "new-aging-form";
 const CONTAINER_TYPES = ["Barrica", "Fudre", "Tanque de acero", "Huevo de hormigón", "Ánfora", "Botella"];
+
+/** Campos del formulario que el backend puede marcar en un 422. */
+const SERVER_FIELDS: readonly AgingField[] = [
+  "fermentationTankId",
+  "containerType",
+  "barrelUseCycle",
+  "volumeLiters",
+  "plannedMonths",
+  "startDate",
+];
 
 export function NewAgingForm() {
   const router = useRouter();
@@ -50,6 +61,8 @@ export function NewAgingForm() {
   const harvest = useHarvestBatches();
   const terroirs = useTerroirs();
   const createAging = useCreateAging();
+  // 422 del backend: cada mensaje junto a su campo (details[].field).
+  const server = fieldErrorsFrom(createAging.error, SERVER_FIELDS).fieldErrors;
 
   const [values, setValues] = useState<AgingValues>(() => ({
     fermentationTankId: params.get("tanque") ?? "",
@@ -200,7 +213,7 @@ export function NewAgingForm() {
             <Field
               label="Tanque"
               required
-              error={errors.fermentationTankId}
+              error={errors.fermentationTankId ?? server.fermentationTankId}
               help="Tanques con destino crianza que aún no la iniciaron."
             >
               <Select
@@ -220,7 +233,7 @@ export function NewAgingForm() {
           </FormSection>
 
           <FormSection title="Recipiente" columns={2}>
-            <Field label="Tipo" required error={errors.containerType}>
+            <Field label="Tipo" required error={errors.containerType ?? server.containerType}>
               <Select
                 size="lg"
                 value={values.containerType}
@@ -238,7 +251,11 @@ export function NewAgingForm() {
             <Field label="Código" help="Identificador de la barrica o del lote de barricas.">
               <Input size="lg" value={values.containerCode} onChange={(e) => set("containerCode", e.target.value)} />
             </Field>
-            <Field label="Ciclo de uso" error={errors.barrelUseCycle} help="1 = barrica nueva.">
+            <Field
+              label="Ciclo de uso"
+              error={errors.barrelUseCycle ?? server.barrelUseCycle}
+              help="1 = barrica nueva."
+            >
               <Input
                 size="lg"
                 numeric
@@ -248,7 +265,7 @@ export function NewAgingForm() {
             </Field>
             <Field
               label="Volumen"
-              error={errors.volumeLiters}
+              error={errors.volumeLiters ?? server.volumeLiters}
               help={
                 tank?.volumeFilledLiters
                   ? `Por defecto, el del tanque: ${fmtLiters(tank.volumeFilledLiters)}.`
@@ -267,7 +284,7 @@ export function NewAgingForm() {
           </FormSection>
 
           <FormSection title="Tiempo de crianza" columns={2}>
-            <Field label="Meses previstos" required error={errors.plannedMonths}>
+            <Field label="Meses previstos" required error={errors.plannedMonths ?? server.plannedMonths}>
               <Input
                 size="lg"
                 numeric
@@ -276,7 +293,7 @@ export function NewAgingForm() {
                 onChange={(e) => set("plannedMonths", e.target.value)}
               />
             </Field>
-            <Field label="Inicio" error={errors.startDate} help="Por defecto, hoy.">
+            <Field label="Inicio" error={errors.startDate ?? server.startDate} help="Por defecto, hoy.">
               <Input
                 size="lg"
                 type="date"
@@ -289,7 +306,7 @@ export function NewAgingForm() {
           <Field label="Notas">
             <Textarea value={values.notes} onChange={(e) => set("notes", e.target.value)} rows={2} />
           </Field>
-          <FormErrorAlert error={createAging.error} />
+          <FormErrorAlert error={createAging.error} fields={SERVER_FIELDS} />
         </Card>
 
         <aside className="grid content-start gap-4">

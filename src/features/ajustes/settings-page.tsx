@@ -25,10 +25,12 @@ import {
 import { PageChrome } from "@/components/page-chrome";
 import { ScreenTitle } from "@/components/screen-title";
 import { ApiError, errorMessage } from "@/lib/api/errors";
+import { fieldErrorsFrom } from "@/lib/api/field-errors";
 import { useMe } from "@/lib/auth/hooks";
+import { activeMembership } from "@/lib/auth/organization";
 import { useCreateMember, useMembers, useUpdateWinery, useWinery } from "@/lib/erp/hooks";
 import { BEVERAGE_CATEGORY, CERTIFICATION_STATUS } from "@/lib/erp/labels";
-import { can, roleLabel } from "@/lib/erp/permissions";
+import { can, isPlatform, roleLabel } from "@/lib/erp/permissions";
 import { fmtDate } from "@/lib/format";
 import { useReturnFocus } from "@/lib/use-return-focus";
 import {
@@ -43,6 +45,17 @@ import {
   type WineryErrors,
   type WineryValues,
 } from "./settings-model";
+
+/** Campos que el backend puede marcar en un 422 (details[].field). */
+const WINERY_FIELDS = ["commercialName", "address", "contactEmail", "contactPhone"] as const;
+const MEMBER_FIELDS = [
+  "fullName",
+  "email",
+  "password",
+  "memberRole",
+  "phoneNumber",
+  "professionalLicenseNumber",
+] as const;
 
 function WineryCard({ winery, editable }: { winery: WineryResponse; editable: boolean }) {
   const update = useUpdateWinery();
@@ -65,8 +78,11 @@ function WineryCard({ winery, editable }: { winery: WineryResponse; editable: bo
       toast({ title: "Datos de la bodega guardados", tone: "success" });
       setEditing(false);
     } catch (err) {
-      if (err instanceof ApiError && err.isValidation) setErrors({ commercialName: err.message });
-      else toast({ title: "No se pudieron guardar los datos", description: errorMessage(err), tone: "danger" });
+      if (err instanceof ApiError && err.isValidation) {
+        // 422: cada mensaje en su campo (details[].field); si ninguno es de este formulario, en el nombre.
+        const { fieldErrors, formErrors } = fieldErrorsFrom(err, WINERY_FIELDS);
+        setErrors(Object.keys(fieldErrors).length ? fieldErrors : { commercialName: formErrors[0] ?? err.message });
+      } else toast({ title: "No se pudieron guardar los datos", description: errorMessage(err), tone: "danger" });
     }
   };
 
@@ -164,8 +180,10 @@ function AddMemberModal({ open, onOpenChange }: { open: boolean; onOpenChange: (
       onOpenChange(false);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) setErrors({ email: err.message });
-      else if (err instanceof ApiError && err.isValidation) setErrors({ email: err.message });
-      else toast({ title: "No se pudo añadir el miembro", description: errorMessage(err), tone: "danger" });
+      else if (err instanceof ApiError && err.isValidation) {
+        const { fieldErrors, formErrors } = fieldErrorsFrom(err, MEMBER_FIELDS);
+        setErrors(Object.keys(fieldErrors).length ? fieldErrors : { email: formErrors[0] ?? err.message });
+      } else toast({ title: "No se pudo añadir el miembro", description: errorMessage(err), tone: "danger" });
     }
   };
 
@@ -232,7 +250,7 @@ function AddMemberModal({ open, onOpenChange }: { open: boolean; onOpenChange: (
 
 export function SettingsPage() {
   const me = useMe();
-  const platform = me.data?.userRole === "PLATFORM_ADMIN";
+  const platform = isPlatform(me.data);
   const winery = useWinery(!!me.data && !platform);
   const members = useMembers();
   const manage = can(me.data, "winery.manage");
@@ -274,7 +292,8 @@ export function SettingsPage() {
 
       {!manage && me.data && (
         <Alert tone="info" title="Modo consulta">
-          Tu rol ({roleLabel(me.data.userRole)}) puede ver los ajustes; los cambia la administración de la bodega.
+          Tu rol ({roleLabel(activeMembership(me.data)?.role)}) puede ver los ajustes; los cambia la administración de
+          la bodega.
         </Alert>
       )}
 

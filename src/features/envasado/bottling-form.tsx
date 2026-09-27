@@ -31,15 +31,10 @@ import { useCreateBottling, useLotViews, useUpload } from "@/lib/erp/hooks";
 import { PRODUCT_TYPE } from "@/lib/erp/labels";
 import { can } from "@/lib/erp/permissions";
 import { today } from "@/lib/erp/today";
-import { fmtDate, fmtNumber } from "@/lib/format";
+import { validationIssues } from "@/lib/api/field-errors";
+import { fmtDate, fmtNumber, parseDecimal } from "@/lib/format";
 import { useReturnFocus } from "@/lib/use-return-focus";
-import {
-  lockMessage,
-  parseDecimal,
-  validateBottling,
-  type BottlingErrors,
-  type BottlingFormValues,
-} from "./bottling-form-model";
+import { lockMessage, validateBottling, type BottlingErrors, type BottlingFormValues } from "./bottling-form-model";
 import { computeYield, yieldInputFromSource } from "./bottling-summary";
 import { BottlingSummary } from "./bottling-summary-card";
 import { FileInput, fileTooBig } from "./file-input";
@@ -155,7 +150,8 @@ export function BottlingForm({ preselect }: { preselect: SourcePreselect }) {
 
   const pending = upload.isPending || create.isPending;
   const blocked = !!source && (source.locked || source.bottled);
-  const serverDetails = Array.isArray(serverError?.details) ? (serverError.details as unknown[]).map(String) : [];
+  // Detalles del 422 (details[].message); el candado u otras reglas llegan con su campo.
+  const serverDetails = validationIssues(serverError?.details).map((d) => d.message);
 
   return (
     <div className="grid grid-cols-1 gap-6">
