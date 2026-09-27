@@ -43,13 +43,23 @@ Usuarios de demo útiles: `admin@altos.test` (dueño), `admin@cintiviejo.test` (
 
 ## Prueba contra el backend real
 
-Excluida por defecto (no corre en CI ni con `pnpm e2e`). **No puede pasar entera hasta que el backend implemente el contrato de la Ola 0 (O0-BE-4)**: login con cookie `doc_rt`, `refresh` sin cuerpo, `GET /users/me` con membresías y listas paginadas. Para lanzarla:
+`e2e/backend-real.spec.ts` recorre el ERP contra el backend de desarrollo (O0-ERP-2). Excluida por defecto: no corre con `pnpm e2e` ni en la CI de cada push. Usa las personas de la semilla del backend (README del backend, "Datos de demostración"); su contraseña es la de `SEED_DEMO_PASSWORD` del servidor y **solo** se pasa por el entorno, nunca en archivos, commits ni registros:
 
 ```bash
-E2E_REAL_API=https://136.243.223.39.sslip.io E2E_PORT=3150 pnpm e2e --project=escritorio
+export E2E_PASSWORD="$(ssh drinksonchain-server "sed -n 's/^SEED_DEMO_PASSWORD=//p' ~/doc-dev/.env")"
+E2E_REAL_API=1 E2E_API_ORIGIN=https://136.243.223.39.sslip.io E2E_PORT=3150 pnpm e2e --project=escritorio
 ```
 
-Con `E2E_REAL_EMAIL` y `E2E_REAL_PASSWORD` (usuario de bodega del backend) prueba también el login y el directorio de terroirs.
+| Variable         | Uso                                                                                                                              |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `E2E_REAL_API`   | `1` activa el modo: solo corre esta prueba, con MSW apagado, un solo worker, sin reintentos ni trazas (guardarían la contraseña) |
+| `E2E_API_ORIGIN` | Origen del backend; el build lo usa como `API_ORIGIN`. Por defecto, el de desarrollo                                             |
+| `E2E_PASSWORD`   | Contraseña de las personas de demostración. Sin ella solo corre la prueba de credenciales inválidas                              |
+| `E2E_REAL_429`   | `1` prueba también el 429 del login con `Retry-After` (suma hasta 8 fallos al bloqueo por IP)                                    |
+
+Recorre: login a través de la reescritura (cookie `doc_rt` de primera parte, `HttpOnly`, nada en el almacenamiento), recarga que mantiene la sesión, los módulos de la dueña de Cinti Viejo con su tiempo de carga (anotaciones de Playwright), alta inocua de una parcela `E2E-<fecha>-<azar>`, un 422 del backend con `details[].field` en el perfil (no guarda nada), cierre de sesión que revoca; Sofía con dos bodegas y cambio a Casa Uriondo (suspendida) y a Altos; el operario sin crianza, destilación, envasado ni parcelas; contabilidad bloqueada por la plataforma. En GitHub hay un job manual (`E2E contra el backend real`, `workflow_dispatch`) que lee el secreto `E2E_PASSWORD` si existe y no sube artefactos.
+
+**Estado (27-09-2026)**: solo pasa entera con el backend corrigiendo los decimales (O0-ERP-2, ver `docs/ROADMAP.md`): hoy el backend devuelve como texto los campos `Decimal` que su OpenAPI declara `number` y todas las pantallas de trazabilidad caen en "Recibimos datos inesperados del servidor". Con esa corrección aplicada en local (sin integrar) el recorrido pasa completo. Las pantallas de la Ola 1 (equipo, invitaciones, bitácora) siguen sin endpoints en el backend.
 
 Publicado en Vercel (con datos de prueba): https://drinks-on-chain-erp.vercel.app · panel de usuarios de demo en `/__mocks`.
 
