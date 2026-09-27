@@ -35,7 +35,7 @@ import {
   type UpdateWineryDto,
 } from "@drinks-on-chain/mocks";
 import { api } from "@/lib/api/client";
-import { toPage, type Page } from "@/lib/api/envelope";
+import { pageSchema, type Page } from "@/lib/api/envelope";
 import { fetchAllPages, MAX_PAGE_SIZE } from "@/lib/api/pagination";
 
 // Acceso a los endpoints del ERP (09 §3). Una función por operación; las pantallas usan
@@ -44,8 +44,8 @@ import { fetchAllPages, MAX_PAGE_SIZE } from "@/lib/api/pagination";
 type Query = Record<string, string | number | boolean | null | undefined>;
 
 async function page<T>(path: string, item: z.ZodType<T>, query: Query, signal?: AbortSignal): Promise<Page<T>> {
-  const data = await api(path, { query, signal });
-  return toPage(data, item, { limit: Number(query.limit), offset: Number(query.offset) });
+  const params = { limit: Number(query.limit), offset: Number(query.offset) };
+  return api(path, { query, signal, schema: pageSchema(item, params) });
 }
 
 /**
