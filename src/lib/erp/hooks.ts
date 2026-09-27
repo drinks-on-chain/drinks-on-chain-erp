@@ -25,9 +25,9 @@ import { today } from "./today";
 const NO_TERROIRS: Page<TerroirResponse> = { items: [], total: 0, limit: 0, offset: 0 };
 
 /**
- * Parcelas de la bodega. El operario no las lee (matriz del backend: 403), pero vendimia y
- * vinificación las usan para poner nombre a la parcela: para ese rol no se piden y la lista llega
- * vacía (con otra clave, para no mezclarla con la de quien sí las lee).
+ * Parcelas de la bodega. Vendimia y vinificación las usan para poner nombre a la parcela: un rol
+ * sin lectura de parcelas no las pide y recibe la lista vacía (con otra clave, para no mezclarla
+ * con la de quien sí las lee). Hoy todos los roles de bodega las leen (Ola 1 §11 bis).
  */
 export function useTerroirs(q: TerroirQuery = {}) {
   const me = useMe();

@@ -36,13 +36,14 @@ describe("permisos por membresía activa (matriz del backend O0-BE-4)", () => {
     expect(can(me(sofia, "uriondo"), "harvest.phyto")).toBe(true);
   });
 
-  it("operario: pesa y registra lecturas; nada de parcelas, crianza, destilación ni embotellado", () => {
+  it("operario: pesa, registra lecturas y lee parcelas; sin altas de parcelas, crianza, destilación ni embotellado", () => {
     const op = only("OPERATOR");
     expect(can(op, "harvest.create")).toBe(true);
     expect(can(op, "tank.log")).toBe(true);
     expect(can(op, "harvest.read")).toBe(true);
+    // Lectura mínima de parcelas para elegir la del pesaje (contrato de la Ola 1 §11 bis).
+    expect(can(op, "terroir.read")).toBe(true);
     for (const action of [
-      "terroir.read",
       "terroir.write",
       "harvest.phyto",
       "tank.create",
