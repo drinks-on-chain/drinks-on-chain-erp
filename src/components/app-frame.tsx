@@ -18,9 +18,11 @@ import {
 import { AppShell, Button, EmptyState, ErrorState, Spinner, type NavGroup } from "@drinks-on-chain/ui";
 import { errorMessage } from "@/lib/api/errors";
 import { useIsAuthenticated, useLogout, useMe } from "@/lib/auth/hooks";
+import { activeMembership } from "@/lib/auth/organization";
 import { useWinery } from "@/lib/erp/hooks";
-import { canUseErp, roleLabel } from "@/lib/erp/permissions";
+import { canUseErp, isPlatform, roleLabel } from "@/lib/erp/permissions";
 import { es } from "@/lib/i18n/es";
+import { OrganizationSwitcher } from "./organization-switcher";
 import { PageChromeProvider, usePageChromeValue } from "./page-chrome";
 
 const icon = (I: typeof Grape) => <I aria-hidden size={20} strokeWidth={1.5} />;
@@ -57,7 +59,10 @@ function FullScreenSpinner() {
   );
 }
 
-/** Protege las rutas privadas del ERP y monta el AppShell. */
+/**
+ * Protege las rutas privadas del ERP y monta el AppShell. Mientras se recupera la sesión al
+ * arrancar (renovación con la cookie) muestra un spinner; sin sesión lleva al login.
+ */
 export function AppFrame({ children }: { children: ReactNode }) {
   const authenticated = useIsAuthenticated();
   const router = useRouter();
@@ -80,11 +85,12 @@ function ErpShell({ children }: { children: ReactNode }) {
   const logout = useLogout();
   const me = useMe();
   const allowed = me.data ? canUseErp(me.data) : undefined;
-  const winery = useWinery(allowed === true && me.data?.userRole !== "PLATFORM_ADMIN");
+  const platform = isPlatform(me.data);
+  const winery = useWinery(allowed === true && !platform);
   const chrome = usePageChromeValue();
 
-  const signOut = () => {
-    logout();
+  const signOut = async () => {
+    await logout();
     router.replace("/login");
   };
 
@@ -97,12 +103,8 @@ function ErpShell({ children }: { children: ReactNode }) {
       <main className="grid min-h-dvh place-items-center p-6">
         <h1 className="sr-only">ERP de Drinks on Chain</h1>
         <div className="grid justify-items-center gap-3">
-          <ErrorState
-            title="No se pudo cargar tu sesión"
-            description={errorMessage(me.error)}
-            onRetry={() => me.refetch()}
-          />
-          <Button variant="tertiary" onClick={signOut}>
+          <ErrorState title={es.auth.sessionError} description={errorMessage(me.error)} onRetry={() => me.refetch()} />
+          <Button variant="tertiary" onClick={() => void signOut()}>
             {es.auth.logout}
           </Button>
         </div>
@@ -110,24 +112,29 @@ function ErpShell({ children }: { children: ReactNode }) {
     );
   }
 
+  // Guardia por audiencia y organización activa (contrato de la Ola 0 §6): el ERP es del
+  // personal de una bodega (o de la plataforma, en solo lectura).
   if (allowed === false) {
     return (
       <main className="grid min-h-dvh place-items-center p-6">
-        <EmptyState
-          title="Este acceso no es para el ERP"
-          description="El ERP es para los equipos de las bodegas asociadas. Si crees que es un error, contacta con la administración de tu bodega."
-          action={<Button onClick={signOut}>{es.auth.logout}</Button>}
-        />
+        <h1 className="sr-only">ERP de Drinks on Chain</h1>
+        <div className="grid justify-items-center gap-3">
+          <EmptyState
+            title="Este acceso no es para el ERP"
+            description="El ERP es para los equipos de las bodegas asociadas. Si crees que es un error, contacta con la administración de tu bodega."
+            action={<Button onClick={() => void signOut()}>{es.auth.logout}</Button>}
+          />
+          {/* Con otra membresía utilizable, se puede cambiar a ella sin salir. */}
+          {me.data && <OrganizationSwitcher me={me.data} />}
+        </div>
       </main>
     );
   }
 
-  const membership = me.data?.wineryMemberships.find((m) => m.isActive) ?? me.data?.wineryMemberships[0];
+  const active = activeMembership(me.data);
   const wineryName =
-    winery.data?.commercialName ??
-    membership?.wineryName ??
-    (me.data?.userRole === "PLATFORM_ADMIN" ? "Todas las bodegas" : "");
-  const role = roleLabel(membership?.memberRole ?? me.data?.userRole);
+    (platform ? "Todas las bodegas" : (winery.data?.commercialName ?? active?.organizationName)) ?? "";
+  const role = roleLabel(active?.role);
 
   return (
     <>
@@ -142,14 +149,19 @@ function ErpShell({ children }: { children: ReactNode }) {
         navigation={navigation}
         currentPath={pathname}
         linkComponent={Link}
-        user={me.data ? { name: me.data.fullName, role: wineryName ? `${role} · ${wineryName}` : role } : undefined}
+        user={me.data ? { name: me.data.user.fullName, role: wineryName ? `${role} · ${wineryName}` : role } : undefined}
         userMenu={[
           { label: "Perfil", href: "/perfil" },
           { type: "separator" },
-          { label: es.auth.logout, onSelect: signOut },
+          { label: es.auth.logout, onSelect: () => void signOut() },
         ]}
         breadcrumbs={[{ label: wineryName || "ERP", href: "/" }, ...(chrome.breadcrumbs ?? [])]}
-        topbarActions={chrome.actions}
+        topbarActions={
+          <>
+            {me.data && <OrganizationSwitcher me={me.data} />}
+            {chrome.actions}
+          </>
+        }
       >
         <div id="contenido" tabIndex={-1} className="outline-none">
           {children}

@@ -1,51 +1,91 @@
-// Sesión del cliente. El access token vive en memoria y en sessionStorage (se pierde al
-// cerrar la pestaña). Cuando el backend confirme el refreshToken en cookie HttpOnly
-// (10 §2.4), el refresh deja de guardarse aquí.
+// Sesión del cliente (contrato de la Ola 0 §5 y §7).
+//
+// - El token de acceso (15 min) vive SOLO en memoria. Nada de la sesión se guarda en
+//   sessionStorage ni localStorage.
+// - La renovación viaja en la cookie HttpOnly `doc_rt` de primera parte (P-1). Para sobrevivir
+//   a una recarga, la app llama a `POST /api/v1/auth/refresh` al arrancar (bootstrapSession).
+// - Tolerancia transitoria (*retirada* en H1): si el backend aún devuelve `tokens.refreshToken`
+//   en el cuerpo, se guarda en memoria y se reenvía en el cuerpo de `refresh`. Así un backend
+//   anterior a O0-BE-4 (sin cookie) sigue funcionando mientras la pestaña no se recargue.
 
-export type Tokens = { accessToken: string; refreshToken: string; expiresAt: number };
+export type SessionStatus = "unknown" | "authenticated" | "anonymous";
 
-const KEY = "doc.session";
-let current: Tokens | null = null;
+export type SessionTokens = {
+  accessToken: string;
+  /** Segundos de vida del acceso (900 en el contrato). */
+  expiresIn: number;
+  /** Solo por compatibilidad hasta H1. */
+  refreshToken?: string | null;
+};
+
+type State = {
+  status: SessionStatus;
+  accessToken: string | null;
+  expiresAt: number;
+  legacyRefreshToken: string | null;
+};
+
+const initial: State = { status: "unknown", accessToken: null, expiresAt: 0, legacyRefreshToken: null };
+let state: State = initial;
 const listeners = new Set<() => void>();
 
-function storage(): Storage | null {
-  try {
-    return typeof window === "undefined" ? null : window.sessionStorage;
-  } catch {
-    return null;
-  }
+function emit() {
+  listeners.forEach((l) => l());
 }
 
-export function getTokens(): Tokens | null {
-  if (current) return current;
-  const raw = storage()?.getItem(KEY);
-  if (!raw) return null;
-  try {
-    current = JSON.parse(raw) as Tokens;
-    return current;
-  } catch {
-    return null;
-  }
+export function getSessionStatus(): SessionStatus {
+  return state.status;
 }
 
-export function setTokens(tokens: { accessToken: string; refreshToken: string; expiresIn: number }) {
-  current = {
+export function getAccessToken(): string | null {
+  return state.accessToken;
+}
+
+/** Epoch en ms en que caduca el acceso (0 sin sesión). */
+export function getAccessExpiresAt(): number {
+  return state.expiresAt;
+}
+
+/** Refresco recibido en el cuerpo (backend anterior al contrato). *Retirada* en H1. */
+export function getLegacyRefreshToken(): string | null {
+  return state.legacyRefreshToken;
+}
+
+export function setSession(tokens: SessionTokens) {
+  state = {
+    status: "authenticated",
     accessToken: tokens.accessToken,
-    refreshToken: tokens.refreshToken,
     expiresAt: Date.now() + tokens.expiresIn * 1000,
+    legacyRefreshToken: tokens.refreshToken ?? null,
   };
-  storage()?.setItem(KEY, JSON.stringify(current));
-  listeners.forEach((l) => l());
+  emit();
 }
 
-export function clearTokens() {
-  current = null;
-  storage()?.removeItem(KEY);
-  listeners.forEach((l) => l());
+/** Sin sesión (tras cerrar sesión, fallar la renovación o no tener cookie al arrancar). */
+export function clearSession() {
+  state = { ...initial, status: "anonymous" };
+  emit();
+}
+
+/** Solo para pruebas: vuelve al estado de arranque. */
+export function resetSessionForTests() {
+  state = initial;
+  emit();
 }
 
 /** Para `useSyncExternalStore`. */
 export function subscribeSession(listener: () => void) {
   listeners.add(listener);
-  return () => listeners.delete(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+/** La plantilla 0.1 guardaba acceso y refresco en sessionStorage: se borra al arrancar. */
+export function purgeLegacyStorage() {
+  try {
+    if (typeof window !== "undefined") window.sessionStorage.removeItem("doc.session");
+  } catch {
+    // Almacenamiento no disponible (modo privado estricto): no hay nada que borrar.
+  }
 }

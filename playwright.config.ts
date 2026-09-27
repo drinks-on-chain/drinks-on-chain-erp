@@ -16,6 +16,8 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? "github" : "list",
+  // MSW arranca en el navegador y la sesión se recupera al cargar: margen para máquinas cargadas.
+  expect: { timeout: 10_000 },
   use: {
     baseURL: `http://localhost:${PORT}`,
     locale: "es-BO",
@@ -30,6 +32,7 @@ export default defineConfig({
     url: `http://localhost:${PORT}`,
     reuseExistingServer: !process.env.CI,
     timeout: 240_000,
-    env: { NEXT_PUBLIC_MOCKS: REAL_API ? "0" : "1", NEXT_PUBLIC_API_URL: REAL_API ?? "" },
+    // Con backend real, Next reescribe /api/v1/* a ${API_ORIGIN}/v1/* (P-1).
+    env: REAL_API ? { NEXT_PUBLIC_MOCKS: "0", API_ORIGIN: REAL_API } : { NEXT_PUBLIC_MOCKS: "1" },
   },
 });

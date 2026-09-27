@@ -14,9 +14,21 @@ pnpm dev:mocks        # http://localhost:3002 con datos de prueba
 
 Entra con `enologa@cintiviejo.test` / `demo1234` o elige usuario en `/__mocks`.
 
-Contra el backend de desarrollo: `NEXT_PUBLIC_MOCKS=0` y `NEXT_PUBLIC_API_URL=https://136.243.223.39.sslip.io`.
+## Variables de entorno
 
-Prueba de integración contra el backend real (no corre en CI):
+| Variable | Uso |
+| --- | --- |
+| `NEXT_PUBLIC_MOCKS` | `1` arranca MSW en el navegador (intercepta `/api/v1/*` con `@drinks-on-chain/mocks`) y habilita `/__mocks` en producción. Es lo que usa hoy Vercel |
+| `API_ORIGIN` | **Solo servidor.** Origen del backend: Next reescribe `/api/v1/*` a `${API_ORIGIN}/v1/*` (P-1, contrato de la Ola 0 §7), así la cookie de renovación `doc_rt` es de primera parte. Obligatoria sin mocks y **al construir** (las reescrituras se fijan en el build). Desarrollo: `https://136.243.223.39.sslip.io` |
+| `NEXT_PUBLIC_URL_LANDING`, `NEXT_PUBLIC_URL_BODEGAS`, `NEXT_PUBLIC_URL_APP` | Enlaces a los otros sitios |
+
+Contra el backend de desarrollo: `NEXT_PUBLIC_MOCKS=0` y `API_ORIGIN=https://136.243.223.39.sslip.io`. `NEXT_PUBLIC_API_URL` ya no existe: el navegador nunca llama al backend directamente.
+
+La sesión, la organización activa, las listas y los errores por campo siguen el contrato de la Ola 0 y los trae la plantilla (su README explica la renovación silenciosa y la tolerancia transitoria hasta H1). Con varias membresías, el selector de la cabecera cambia la organización activa (prueba con `sofia@aramayo.test`); los permisos del ERP salen de la membresía activa.
+
+## Prueba contra el backend real
+
+Excluida por defecto (no corre en CI ni con `pnpm e2e`). **No puede pasar entera hasta que el backend implemente el contrato de la Ola 0 (O0-BE-4)**: login con cookie `doc_rt`, `refresh` sin cuerpo, `GET /users/me` con membresías y listas paginadas. Para lanzarla:
 
 ```bash
 E2E_REAL_API=https://136.243.223.39.sslip.io E2E_PORT=3150 pnpm e2e --project=escritorio

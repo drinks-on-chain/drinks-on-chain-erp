@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// Envoltorio común del backend (09 §1).
+// Envoltorio común del backend (09 §1 y contrato de la Ola 0 §1).
 export const errorEnvelope = z.object({
   success: z.literal(false),
   statusCode: z.number(),
@@ -26,9 +26,9 @@ export type Page<T> = { items: T[]; total: number; limit: number; offset: number
 export type PageParams = { limit?: number; offset?: number };
 
 /**
- * Normaliza una lista del backend a `Page<T>`.
- * El backend aún no confirma si `data` es `T[]` o `{ items, total, limit, offset }`
- * (09 §8, punto 1): se aceptan las dos formas para no depender de la respuesta.
+ * Normaliza una lista del backend a `Page<T>`. El contrato de la Ola 0 §2 fija
+ * `{ items, total, limit, offset }` (`limit` 20 por defecto, 100 como máximo); el array plano
+ * del backend anterior a O0-BE-2 se sigue aceptando hasta H1.
  */
 export function toPage<T>(data: unknown, item: z.ZodType<T>, params: PageParams = {}): Page<T> {
   if (Array.isArray(data)) {
