@@ -37,6 +37,7 @@ import { api } from "@/lib/api/client";
 import { pageSchema, type Page } from "@/lib/api/envelope";
 import { fetchAllPages, MAX_PAGE_SIZE } from "@/lib/api/pagination";
 import { DagResponseSchema } from "./dag";
+import { omitNulls } from "./omit-nulls";
 
 // Acceso a los endpoints del ERP (09 §3). Una función por operación; las pantallas usan
 // los hooks de hooks.ts, nunca estas funciones directamente.
@@ -78,7 +79,7 @@ export const erpApi = {
   terroirs: (q: TerroirQuery = {}, s?: AbortSignal) => list("/v1/terroirs", TerroirResponseSchema, q, s),
   terroir: (id: string, signal?: AbortSignal) => api(`/v1/terroirs/${id}`, { schema: TerroirDetailSchema, signal }),
   createTerroir: (body: CreateTerroirDto) =>
-    api("/v1/terroirs", { method: "POST", body, schema: TerroirResponseSchema }),
+    api("/v1/terroirs", { method: "POST", body: omitNulls(body), schema: TerroirResponseSchema }),
   updateTerroir: (id: string, body: UpdateTerroirDto) =>
     api(`/v1/terroirs/${id}`, { method: "PATCH", body, schema: TerroirResponseSchema }),
 
@@ -88,7 +89,7 @@ export const erpApi = {
   harvestBatch: (id: string, signal?: AbortSignal) =>
     api(`/v1/harvest-batches/${id}`, { schema: HarvestBatchDetailSchema, signal }),
   createHarvestBatch: (body: CreateHarvestBatchDto) =>
-    api("/v1/harvest-batches", { method: "POST", body, schema: HarvestBatchResponseSchema }),
+    api("/v1/harvest-batches", { method: "POST", body: omitNulls(body), schema: HarvestBatchResponseSchema }),
   updatePhytoStatus: (id: string, body: UpdatePhytoStatusDto) =>
     api(`/v1/harvest-batches/${id}/phyto-status`, { method: "PATCH", body, schema: HarvestBatchResponseSchema }),
 
@@ -97,17 +98,21 @@ export const erpApi = {
   tank: (id: string, signal?: AbortSignal) =>
     api(`/v1/fermentation-tanks/${id}`, { schema: FermentationTankDetailSchema, signal }),
   createTank: (body: CreateFermentationTankDto) =>
-    api("/v1/fermentation-tanks", { method: "POST", body, schema: FermentationTankResponseSchema }),
+    api("/v1/fermentation-tanks", { method: "POST", body: omitNulls(body), schema: FermentationTankResponseSchema }),
   addTankLog: (id: string, body: CreateFermentationLogDto) =>
-    api(`/v1/fermentation-tanks/${id}/logs`, { method: "POST", body, schema: FermentationLogSchema }),
+    api(`/v1/fermentation-tanks/${id}/logs`, { method: "POST", body: omitNulls(body), schema: FermentationLogSchema }),
   addTreatment: (id: string, body: CreateEnologicalTreatmentDto) =>
-    api(`/v1/fermentation-tanks/${id}/treatments`, { method: "POST", body, schema: EnologicalTreatmentSchema }),
+    api(`/v1/fermentation-tanks/${id}/treatments`, {
+      method: "POST",
+      body: omitNulls(body),
+      schema: EnologicalTreatmentSchema,
+    }),
 
   // Crianza
   agings: (q: PageQuery = {}, s?: AbortSignal) => list("/v1/wine-aging", WineAgingResponseSchema, q, s),
   aging: (id: string, signal?: AbortSignal) => api(`/v1/wine-aging/${id}`, { schema: WineAgingResponseSchema, signal }),
   createAging: (body: CreateWineAgingBatchDto) =>
-    api("/v1/wine-aging", { method: "POST", body, schema: WineAgingResponseSchema }),
+    api("/v1/wine-aging", { method: "POST", body: omitNulls(body), schema: WineAgingResponseSchema }),
 
   // Destilación
   productions: (q: ProductionQuery = {}, s?: AbortSignal) =>
@@ -117,18 +122,22 @@ export const erpApi = {
   restStatus: (id: string, signal?: AbortSignal) =>
     api(`/v1/production-batches/${id}/rest-status`, { schema: RestStatusResponseSchema, signal }),
   createDistillation: (body: CreateDistillationBatchDto) =>
-    api("/v1/production-batches/distillation", { method: "POST", body, schema: ProductionBatchResponseSchema }),
+    api("/v1/production-batches/distillation", {
+      method: "POST",
+      body: omitNulls(body),
+      schema: ProductionBatchResponseSchema,
+    }),
 
   // Envasado, laboratorio y trazabilidad
   bottlings: (q: PageQuery = {}, s?: AbortSignal) => list("/v1/bottling", BottlingBatchResponseSchema, q, s),
   bottling: (id: string, signal?: AbortSignal) =>
     api(`/v1/bottling/${id}`, { schema: BottlingBatchResponseSchema, signal }),
   createBottling: (body: CreateBottlingBatchDto) =>
-    api("/v1/bottling", { method: "POST", body, schema: BottlingBatchResponseSchema }),
+    api("/v1/bottling", { method: "POST", body: omitNulls(body), schema: BottlingBatchResponseSchema }),
   labAnalysis: (bottlingId: string, signal?: AbortSignal) =>
     api(`/v1/lab-analyses/batch/${bottlingId}`, { schema: BatchLabAnalysisResponseSchema, signal }),
   createLabAnalysis: (body: CreateBatchLabAnalysisDto) =>
-    api("/v1/lab-analyses", { method: "POST", body, schema: BatchLabAnalysisResponseSchema }),
+    api("/v1/lab-analyses", { method: "POST", body: omitNulls(body), schema: BatchLabAnalysisResponseSchema }),
   dag: (bottlingId: string, signal?: AbortSignal) =>
     api(`/v1/traceability/dag/${bottlingId}`, { schema: DagResponseSchema, signal }),
 
