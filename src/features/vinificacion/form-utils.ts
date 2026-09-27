@@ -2,10 +2,7 @@
 // Las cifras se escriben en es-BO ("22,4") o con punto ("22.4"); las fechas se tratan en UTC,
 // igual que las muestra src/lib/format.ts.
 
-// Una sola lectura de cifras para todo el ERP (miles con punto en es-BO: "12.100" = 12100).
-import { parseDecimal } from "@/lib/format";
-
-export { parseDecimal };
+// Las cifras se leen con `parseDecimal` de `@/lib/format` (el único del ecosistema).
 
 /** "2026-09-25" (UTC) para un `<input type="date">`. */
 export const toDateInput = (d: Date) => d.toISOString().slice(0, 10);
@@ -21,13 +18,6 @@ export function isAfter(value: string, now: Date): boolean {
   const iso = value.length === 10 ? `${value}T00:00:00Z` : dateTimeInputToIso(value);
   const ms = Date.parse(iso);
   return !Number.isNaN(ms) && ms > now.getTime();
-}
-
-/** Mensajes de un error de validación del backend (`details` es una lista de textos). */
-export function detailMessages(details: unknown): string[] {
-  if (Array.isArray(details)) return details.map(String);
-  if (typeof details === "string") return [details];
-  return [];
 }
 
 export type FieldErrors<K extends string> = Partial<Record<K, string>>;

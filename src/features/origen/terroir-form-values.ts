@@ -5,7 +5,7 @@ import {
   type UpdateTerroirDto,
 } from "@drinks-on-chain/mocks";
 import { numberToInput, parseDecimal } from "@/lib/format";
-import { detailPairs } from "./api-details";
+import { fieldErrorsFrom } from "@/lib/api/field-errors";
 import { outerRing } from "./parcel-shape";
 
 // Valores del formulario de terroir (texto tal como se escribe) y su conversión al DTO de
@@ -161,14 +161,15 @@ export function toTerroirDto(v: TerroirFormValues): Result {
 
 const FIELD_ALIASES: Record<string, TerroirField> = { geographicPolygonGeojson: "polygon" };
 
-/** Asigna los `details` de un 400/422 ("campo: mensaje") a los campos del formulario. */
-export function terroirFieldErrors(details: unknown): TerroirFormErrors {
-  const errors: TerroirFormErrors = {};
-  const fields = new Set<string>([...Object.keys(EMPTY_TERROIR), ...Object.keys(FIELD_ALIASES)]);
-  for (const [field, message] of detailPairs(details)) {
-    if (!fields.has(field)) continue;
-    const key = FIELD_ALIASES[field] ?? (field as TerroirField);
-    errors[key] ??= message;
-  }
-  return errors;
+const TERROIR_FIELDS = new Set<string>(Object.keys(EMPTY_TERROIR));
+
+/**
+ * Lleva los `details[].field` de un 422 del backend a los campos del formulario
+ * (`geographicPolygonGeojson` se marca en el mapa de la parcela).
+ */
+export function terroirFieldErrors(error: unknown): TerroirFormErrors {
+  return fieldErrorsFrom<TerroirField>(error, (field) => {
+    const root = field.split(".")[0]!;
+    return FIELD_ALIASES[root] ?? (TERROIR_FIELDS.has(root) ? (root as TerroirField) : undefined);
+  }).fieldErrors;
 }

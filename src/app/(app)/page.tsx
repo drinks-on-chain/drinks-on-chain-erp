@@ -40,7 +40,7 @@ export default function DashboardPage() {
   const me = useMe();
   const dashboard = useDashboard();
   const d = dashboard.data;
-  const firstName = me.data?.fullName.replace(/^(Lic\.|Ing\.|Dr\.|Dra\.)\s+/, "").split(" ")[0];
+  const firstName = me.data?.user.fullName.replace(/^(Lic\.|Ing\.|Dr\.|Dra\.)\s+/, "").split(" ")[0];
 
   return (
     <div className="grid grid-cols-1 gap-6">

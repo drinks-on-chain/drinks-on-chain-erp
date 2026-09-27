@@ -48,7 +48,7 @@ export function TrendSparkline({
     <figure className={cn("m-0 grid gap-1", className)}>
       <figcaption className="flex items-baseline justify-between gap-2 text-sm text-fg-muted">
         <span>{label}</span>
-        <span className={cn("text-lg font-medium tabular-nums", alert ? "text-warning" : "text-fg")}>
+        <span className={cn("text-lg font-medium tabular-nums", alert ? "text-warning-text" : "text-fg")}>
           {last ? `${fmtNumber(last.value, digits)}${u}` : "—"}
         </span>
       </figcaption>

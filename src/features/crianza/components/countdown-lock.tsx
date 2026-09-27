@@ -65,7 +65,7 @@ export function CountdownLock({
         <div
           className={cn(
             "font-display text-5xl leading-none font-medium tabular-nums",
-            released ? "text-success" : "text-warning",
+            released ? "text-success-text" : "text-warning-text",
           )}
           aria-label={fmtDaysLeft(days)}
           data-testid="countdown-days"

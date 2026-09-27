@@ -107,7 +107,9 @@ export function DecisionModal<V extends string>({
                 </span>
                 <strong className="text-lg">{o.title}</strong>
                 <span className="text-sm text-fg-muted">{o.subtitle}</span>
-                {o.disabled && o.disabledReason && <span className="text-xs text-warning">{o.disabledReason}</span>}
+                {o.disabled && o.disabledReason && (
+                  <span className="text-xs text-warning-text">{o.disabledReason}</span>
+                )}
               </button>
             );
           })}

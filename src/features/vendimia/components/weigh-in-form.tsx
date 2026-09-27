@@ -74,7 +74,7 @@ export function WeighInForm({ initialTerroirId }: { initialTerroirId?: string })
       router.push(`/vendimia/${batch.id}`);
     } catch (err) {
       if (err instanceof ApiError && err.isValidation) {
-        setErrors(weighInFieldErrors(err.details));
+        setErrors(weighInFieldErrors(err));
         setFormError(err.message);
       } else {
         toast({ title: "No se pudo registrar el ingreso", description: errorMessage(err), tone: "danger" });

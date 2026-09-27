@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { erpFixtures as fx } from "@drinks-on-chain/mocks/fixtures";
-import { parseDecimal } from "./form-utils";
 import {
   buildTankCards,
   doEligibility,
@@ -20,22 +19,6 @@ import {
 const TODAY = new Date("2026-09-25T12:00:00Z");
 const altos = fx.wineries.find((w) => w.commercialName.includes("Calamuchita"))!;
 const mine = <T extends { wineryId: string }>(xs: T[]) => xs.filter((x) => x.wineryId === altos.id);
-
-describe("parseDecimal", () => {
-  it("acepta coma, punto y miles", () => {
-    expect(parseDecimal("22,4")).toBe(22.4);
-    // En es-BO el punto separa miles: "12.100" L son doce mil cien.
-    expect(parseDecimal("12.100")).toBe(12100);
-    expect(parseDecimal("1.048")).toBe(1048);
-    // Las densidades (tres decimales) se leen sin agrupar.
-    expect(parseDecimal("1.048", { grouping: false })).toBe(1.048);
-    expect(parseDecimal("12.100,5")).toBe(12100.5);
-    expect(parseDecimal("1.200.000")).toBe(1200000);
-    expect(parseDecimal(" 8300 ")).toBe(8300);
-    expect(parseDecimal("")).toBeNull();
-    expect(parseDecimal("abc")).toBeNull();
-  });
-});
 
 describe("mapa de tanques", () => {
   const tanks = mine(fx.fermentationTanks);

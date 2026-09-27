@@ -3,7 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { SCENARIOS, getScenario, resetErpDb, setScenario, type ScenarioName } from "@drinks-on-chain/mocks/browser";
+import {
+  SCENARIOS,
+  expireAccessTokens,
+  getScenario,
+  resetErpDb,
+  setScenario,
+  type ScenarioName,
+} from "@drinks-on-chain/mocks/browser";
 import { DEMO_PASSWORD, demoUsers } from "@drinks-on-chain/mocks/fixtures";
 import { Alert, Badge, Button, Card, CardHeader, DataTable, Field, Select, toast } from "@drinks-on-chain/ui";
 import { env } from "@/lib/env";
@@ -76,6 +83,15 @@ export function MocksPanel() {
           >
             {es.mocks.reset}
           </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              expireAccessTokens();
+              toast({ title: es.mocks.expireDone, tone: "info" });
+            }}
+          >
+            {es.mocks.expire}
+          </Button>
         </div>
       </Card>
 
@@ -90,7 +106,13 @@ export function MocksPanel() {
             { id: "name", header: "Nombre", cell: (u) => u.fullName },
             { id: "email", header: "Correo", cell: (u) => u.email },
             { id: "role", header: "Rol", cell: (u) => <Badge>{u.memberRole ?? u.userRole}</Badge> },
-            { id: "winery", header: "Bodega", cell: (u) => u.wineryName ?? "—" },
+            { id: "winery", header: "Bodega activa", cell: (u) => u.wineryName ?? "—" },
+            {
+              id: "memberships",
+              header: "Membresías",
+              align: "right",
+              cell: (u) => u.memberships.length,
+            },
             {
               id: "enter",
               header: "",

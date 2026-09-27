@@ -263,7 +263,7 @@ export function TankDetail({ id }: { id: string }) {
               header: "Temp. °C",
               numeric: true,
               cell: (l) => (
-                <span className={isHot(l) ? "font-medium text-warning" : undefined}>
+                <span className={isHot(l) ? "font-medium text-warning-text" : undefined}>
                   {fmtNumber(l.temperatureCelsius, 1)}
                 </span>
               ),

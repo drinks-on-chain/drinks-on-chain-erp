@@ -1,9 +1,12 @@
 import { expect, test } from "@playwright/test";
 
-// Integración temprana contra el backend real (03 §4, 1G). Solo corre con E2E_REAL_API:
+// Integración temprana contra el backend real (03 §4, 1G; O0-ERP-2). Excluida por defecto: solo
+// corre con E2E_REAL_API, que el build usa como API_ORIGIN (Next reescribe /api/v1/* al backend):
 //   E2E_REAL_API=https://136.243.223.39.sslip.io E2E_PORT=3150 pnpm e2e --project=escritorio
 // Con E2E_REAL_EMAIL y E2E_REAL_PASSWORD (usuario de bodega creado por backend) prueba además
 // el login y la lectura de terroirs. Las credenciales nunca se escriben en el repo.
+// No puede pasar entera hasta que el backend implemente el contrato de la Ola 0 (O0-BE-4):
+// `GET /users/me` con membresías, listas paginadas y la cookie de renovación `doc_rt`.
 
 test("el backend real rechaza credenciales inválidas con el envoltorio esperado", async ({ page }) => {
   await page.goto("/login");

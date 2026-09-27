@@ -5,7 +5,8 @@ import {
   type ProductionBatchResponse,
   type RestStatusResponse,
 } from "@drinks-on-chain/mocks";
-import { isAfter, parseDecimal, type FieldErrors } from "@/features/vinificacion/form-utils";
+import { isAfter, type FieldErrors } from "@/features/vinificacion/form-utils";
+import { parseDecimal } from "@/lib/format";
 import { lotName, type LotLookup } from "@/features/vinificacion/tank-model";
 
 // Cálculos puros de destilación (03 §4, 1D; 09 §3 filas 5.1B y 5.2B): cortes del alambique

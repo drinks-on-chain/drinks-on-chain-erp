@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { erpFixtures } from "@drinks-on-chain/mocks/fixtures";
 import type { TerroirResponse } from "@drinks-on-chain/mocks";
-import { numberToInput, parseDecimal } from "@/lib/format";
-import { detailPairs } from "./api-details";
 import { doBadgeText, doEligibility, isDoVariety } from "./do-eligibility";
 import { filterTerroirs, shortVariety, varietiesOf } from "./filter-terroirs";
 import { outerRing, ringToSvgPoints } from "./parcel-shape";
+import { ApiError } from "@/lib/api/errors";
 import { EMPTY_TERROIR, terroirFieldErrors, terroirToValues, toTerroirDto } from "./terroir-form-values";
 
 const terroirs = erpFixtures.terroirs as TerroirResponse[];
@@ -159,27 +158,25 @@ describe("formulario de terroir", () => {
     });
   });
 
-  it("lleva los details del backend a los campos", () => {
-    expect(terroirFieldErrors(["altitudeMasl: Too small", "geographicPolygonGeojson: Invalid", "otro: x"])).toEqual({
-      altitudeMasl: "Too small",
-      polygon: "Invalid",
+  it("lleva los details[].field de un 422 a los campos", () => {
+    const error = new ApiError({
+      status: 422,
+      code: "VALIDATION_ERROR",
+      message: "Validation failed",
+      details: [
+        { field: "altitudeMasl", message: "Too small" },
+        { field: "geographicPolygonGeojson.coordinates", message: "Invalid" },
+        { field: "otro", message: "x" },
+      ],
     });
-    expect(detailPairs(["brixDegrees es obligatorio"])).toEqual([["brixDegrees", "es obligatorio"]]);
-    expect(detailPairs({ initialPh: ["fuera de rango"] })).toEqual([["initialPh", "fuera de rango"]]);
-  });
-});
-
-describe("parseDecimal", () => {
-  it("lee comas decimales y puntos de miles", () => {
-    expect(parseDecimal("23,4")).toBe(23.4);
-    expect(parseDecimal("3.40")).toBe(3.4);
-    expect(parseDecimal("18.400")).toBe(18400);
-    expect(parseDecimal("1.234,5")).toBe(1234.5);
-    expect(parseDecimal(" 150 ")).toBe(150);
-    expect(parseDecimal("")).toBeNull();
-    expect(parseDecimal("abc")).toBeNull();
-    expect(parseDecimal("1,2,3")).toBeNull();
-    expect(parseDecimal("-21.561", { grouping: false })).toBe(-21.561);
-    expect(parseDecimal(numberToInput(4.125))).toBe(4.125);
+    expect(terroirFieldErrors(error)).toEqual({ altitudeMasl: "Too small", polygon: "Invalid" });
+    // Backend anterior a O0-BE-2: "campo: mensaje" (hasta H1).
+    const legacy = new ApiError({
+      status: 400,
+      code: "VALIDATION_ERROR",
+      message: "x",
+      details: ["altitudeMasl: Too small"],
+    });
+    expect(terroirFieldErrors(legacy)).toEqual({ altitudeMasl: "Too small" });
   });
 });

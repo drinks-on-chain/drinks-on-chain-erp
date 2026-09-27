@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
-import { AuthLayout } from "@drinks-on-chain/ui";
+import { AuthLayout, BrandSeal, VineyardScene } from "@drinks-on-chain/ui";
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = { title: "Iniciar sesión" };
 
-// Login dividido del ERP (01-erp.html §03): sin registro público; los usuarios los crea
-// la bodega o el equipo gestor.
+// Login dividido del ERP (01-erp.html §03) con la chapa de la marca y el grabado animado del
+// viñedo, como en las landings. Sin registro público: los usuarios los crea la bodega o el equipo gestor.
 export default function LoginPage() {
   return (
     <AuthLayout
       variant="split"
-      eyebrow="ERP de trazabilidad"
+      brand={<BrandSeal tagline="ERP de trazabilidad" />}
+      image={<VineyardScene />}
       title="Iniciar sesión"
       imageCaption={
         <>
