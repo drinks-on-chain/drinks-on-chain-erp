@@ -10,7 +10,7 @@ S1 · ERP de trazabilidad de las bodegas (`erp.`). Nace de `drinks-on-chain-app-
 - El backend no tiene entidad "Lote": la vista `LotView` se deriva con `useLotViews()` (`deriveLotViews` de `@drinks-on-chain/mocks`).
 - "Hoy" siempre con `today()` de `src/lib/erp/today.ts` (con mocks es 2026-09-25, la fecha de los fixtures).
 - Permisos con `can(me, acción)` de `src/lib/erp/permissions.ts` (09 §3): salen de la membresía de la **organización activa** (`erpRole(me)`), no del rol global; ocultar o desactivar lo que el rol no puede hacer. La plataforma entra en solo lectura.
-- Sesión (contrato de la Ola 0, heredada de la plantilla): acceso solo en memoria, renovación con la cookie `doc_rt`; nunca guardar tokens en `sessionStorage`/`localStorage`. La API se llama en `/api/v1/*` del propio origen (Next reescribe a `API_ORIGIN`). `useMe()` devuelve `{ user, memberships, activeOrganizationId }`.
+- Sesión (contrato de la Ola 0, heredada de la plantilla): acceso solo en memoria, renovación con la cookie `doc_rt`; nunca guardar tokens en `sessionStorage`/`localStorage`. La API se llama en `/api/v1/*` del propio origen (`src/proxy.ts` la reescribe a `API_ORIGIN` con la IP del cliente firmada con `PROXY_SHARED_SECRET`). `useMe()` devuelve `{ user, memberships, activeOrganizationId }`.
 - Listas con `limit` ≤ 100: las colecciones que se cargan enteras pasan por `fetchAllPages()`. Errores de formulario con `fieldErrorsFrom()` (`details[].field`).
 - Estados y textos de enumeraciones en `src/lib/erp/labels.ts`; cifras y fechas con `src/lib/format.ts` de la plantilla (único `parseDecimal`, es-BO, fechas en UTC).
 - Cada página fija sus migas y su única acción principal con `<PageChrome breadcrumbs actions />`.

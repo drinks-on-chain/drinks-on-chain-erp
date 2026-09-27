@@ -49,8 +49,8 @@ export const devToolsEnabled = process.env.NODE_ENV !== "production" || env.mock
 
 /**
  * Prefijo de la API en el origen de la propia app (P-1, contrato de la Ola 0 §7). El cliente
- * llama a `/api/v1/*`; Next lo reescribe a `${API_ORIGIN}/v1/*` y la cookie de renovación
- * queda de primera parte. Con mocks, MSW intercepta `/api/v1/*` en el navegador.
+ * llama a `/api/v1/*`; `src/proxy.ts` lo reescribe a `${API_ORIGIN}/v1/*` y la cookie de
+ * renovación queda de primera parte. Con mocks, MSW intercepta `/api/v1/*` en el navegador.
  */
 export const API_BASE = "/api";
 
@@ -65,8 +65,8 @@ const apiOriginSchema = z
 type ServerVars = { API_ORIGIN?: string; NEXT_PUBLIC_MOCKS?: string };
 
 /**
- * Origen del backend para la reescritura de `next.config.ts` (variable de servidor
- * `API_ORIGIN`, nunca pública). Obligatoria salvo con `NEXT_PUBLIC_MOCKS=1`, donde no hay
+ * Origen del backend para la reescritura de `src/proxy.ts` (variable de servidor
+ * `API_ORIGIN`, nunca pública; `next.config.ts` la valida también al construir). Obligatoria salvo con `NEXT_PUBLIC_MOCKS=1`, donde no hay
  * reescritura y devuelve `null`. Solo se evalúa en el servidor (build y `next start`).
  */
 export function resolveApiOrigin(

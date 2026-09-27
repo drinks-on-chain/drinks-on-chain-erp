@@ -79,3 +79,4 @@ Contrato: `plan/contratos/o1-backoffice-y-bodegas.md` del plan maestro (§1, §2
 - [x] Pantalla de bodega no activa (`ORG_NOT_ACTIVE`: invitada, suspendida, revocada) sin romper la navegación · 2026-09-27
 - [x] Pruebas: unitarias de reglas de equipo, contraseñas, estado de la organización, configuración, bitácora y cuenta; e2e con el buzón simulado (invitación nueva y existente, recuperación), equipo, bodega no activa, axe y teclado · 2026-09-27
 - [ ] Contra el backend real cuando publique O1-BE-1 (todo el §6 de los mocks está pendiente del backend)
+- [x] IP real del cliente detrás del proxy (O1-OPS-1): `rewrites` sustituidos por `src/proxy.ts`, que reescribe `/api/v1/*` a `${API_ORIGIN}/v1/*` con `X-DOC-Client-IP` firmada (HMAC con `PROXY_SHARED_SECRET`, variable de servidor) · 2026-09-27
