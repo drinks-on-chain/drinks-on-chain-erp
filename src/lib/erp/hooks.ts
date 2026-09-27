@@ -98,6 +98,8 @@ export const useAudit = (q: AuditQuery, enabled = true) =>
  * Vista derivada "Lote" (09 §2): une toda la cadena de la bodega y calcula etapa y candado
  * de cada lote de vendimia. Carga las seis colecciones completas.
  */
+const NONE: never[] = [];
+
 export function useLotViews() {
   // Cada rol lee solo parte de la cadena (matriz del backend): lo que no puede leer no se pide y
   // cuenta como vacío, así el panel del operario o de agronomía no falla con un 403.
@@ -125,20 +127,23 @@ export function useLotViews() {
     ],
   });
   const used = results.filter((_, i) => allowed[i]);
-  const [harvest, terroirs, tanks, agings, productions, bottlings] = results;
-  const ready = !!me.data && used.every((r) => r.isSuccess);
+  // Lo que el rol no lee cuenta como vacío (una misma lista para no recalcular); lo que lee, cuando llega.
+  const items = <T>(i: number, page: { items: T[] } | undefined): T[] | undefined =>
+    me.data ? (allowed[i] ? page?.items : (NONE as T[])) : undefined;
+  const harvestBatches = items(0, results[0].data);
+  const terroirs = items(1, results[1].data);
+  const tanks = items(2, results[2].data);
+  const wineAgings = items(3, results[3].data);
+  const productionBatches = items(4, results[4].data);
+  const bottlings = items(5, results[5].data);
 
-  const chain = useMemo<LotChain | undefined>(() => {
-    if (!ready) return undefined;
-    return {
-      harvestBatches: harvest.data?.items ?? [],
-      terroirs: terroirs.data?.items ?? [],
-      tanks: tanks.data?.items ?? [],
-      wineAgings: agings.data?.items ?? [],
-      productionBatches: productions.data?.items ?? [],
-      bottlings: bottlings.data?.items ?? [],
-    };
-  }, [ready, harvest.data, terroirs.data, tanks.data, agings.data, productions.data, bottlings.data]);
+  const chain = useMemo<LotChain | undefined>(
+    () =>
+      harvestBatches && terroirs && tanks && wineAgings && productionBatches && bottlings
+        ? { harvestBatches, terroirs, tanks, wineAgings, productionBatches, bottlings }
+        : undefined,
+    [harvestBatches, terroirs, tanks, wineAgings, productionBatches, bottlings],
+  );
 
   const data = useMemo<LotView[] | undefined>(
     () => (chain ? deriveLotViews(chain, { today: today() }) : undefined),
