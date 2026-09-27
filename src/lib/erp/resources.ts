@@ -32,19 +32,30 @@ import {
 } from "@drinks-on-chain/mocks";
 import { api } from "@/lib/api/client";
 import { toPage, type Page } from "@/lib/api/envelope";
+import { fetchAllPages, MAX_PAGE_SIZE } from "@/lib/api/pagination";
 
 // Acceso a los endpoints del ERP (09 §3). Una función por operación; las pantallas usan
 // los hooks de hooks.ts, nunca estas funciones directamente.
 
 type Query = Record<string, string | number | boolean | null | undefined>;
 
-/** Límite para listas que se cargan enteras (p. ej. para derivar la vista "Lote"). */
-export const ALL = 500;
+async function page<T>(path: string, item: z.ZodType<T>, query: Query, signal?: AbortSignal): Promise<Page<T>> {
+  const data = await api(path, { query, signal });
+  return toPage(data, item, { limit: Number(query.limit), offset: Number(query.offset) });
+}
 
+/**
+ * Colección del backend. Sin `limit`, se carga entera en páginas de 100 (máximo del contrato
+ * de la Ola 0 §2): las pantallas del ERP filtran en el cliente y la vista "Lote" necesita la
+ * cadena completa. Con `limit`, una sola página (acotada a 100).
+ */
 async function list<T>(path: string, item: z.ZodType<T>, query: Query = {}, signal?: AbortSignal): Promise<Page<T>> {
-  const params = { limit: ALL, offset: 0, ...query };
-  const data = await api(path, { query: params, signal });
-  return toPage(data, item, { limit: Number(params.limit), offset: Number(params.offset) });
+  const { limit, offset, ...filters } = query;
+  if (limit != null) {
+    const size = Math.min(Number(limit), MAX_PAGE_SIZE);
+    return page(path, item, { ...filters, limit: size, offset: Number(offset ?? 0) }, signal);
+  }
+  return fetchAllPages((p) => page(path, item, { ...filters, ...p }, signal));
 }
 
 export type PageQuery = { limit?: number; offset?: number };
@@ -120,7 +131,7 @@ export const erpApi = {
   updateWinery: (body: UpdateWineryDto) =>
     api("/v1/wineries/my", { method: "PATCH", body, schema: WineryResponseSchema }),
   members: (signal?: AbortSignal) =>
-    api("/v1/wineries/my/members", { signal }).then((d) => toPage(d, WineryMemberItemSchema).items),
+    list("/v1/wineries/my/members", WineryMemberItemSchema, {}, signal).then((p) => p.items),
   createMember: (body: CreateMemberDto) =>
     api("/v1/wineries/my/members/create", { method: "POST", body, schema: WineryMemberItemSchema }),
 
