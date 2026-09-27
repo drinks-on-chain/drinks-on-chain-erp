@@ -16,7 +16,7 @@ const CINTI = {
 const ALTOS_FERMENTING_TANK = "f87af6c0-197d-5fa3-b85e-29d7b27f00d9";
 
 // Un embotellado sin certificado responde 404 en su certificado: es el estado "sin certificado".
-const EXPECTED = [/^404 \/v1\/lab-analyses\/batch\//];
+const EXPECTED = [/^404 \/api\/v1\/lab-analyses\/batch\//];
 
 async function audit(page: Page, { dialog = false } = {}) {
   await settled(page);

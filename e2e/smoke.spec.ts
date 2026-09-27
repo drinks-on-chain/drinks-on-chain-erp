@@ -23,7 +23,7 @@ test("login de la enóloga de Cinti Viejo y panel de su bodega", async ({ page }
   await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page.getByRole("heading", { name: /, Lucía$/ })).toBeVisible();
   await expect(page.getByText("Destilería Cinti Viejo").first()).toBeVisible();
-  await expect(page.getByText("Tareas pendientes")).toBeVisible();
+  await expect(page.getByText("Tareas pendientes", { exact: true })).toBeVisible();
   await expect(page.getByText("Dictaminar ingreso de uva").first()).toBeVisible();
   // Una sola membresía: no hay selector de organización; nada de la sesión en el almacenamiento.
   await expect(page.getByRole("combobox", { name: "Organización activa" })).toHaveCount(0);
@@ -52,7 +52,7 @@ test("la recarga mantiene la sesión (renovación con la cookie al arrancar)", a
   const errors = trackErrors(page);
   await login(page, "enologa@cintiviejo.test");
   await page.reload();
-  await expect(page.getByText("Tareas pendientes")).toBeVisible();
+  await expect(page.getByText("Tareas pendientes", { exact: true })).toBeVisible();
   await expect(page).not.toHaveURL(/\/login/);
   expect(errors).toEqual([]);
 });
@@ -72,7 +72,7 @@ test("cambio de organización: Sofía pasa de enóloga en Altos a dueña de Casa
   await expect(page.getByText("Ahora trabajas en Casa Uriondo.", { exact: true })).toBeVisible();
   await expect(page).toHaveURL(/\/$/);
   await expect(shellUser(page)).toContainText("Dirección · Casa Uriondo");
-  await expect(page.getByText("Tareas pendientes")).toBeVisible();
+  await expect(page.getByText("Tareas pendientes", { exact: true })).toBeVisible();
 
   // Como dueña ve los ajustes de la bodega como editables.
   await page.getByRole("link", { name: "Ajustes", exact: true }).first().click();

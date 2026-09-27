@@ -1,27 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
+import { trackErrors } from "./support";
 import { unzipSync } from "fflate";
 
 // 1E Envasado y QR, lotes, 1F Cuenta Stellar y el resto de 1A (perfil y ajustes) contra los mocks.
 // La base de datos de MSW vive en la página: tras una escritura se navega con enlaces (sin recargar).
 
-function trackErrors(page: Page, expected: RegExp[] = []) {
-  const errors: string[] = [];
-  page.on("pageerror", (e) => errors.push(e.message));
-  page.on(
-    "console",
-    (m) => m.type() === "error" && !m.text().startsWith("Failed to load resource") && errors.push(m.text()),
-  );
-  page.on("response", (r) => {
-    if (r.status() < 400) return;
-    const line = `${r.status()} ${new URL(r.url()).pathname}`;
-    if (!expected.some((re) => re.test(line))) errors.push(line);
-  });
-  return errors;
-}
-
 // Un embotellado sin certificado responde 404 en su certificado: es el estado "sin certificado".
-const NO_LAB = /^404 \/v1\/lab-analyses\/batch\//;
+const NO_LAB = /^404 \/api\/v1\/lab-analyses\/batch\//;
 
 async function login(page: Page, email: string) {
   await page.goto("/login");

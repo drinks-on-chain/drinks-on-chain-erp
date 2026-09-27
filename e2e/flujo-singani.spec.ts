@@ -1,25 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
+import { trackErrors } from "./support";
+
+// Un embotellado recién creado aún no tiene certificado de laboratorio: 404 esperado.
+const NO_LAB = /^404 \/api\/v1\/lab-analyses\/batch\//;
 
 // Flujo de ejemplo del documento maestro ("Singani Gran Reserva 2026"), de origen a QR (03 §4, 1G).
 // Parte 1: un lote nuevo recorre origen → vendimia → tanque → destilación y queda en el reposo
 // de 180 días. Parte 2: como el reposo no puede cumplirse en una prueba, se embotella la
 // destilación de la misma bodega que ya lo cumplió y se exportan sus QR.
 // Los mocks viven en la memoria de la página: tras crear datos se navega solo con clics.
-
-function trackErrors(page: Page) {
-  const errors: string[] = [];
-  page.on("pageerror", (e) => errors.push(e.message));
-  page.on(
-    "console",
-    (m) => m.type() === "error" && !m.text().startsWith("Failed to load resource") && errors.push(m.text()),
-  );
-  page.on("response", (r) => {
-    const line = `${r.status()} ${new URL(r.url()).pathname}`;
-    // Un embotellado recién creado aún no tiene certificado de laboratorio: 404 esperado.
-    if (r.status() >= 400 && !/^404 \/v1\/lab-analyses\/batch\//.test(line)) errors.push(line);
-  });
-  return errors;
-}
 
 async function login(page: Page, email: string) {
   await page.getByLabel("Correo electrónico").fill(email);
@@ -38,7 +27,7 @@ const nav = (page: Page, name: string) => page.getByRole("link", { name, exact: 
 
 test("Singani Gran Reserva 2026: de la parcela al reposo y del reposo cumplido al QR", async ({ page }) => {
   test.setTimeout(120_000);
-  const errors = trackErrors(page);
+  const errors = trackErrors(page, [NO_LAB]);
   await page.goto("/login");
 
   // 1. El agrónomo registra la parcela D.O. y el ingreso de uva, y lo aprueba.

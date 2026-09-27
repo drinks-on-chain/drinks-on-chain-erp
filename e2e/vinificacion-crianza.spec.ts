@@ -1,20 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
+import { trackErrors } from "./support";
 
 // 1C (vinificación) y 1D (crianza y destilación) contra los mocks (hoy = 2026-09-25).
 
 // Flujos largos (login + varias pantallas): margen para máquinas cargadas.
 test.describe.configure({ timeout: 60_000 });
-
-function trackErrors(page: Page) {
-  const errors: string[] = [];
-  page.on("pageerror", (e) => errors.push(e.message));
-  page.on(
-    "console",
-    (m) => m.type() === "error" && !m.text().startsWith("Failed to load resource") && errors.push(m.text()),
-  );
-  page.on("response", (r) => r.status() >= 400 && errors.push(`${r.status()} ${new URL(r.url()).pathname}`));
-  return errors;
-}
 
 async function login(page: Page, email: string) {
   await page.goto("/login");
