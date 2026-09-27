@@ -5,7 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Alert, Button, Field, Input, Select, Skeleton, Textarea, toast } from "@drinks-on-chain/ui";
 import { ApiError, errorMessage } from "@/lib/api/errors";
+import { useMe } from "@/lib/auth/hooks";
 import { useCreateHarvestBatch, useTerroirs } from "@/lib/erp/hooks";
+import { can } from "@/lib/erp/permissions";
 import { today } from "@/lib/erp/today";
 import { fmtKg, fmtNumber } from "@/lib/format";
 import { LAB_TARGETS } from "../lab-targets";
@@ -27,7 +29,9 @@ import { LabReadingCard } from "./lab-reading-card";
  */
 export function WeighInForm({ initialTerroirId }: { initialTerroirId?: string }) {
   const router = useRouter();
+  const me = useMe();
   const terroirs = useTerroirs();
+  const canReadTerroirs = can(me.data, "terroir.read");
   const create = useCreateHarvestBatch();
   const [values, setValues] = useState<WeighInValues>(() => emptyWeighIn(today(), initialTerroirId));
   const [errors, setErrors] = useState<WeighInErrors>({});
@@ -104,6 +108,11 @@ export function WeighInForm({ initialTerroirId }: { initialTerroirId?: string })
             </Alert>
           ) : !terroirs.data ? (
             <Skeleton shape="block" className="h-20" />
+          ) : !canReadTerroirs ? (
+            <Alert tone="warning" title="Tu rol no puede consultar las parcelas">
+              El pesaje necesita elegir la parcela de origen y el backend aún no deja al operario leerlas. Pide a la
+              dirección, enología o agronomía que registren este ingreso.
+            </Alert>
           ) : options.length === 0 ? (
             <Alert tone="warning" title="No hay terroirs activos">
               Registra primero la parcela de origen en{" "}

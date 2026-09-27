@@ -2,7 +2,8 @@
 
 import { useMemo } from "react";
 import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { deriveLotViews, type LotChain, type LotView } from "@drinks-on-chain/mocks";
+import { deriveLotViews, type LotChain, type LotView, type TerroirResponse } from "@drinks-on-chain/mocks";
+import type { Page } from "@/lib/api/envelope";
 import { ApiError } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
 import { erpKeys } from "./keys";
@@ -21,8 +22,22 @@ import { today } from "./today";
 
 // ---------- Lecturas ----------
 
-export const useTerroirs = (q: TerroirQuery = {}) =>
-  useQuery({ queryKey: erpKeys.terroirs(q), queryFn: ({ signal }) => erpApi.terroirs(q, signal) });
+const NO_TERROIRS: Page<TerroirResponse> = { items: [], total: 0, limit: 0, offset: 0 };
+
+/**
+ * Parcelas de la bodega. El operario no las lee (matriz del backend: 403), pero vendimia y
+ * vinificación las usan para poner nombre a la parcela: para ese rol no se piden y la lista llega
+ * vacía (con otra clave, para no mezclarla con la de quien sí las lee).
+ */
+export function useTerroirs(q: TerroirQuery = {}) {
+  const me = useMe();
+  const allowed = can(me.data, "terroir.read");
+  return useQuery({
+    queryKey: allowed ? erpKeys.terroirs(q) : [...erpKeys.terroirs(q), "sin-permiso"],
+    queryFn: ({ signal }) => (allowed ? erpApi.terroirs(q, signal) : Promise.resolve(NO_TERROIRS)),
+    enabled: !!me.data,
+  });
+}
 export const useTerroir = (id: string) =>
   useQuery({ queryKey: erpKeys.terroir(id), queryFn: ({ signal }) => erpApi.terroir(id, signal) });
 
