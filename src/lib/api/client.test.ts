@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { api, bootstrapSession, logoutSession, setSessionEndedHandler } from "./client";
-import { ApiError, ContractError, NetworkError } from "./errors";
+import { ApiError, ContractError, NetworkError, errorMessage } from "./errors";
 import { toPage } from "./envelope";
 import { fetchAllPages } from "./pagination";
 import { CLIENT_APP } from "@/lib/client-app";
@@ -97,6 +97,18 @@ describe("api", () => {
     expect(err).toBeInstanceOf(ApiError);
     expect(err).toMatchObject({ status: 422, code: "VALIDATION_ERROR", isValidation: true });
     expect(err.details).toEqual([{ field: "grossWeightKg", message: "Debe ser mayor que la tara" }]);
+  });
+
+  it("un 429 lleva la espera de Retry-After y el mensaje la muestra", async () => {
+    clearSession();
+    const res = fail(429, "AUTH_TOO_MANY_ATTEMPTS", "Demasiados intentos");
+    res.headers.set("Retry-After", "300");
+    fetchMock.mockResolvedValueOnce(res);
+    const err = (await api("/v1/auth/login", { method: "POST", body: {}, auth: false }).catch(
+      (e: unknown) => e,
+    )) as ApiError;
+    expect(err).toMatchObject({ status: 429, code: "AUTH_TOO_MANY_ATTEMPTS", retryAfter: 300 });
+    expect(errorMessage(err)).toBe("Demasiados intentos. Vuelve a intentarlo en 5 minutos.");
   });
 
   describe("arranque", () => {

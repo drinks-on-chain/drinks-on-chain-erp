@@ -83,7 +83,18 @@ async function send(path: string, opts: RequestOptions<unknown>, token: string |
   }
 }
 
+/** `Retry-After` en segundos (también admite una fecha HTTP). */
+function retryAfterSeconds(res: Response): number | undefined {
+  const raw = res.headers.get("Retry-After");
+  if (!raw) return undefined;
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds);
+  const at = Date.parse(raw);
+  return Number.isNaN(at) ? undefined : Math.max(0, Math.round((at - Date.now()) / 1000));
+}
+
 async function parseError(res: Response, path: string): Promise<ApiError> {
+  const retryAfter = retryAfterSeconds(res);
   let json: unknown = null;
   try {
     json = await res.json();
@@ -99,9 +110,16 @@ async function parseError(res: Response, path: string): Promise<ApiError> {
       message: error.message,
       details: error.details,
       path: p,
+      retryAfter,
     });
   }
-  return new ApiError({ status: res.status, code: `HTTP_${res.status}`, message: res.statusText || "Error", path });
+  return new ApiError({
+    status: res.status,
+    code: `HTTP_${res.status}`,
+    message: res.statusText || "Error",
+    path,
+    retryAfter,
+  });
 }
 
 // ---------------------------------------------------------------------------
