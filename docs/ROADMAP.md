@@ -44,8 +44,8 @@ Detalle de `docs/03-roadmap-frontend.md` §4. Se marca con fecha cuando la sub-e
 
 - [x] Estados en todas las pantallas, teclado, lector de pantalla · 2026-09-25
 - [x] Playwright del flujo "Singani Gran Reserva 2026" de origen a QR (lote nuevo hasta el reposo + embotellado de un reposo cumplido y exportación de QR) · 2026-09-25
-- [x] Integración temprana contra el backend real: `e2e/backend-real.spec.ts` (manual, `E2E_REAL_API=1`, job `workflow_dispatch`) con las personas de la semilla · 2026-09-27 (pasa entera solo cuando el backend sirva los decimales como números: ver Ola 0)
-- [ ] Recorrido real en verde sin parches: pendiente de que el backend corrija los `Decimal` como texto
+- [x] Integración temprana contra el backend real: `e2e/backend-real.spec.ts` (manual, `E2E_REAL_API=1`, job `workflow_dispatch`) con las personas de la semilla · 2026-09-27
+- [x] Recorrido real en verde sin parches (backend `b9e8b68`: decimales como número, `null` en opcionales como omitido, DAG declarado en el OpenAPI): las 6 pruebas, incluido el 429 · 2026-09-27
 
 ## Ola 0 · Sesiones y estándares (O0-ERP-1)
 
@@ -62,7 +62,7 @@ Contrato: `plan/contratos/o0-sesiones-y-estandares.md` del plan maestro. La base
 - [x] Pruebas unitarias y todas las E2E con mocks en verde (humo con recarga, cambio de organización, cierre de sesión y error por campo) · 2026-09-27
 - [x] Integración real (O0-ERP-2): login y cookie `doc_rt` por la reescritura, recarga, cambio de organización, cierre que revoca, permisos de operario, 422 con `details[].field`, 429 con `Retry-After`, alta de parcela `E2E-…` · 2026-09-27
   - Corregido en el ERP: listas validadas como `ContractError` y sin reintentos ante un contrato roto (antes, 3 peticiones y ~4,5 s por pantalla); grafo de trazabilidad del backend normalizado (`src/lib/erp/dag.ts`); las altas no envían `null` en campos opcionales no anulables (`omitNulls`); el operario no pide parcelas (403); certificados del listado de envasado solo de la página visible
-  - Bloqueado por el backend: los campos `Decimal` llegan como texto (`"4.50"`) donde el OpenAPI dice `number`; con la conversión aplicada solo en local, todo el recorrido pasa y las pantallas cargan en 0,2–1 s
+  - Backend corregido en `b9e8b68` (decimales como número): el recorrido pasa sin parches; pantallas en 0,2–0,8 s navegando dentro de la app. La línea de tiempo toma el certificado de `details.labAnalysis` del embotellado
 
 ## Ola 1 · Cuenta, organización y equipo (O1-ERP-1, sub-etapa 1I)
 

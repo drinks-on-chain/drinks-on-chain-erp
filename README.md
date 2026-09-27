@@ -59,7 +59,7 @@ E2E_REAL_API=1 E2E_API_ORIGIN=https://136.243.223.39.sslip.io E2E_PORT=3150 pnpm
 
 Recorre: login a través de la reescritura (cookie `doc_rt` de primera parte, `HttpOnly`, nada en el almacenamiento), recarga que mantiene la sesión, los módulos de la dueña de Cinti Viejo con su tiempo de carga (anotaciones de Playwright), alta inocua de una parcela `E2E-<fecha>-<azar>`, un 422 del backend con `details[].field` en el perfil (no guarda nada), cierre de sesión que revoca; Sofía con dos bodegas y cambio a Casa Uriondo (suspendida) y a Altos; el operario sin crianza, destilación, envasado ni parcelas; contabilidad bloqueada por la plataforma. En GitHub hay un job manual (`E2E contra el backend real`, `workflow_dispatch`) que lee el secreto `E2E_PASSWORD` si existe y no sube artefactos.
 
-**Estado (27-09-2026)**: solo pasa entera con el backend corrigiendo los decimales (O0-ERP-2, ver `docs/ROADMAP.md`): hoy el backend devuelve como texto los campos `Decimal` que su OpenAPI declara `number` y todas las pantallas de trazabilidad caen en "Recibimos datos inesperados del servidor". Con esa corrección aplicada en local (sin integrar) el recorrido pasa completo. Las pantallas de la Ola 1 (equipo, invitaciones, bitácora) siguen sin endpoints en el backend.
+**Estado (27-09-2026)**: en verde sin parches contra el backend de desarrollo (`b9e8b68`), las 6 pruebas incluido el 429. Las pantallas de la Ola 1 (equipo, invitaciones, bitácora) quedan fuera hasta que el backend publique sus endpoints.
 
 Publicado en Vercel (con datos de prueba): https://drinks-on-chain-erp.vercel.app · panel de usuarios de demo en `/__mocks`.
 
