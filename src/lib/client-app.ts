@@ -7,4 +7,4 @@ export type ClientApp = "ERP" | "BACKOFFICE" | "MARKETPLACE" | "POS" | "API";
 
 export const CLIENT_APP_HEADER = "X-Client-App";
 
-export const CLIENT_APP: ClientApp = "API";
+export const CLIENT_APP: ClientApp = "ERP";
