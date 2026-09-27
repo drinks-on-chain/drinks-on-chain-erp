@@ -1,0 +1,44 @@
+name: E2E contra el backend real
+
+# Solo manual (O0-ERP-2): recorre el ERP contra el backend de desarrollo con las personas de la
+# semilla. Lee la contraseña de demostración del secreto E2E_PASSWORD; sin él, solo corre la
+# prueba de credenciales inválidas y el resto se salta.
+on:
+  workflow_dispatch:
+    inputs:
+      api_origin:
+        description: Origen del backend
+        required: true
+        default: https://136.243.223.39.sslip.io
+      with_429:
+        description: Probar también el 429 del login (suma fallos al bloqueo por IP del runner)
+        type: boolean
+        default: false
+
+concurrency:
+  group: e2e-backend-real
+  cancel-in-progress: false
+
+jobs:
+  e2e-backend-real:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      E2E_REAL_API: "1"
+      E2E_API_ORIGIN: ${{ inputs.api_origin }}
+      E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+      E2E_REAL_429: ${{ inputs.with_429 && '1' || '' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Aviso si falta el secreto
+        if: env.E2E_PASSWORD == ''
+        run: echo "::warning::Sin el secreto E2E_PASSWORD solo corre la prueba de credenciales inválidas."
+      - run: pnpm e2e --project=escritorio
+      # Sin artefactos: el repo es público y las trazas o capturas podrían contener la contraseña.

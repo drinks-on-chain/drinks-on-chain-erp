@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import type { BottlingBatchResponse } from "@drinks-on-chain/mocks";
-import { Badge, Button, DataTable, EmptyState, ErrorState, Skeleton } from "@drinks-on-chain/ui";
+import { Badge, Button, DataTable, EmptyState, ErrorState, Skeleton, type SortState } from "@drinks-on-chain/ui";
 import { PageChrome } from "@/components/page-chrome";
 import { errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
@@ -12,13 +13,18 @@ import { PRODUCT_TYPE } from "@/lib/erp/labels";
 import { can } from "@/lib/erp/permissions";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import { AnchorBadge } from "./anchor-badge";
+import { BOTTLING_PAGE_SIZE, DEFAULT_BOTTLING_SORT, bottlingPage, sortBottlings } from "./bottling-page";
 
 const abv = (n: number) => `${fmtNumber(n, Number.isInteger(n) ? 0 : 1)} % vol`;
 
 export function BottlingList() {
   const me = useMe();
   const bottlings = useBottlings();
-  const items = [...(bottlings.data?.items ?? [])].sort((a, b) => b.bottlingDate.localeCompare(a.bottlingDate));
+  const [sort, setSort] = useState<SortState | null>(DEFAULT_BOTTLING_SORT);
+  const [offset, setOffset] = useState(0);
+  const sorted = useMemo(() => sortBottlings(bottlings.data?.items ?? [], sort), [bottlings.data, sort]);
+  const items = bottlingPage(sorted, offset);
+  // Un certificado por embotellado (sin endpoint de lista): solo los de la página visible.
   const labs = useLabAnalysesOf(items.map((b) => b.id));
   const canCreate = can(me.data, "bottling.create");
 
@@ -52,7 +58,17 @@ export function BottlingList() {
           data={items}
           loading={bottlings.isPending}
           getRowId={(b) => b.id}
-          defaultSort={{ columnId: "date", direction: "desc" }}
+          sort={sort}
+          onSortChange={(next) => {
+            setSort(next);
+            setOffset(0);
+          }}
+          manualSorting
+          pagination={
+            sorted.length > BOTTLING_PAGE_SIZE
+              ? { total: sorted.length, limit: BOTTLING_PAGE_SIZE, offset, onOffsetChange: setOffset }
+              : undefined
+          }
           columns={[
             {
               id: "lot",

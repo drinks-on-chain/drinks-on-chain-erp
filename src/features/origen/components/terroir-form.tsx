@@ -94,7 +94,7 @@ export function TerroirForm({ mode, initial, terroirId }: Props) {
       router.push(`/origen/${saved.id}`);
     } catch (err) {
       if (err instanceof ApiError && err.isValidation) {
-        setErrors(terroirFieldErrors(err.details));
+        setErrors(terroirFieldErrors(err));
         setFormError(err.message);
       } else {
         toast({ title: "No se pudo guardar", description: errorMessage(err), tone: "danger" });

@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Building2, UserPlus } from "lucide-react";
-import type { WineryMemberItem, WineryResponse } from "@drinks-on-chain/mocks";
+import { Building2 } from "lucide-react";
+import type { EffectiveSetting, WineryResponse } from "@drinks-on-chain/mocks";
 import {
   Alert,
   Badge,
@@ -16,8 +16,6 @@ import {
   Field,
   Input,
   KeyValueList,
-  Modal,
-  Select,
   Skeleton,
   TextLink,
   toast,
@@ -25,24 +23,18 @@ import {
 import { PageChrome } from "@/components/page-chrome";
 import { ScreenTitle } from "@/components/screen-title";
 import { ApiError, errorMessage } from "@/lib/api/errors";
+import { fieldErrorsFrom } from "@/lib/api/field-errors";
 import { useMe } from "@/lib/auth/hooks";
-import { useCreateMember, useMembers, useUpdateWinery, useWinery } from "@/lib/erp/hooks";
+import { activeMembership } from "@/lib/auth/organization";
+import { useEffectiveSettings, useUpdateWinery, useWinery } from "@/lib/erp/hooks";
 import { BEVERAGE_CATEGORY, CERTIFICATION_STATUS } from "@/lib/erp/labels";
-import { can, roleLabel } from "@/lib/erp/permissions";
+import { can, isPlatform, roleLabel } from "@/lib/erp/permissions";
 import { fmtDate } from "@/lib/format";
-import { useReturnFocus } from "@/lib/use-return-focus";
-import {
-  MEMBER_ROLE_OPTIONS,
-  MIN_PASSWORD,
-  emptyMember,
-  validateMember,
-  validateWinery,
-  wineryValues,
-  type MemberErrors,
-  type MemberValues,
-  type WineryErrors,
-  type WineryValues,
-} from "./settings-model";
+import { APPLIES_AT, formatSettingValue, settingGroup, sortSettings } from "./effective-settings";
+import { validateWinery, wineryValues, type WineryErrors, type WineryValues } from "./settings-model";
+
+/** Campos que el backend puede marcar en un 422 (details[].field). */
+const WINERY_FIELDS = ["commercialName", "address", "contactEmail", "contactPhone"] as const;
 
 function WineryCard({ winery, editable }: { winery: WineryResponse; editable: boolean }) {
   const update = useUpdateWinery();
@@ -65,8 +57,11 @@ function WineryCard({ winery, editable }: { winery: WineryResponse; editable: bo
       toast({ title: "Datos de la bodega guardados", tone: "success" });
       setEditing(false);
     } catch (err) {
-      if (err instanceof ApiError && err.isValidation) setErrors({ commercialName: err.message });
-      else toast({ title: "No se pudieron guardar los datos", description: errorMessage(err), tone: "danger" });
+      if (err instanceof ApiError && err.isValidation) {
+        // 422: cada mensaje en su campo (details[].field); si ninguno es de este formulario, en el nombre.
+        const { fieldErrors, formErrors } = fieldErrorsFrom(err, WINERY_FIELDS);
+        setErrors(Object.keys(fieldErrors).length ? fieldErrors : { commercialName: formErrors[0] ?? err.message });
+      } else toast({ title: "No se pudieron guardar los datos", description: errorMessage(err), tone: "danger" });
     }
   };
 
@@ -141,102 +136,69 @@ function WineryCard({ winery, editable }: { winery: WineryResponse; editable: bo
   );
 }
 
-function AddMemberModal({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
-  const create = useCreateMember();
-  useReturnFocus(open);
-  const [values, setValues] = useState<MemberValues>(emptyMember);
-  const [errors, setErrors] = useState<MemberErrors>({});
-  const field = (k: Exclude<keyof MemberValues, "memberRole">) => ({
-    value: values[k],
-    onChange: (e: React.ChangeEvent<HTMLInputElement>) => setValues((v) => ({ ...v, [k]: e.target.value })),
-  });
-  const role = MEMBER_ROLE_OPTIONS.find((r) => r.value === values.memberRole);
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const { errors: next, dto } = validateMember(values);
-    setErrors(next);
-    if (!dto) return;
-    try {
-      const m = await create.mutateAsync(dto);
-      toast({ title: `${m.fullName} ya es parte de la bodega`, tone: "success" });
-      setValues(emptyMember());
-      onOpenChange(false);
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 409) setErrors({ email: err.message });
-      else if (err instanceof ApiError && err.isValidation) setErrors({ email: err.message });
-      else toast({ title: "No se pudo añadir el miembro", description: errorMessage(err), tone: "danger" });
-    }
-  };
-
+/** Parámetros que aplican a la bodega (contrato de la Ola 1 §6): solo lectura. */
+function EffectiveSettingsCard() {
+  const settings = useEffectiveSettings();
   return (
-    <Modal
-      open={open}
-      onOpenChange={(o) => !create.isPending && onOpenChange(o)}
-      title="Añadir miembro"
-      description="Crea la cuenta de una persona del equipo y la une a la bodega. Comparte con ella la contraseña inicial."
-      size="md"
-      footer={
-        <>
-          <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={create.isPending}>
-            Cancelar
-          </Button>
-          <Button type="submit" form="member-form" loading={create.isPending}>
-            Añadir miembro
-          </Button>
-        </>
-      }
-    >
-      <form id="member-form" noValidate onSubmit={submit} className="grid gap-4 md:grid-cols-2">
-        <Field label="Nombre completo" required error={errors.fullName} className="md:col-span-2">
-          <Input autoComplete="off" {...field("fullName")} />
-        </Field>
-        <Field label="Correo electrónico" required error={errors.email}>
-          <Input type="email" autoComplete="off" {...field("email")} />
-        </Field>
-        <Field
-          label="Contraseña inicial"
-          required
-          help={`Al menos ${MIN_PASSWORD} caracteres.`}
-          error={errors.password}
-        >
-          <Input type="password" autoComplete="new-password" {...field("password")} />
-        </Field>
-        <Field label="Rol en la bodega" required help={role?.help} error={errors.memberRole}>
-          {/* El desplegable del Select usa z-dropdown (20), bajo el velo del Modal (30): se sube
-              por encima del Modal (40) hasta que el sistema de diseño lo corrija. */}
-          <Select
-            placeholder="Elige un rol"
-            contentClassName="z-[45]!"
-            options={MEMBER_ROLE_OPTIONS.map(({ value, label }) => ({ value, label }))}
-            value={values.memberRole}
-            onValueChange={(memberRole) =>
-              setValues((v) => ({ ...v, memberRole: memberRole as MemberValues["memberRole"] }))
-            }
-          />
-        </Field>
-        <Field label="Teléfono" error={errors.phoneNumber}>
-          <Input type="tel" {...field("phoneNumber")} />
-        </Field>
-        <Field
-          label="Matrícula profesional"
-          help="Colegio de enólogos o agrónomos, si aplica."
-          className="md:col-span-2"
-        >
-          <Input {...field("professionalLicenseNumber")} />
-        </Field>
-      </form>
-    </Modal>
+    <Card padding="none" className="grid grid-cols-1">
+      <CardHeader
+        title="Configuración efectiva"
+        description="Valores que aplican a tu bodega. Los fija Drinks on Chain: «Estándar» es el general de la plataforma; «Propio» es un ajuste solo para tu bodega."
+        divided
+        className="px-5 pt-5"
+      />
+      <DataTable<EffectiveSetting>
+        caption="Configuración efectiva de la bodega"
+        captionHidden
+        bleed
+        data={settings.data ? sortSettings(settings.data) : []}
+        loading={settings.isPending}
+        error={
+          settings.isError
+            ? {
+                title: "No se pudo cargar la configuración",
+                description: errorMessage(settings.error),
+                onRetry: () => void settings.refetch(),
+              }
+            : undefined
+        }
+        getRowId={(s) => s.key}
+        columns={[
+          {
+            id: "setting",
+            header: "Parámetro",
+            cell: (s) => (
+              <span className="grid">
+                <span>{s.description}</span>
+                <span className="font-mono text-xs break-all text-fg-subtle">{s.key}</span>
+              </span>
+            ),
+          },
+          { id: "area", header: "Área", hideBelow: "md", cell: (s) => settingGroup(s.key) },
+          {
+            id: "value",
+            header: "Valor",
+            cell: (s) => <span className="tabular-nums">{formatSettingValue(s.key, s.value)}</span>,
+          },
+          {
+            id: "source",
+            header: "Origen",
+            cell: (s) =>
+              s.source === "WINERY" ? <Badge tone="accent">Propio</Badge> : <Badge tone="neutral">Estándar</Badge>,
+          },
+          { id: "applies", header: "Se aplica", hideBelow: "lg", cell: (s) => APPLIES_AT[s.appliesAt] },
+        ]}
+        empty={<EmptyState bare title="Sin parámetros" description="La plataforma aún no publica parámetros." />}
+      />
+    </Card>
   );
 }
 
 export function SettingsPage() {
   const me = useMe();
-  const platform = me.data?.userRole === "PLATFORM_ADMIN";
+  const platform = isPlatform(me.data);
   const winery = useWinery(!!me.data && !platform);
-  const members = useMembers();
   const manage = can(me.data, "winery.manage");
-  const [adding, setAdding] = useState(false);
   const crumbs = [{ label: "Ajustes" }];
 
   if (platform) {
@@ -253,32 +215,37 @@ export function SettingsPage() {
     );
   }
 
-  const addAction = manage ? (
-    <Button iconStart={<UserPlus aria-hidden size={18} />} onClick={() => setAdding(true)}>
-      Añadir miembro
-    </Button>
-  ) : undefined;
-
   return (
     <div className="grid grid-cols-1 gap-6">
-      <PageChrome breadcrumbs={crumbs} actions={addAction} />
+      <PageChrome breadcrumbs={crumbs} />
       <header className="grid grid-cols-1 gap-1">
         <h1 className="font-display text-3xl">Ajustes de la bodega</h1>
         <p className="text-fg-muted">
-          Datos de la bodega y su equipo.{" "}
+          Datos de la bodega y parámetros que le aplican. El equipo se gestiona en{" "}
           <TextLink asChild variant="inline">
-            <Link href="/cuenta">Ver la cuenta Stellar</Link>
+            <Link href="/equipo">Equipo</Link>
           </TextLink>
+          {manage && (
+            <>
+              {" "}
+              y lo ocurrido queda en la{" "}
+              <TextLink asChild variant="inline">
+                <Link href="/ajustes/bitacora">bitácora</Link>
+              </TextLink>
+            </>
+          )}
+          .
         </p>
       </header>
 
       {!manage && me.data && (
         <Alert tone="info" title="Modo consulta">
-          Tu rol ({roleLabel(me.data.userRole)}) puede ver los ajustes; los cambia la administración de la bodega.
+          Tu rol ({roleLabel(activeMembership(me.data)?.role)}) puede ver los ajustes; los cambia la administración de
+          la bodega.
         </Alert>
       )}
 
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+      <div className="grid max-w-3xl grid-cols-1">
         {winery.isError ? (
           <ErrorState
             description={errorMessage(winery.error)}
@@ -290,81 +257,8 @@ export function SettingsPage() {
         ) : (
           <Skeleton className="h-96" />
         )}
-
-        <section className="grid grid-cols-1 gap-3" aria-labelledby="members-title">
-          <h2 id="members-title" className="text-lg font-medium">
-            Miembros
-          </h2>
-          {members.isError ? (
-            <ErrorState
-              bare
-              description={errorMessage(members.error)}
-              onRetry={() => members.refetch()}
-              retrying={members.isFetching}
-            />
-          ) : (
-            <DataTable<WineryMemberItem>
-              caption="Miembros de la bodega"
-              captionHidden
-              data={members.data ?? []}
-              loading={members.isPending}
-              getRowId={(m) => m.id}
-              defaultSort={{ columnId: "name", direction: "asc" }}
-              columns={[
-                {
-                  id: "name",
-                  header: "Nombre",
-                  accessor: "fullName",
-                  sortable: true,
-                  cell: (m) => (
-                    <span className="grid">
-                      <span className="font-medium">{m.fullName}</span>
-                      <span className="text-fg-muted text-sm">{m.email}</span>
-                    </span>
-                  ),
-                },
-                {
-                  id: "role",
-                  header: "Rol",
-                  accessor: (m) => roleLabel(m.memberRole),
-                  sortable: true,
-                  cell: (m) => roleLabel(m.memberRole),
-                },
-                {
-                  id: "license",
-                  header: "Matrícula",
-                  hideBelow: "lg",
-                  cell: (m) => m.professionalLicenseNumber ?? <span className="text-fg-subtle">—</span>,
-                },
-                {
-                  id: "joined",
-                  header: "Desde",
-                  accessor: "joinedAt",
-                  sortable: true,
-                  hideBelow: "md",
-                  cell: (m) => <span className="whitespace-nowrap">{fmtDate(m.joinedAt)}</span>,
-                },
-                {
-                  id: "state",
-                  header: "Estado",
-                  cell: (m) =>
-                    m.isActive ? <Badge tone="success">Activo</Badge> : <Badge tone="neutral">Inactivo</Badge>,
-                },
-              ]}
-              empty={
-                <EmptyState
-                  bare
-                  title="Sin miembros"
-                  description="Añade a tu equipo para repartir el trabajo."
-                  action={addAction}
-                />
-              }
-            />
-          )}
-        </section>
       </div>
-
-      {manage && <AddMemberModal open={adding} onOpenChange={setAdding} />}
+      <EffectiveSettingsCard />
     </div>
   );
 }

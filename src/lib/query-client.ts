@@ -1,14 +1,25 @@
-import { QueryClient } from "@tanstack/react-query";
-import { ApiError } from "@/lib/api/errors";
+import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
+import { ApiError, ContractError } from "@/lib/api/errors";
+import { meQueryKey } from "@/lib/auth/keys";
+import { flagOrgInactive } from "@/lib/auth/org-status";
 
 export function makeQueryClient() {
-  return new QueryClient({
+  // Un 403 `ORG_NOT_ACTIVE` (la bodega se suspendió o revocó a mitad de la sesión) avisa al shell,
+  // que muestra la pantalla de bodega no activa, y vuelve a leer `me` para conocer el estado.
+  const onError = (error: unknown) => {
+    if (flagOrgInactive(error)) void client.invalidateQueries({ queryKey: meQueryKey });
+  };
+  const client: QueryClient = new QueryClient({
+    queryCache: new QueryCache({ onError }),
+    mutationCache: new MutationCache({ onError }),
     defaultOptions: {
       queries: {
         staleTime: 30_000,
-        // No se reintenta lo que no va a cambiar (4xx); sí los fallos de red y 5xx.
+        // No se reintenta lo que no va a cambiar (4xx, o una respuesta que no cumple el contrato);
+        // sí los fallos de red y 5xx.
         retry: (count, error) => {
           if (error instanceof ApiError && error.status < 500) return false;
+          if (error instanceof ContractError) return false;
           return count < 2;
         },
         refetchOnWindowFocus: false,
@@ -16,4 +27,5 @@ export function makeQueryClient() {
       mutations: { retry: false },
     },
   });
+  return client;
 }

@@ -1,5 +1,5 @@
 import { CreateBatchLabAnalysisSchema, type CreateBatchLabAnalysisDto } from "@drinks-on-chain/mocks";
-import { parseDecimal } from "./bottling-form-model";
+import { parseDecimal } from "@/lib/format";
 
 // Certificado de laboratorio del lote embotellado (ISO 17025 / SENASAG): validación del
 // formulario con el DTO del backend. El PDF se sube antes (uploads?folder=lab-reports).

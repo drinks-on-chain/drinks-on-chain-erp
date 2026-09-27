@@ -1,15 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-
-function trackErrors(page: Page) {
-  const errors: string[] = [];
-  page.on("pageerror", (e) => errors.push(e.message));
-  page.on(
-    "console",
-    (m) => m.type() === "error" && !m.text().startsWith("Failed to load resource") && errors.push(m.text()),
-  );
-  page.on("response", (r) => r.status() >= 400 && errors.push(`${r.status()} ${new URL(r.url()).pathname}`));
-  return errors;
-}
+import { expect, test } from "@playwright/test";
+import { trackErrors } from "./support";
 
 // Flujo de origen a dictamen: terroir nuevo → pesaje con laboratorio → aprobación.
 // Tras crear datos se navega con clics: los mocks viven en la memoria de la página.

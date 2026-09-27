@@ -64,7 +64,7 @@ export function TankCard({ tank, className }: { tank: TankCardModel; className?:
         <span
           className={cn(
             "flex items-center gap-1 text-lg leading-none font-medium tabular-nums",
-            tank.hot ? "text-warning" : "text-fg",
+            tank.hot ? "text-warning-text" : "text-fg",
           )}
         >
           <Thermometer aria-hidden size={16} strokeWidth={1.5} />

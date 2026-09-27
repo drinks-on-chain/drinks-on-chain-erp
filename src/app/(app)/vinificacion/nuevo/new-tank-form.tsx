@@ -25,7 +25,8 @@ import {
 import { PageChrome } from "@/components/page-chrome";
 import { DecisionModal, type DecisionOption } from "@/features/vinificacion/components/decision-modal";
 import { FormErrorAlert } from "@/features/vinificacion/components/form-error";
-import { hasErrors, parseDecimal, toDateInput } from "@/features/vinificacion/form-utils";
+import { hasErrors, toDateInput } from "@/features/vinificacion/form-utils";
+import { parseDecimal, fmtDate, fmtKg, fmtNumber } from "@/lib/format";
 import {
   doEligibility,
   suggestTankCode,
@@ -33,14 +34,23 @@ import {
   type NewTankField,
   type NewTankValues,
 } from "@/features/vinificacion/tank-model";
+import { fieldErrorsFrom } from "@/lib/api/field-errors";
 import { errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
 import { useCreateTank, useHarvestBatches, useTanks, useTerroirs } from "@/lib/erp/hooks";
 import { can } from "@/lib/erp/permissions";
 import { today } from "@/lib/erp/today";
-import { fmtDate, fmtKg, fmtNumber } from "@/lib/format";
 
 const FORM_ID = "new-tank-form";
+
+/** Campos del formulario que el backend puede marcar en un 422. */
+const SERVER_FIELDS: readonly NewTankField[] = [
+  "harvestBatchId",
+  "tankCode",
+  "capacityLiters",
+  "volumeFilledLiters",
+  "startDate",
+];
 
 export function NewTankForm() {
   const router = useRouter();
@@ -50,6 +60,8 @@ export function NewTankForm() {
   const terroirs = useTerroirs();
   const tanks = useTanks();
   const createTank = useCreateTank();
+  // 422 del backend: cada mensaje junto a su campo (details[].field).
+  const server = fieldErrorsFrom(createTank.error, SERVER_FIELDS).fieldErrors;
 
   const [values, setValues] = useState<Omit<NewTankValues, "tankCode"> & { tankCode: string | null }>(() => ({
     harvestBatchId: params.get("vendimia") ?? "",
@@ -241,7 +253,7 @@ export function NewTankForm() {
       <form id={FORM_ID} onSubmit={submit} noValidate className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Card className="grid gap-8 p-5 md:p-6">
           <FormSection title="Lote de vendimia" description="Solo se ofrecen lotes con dictamen aprobado." columns={1}>
-            <Field label="Lote" required error={errors.harvestBatchId}>
+            <Field label="Lote" required error={errors.harvestBatchId ?? server.harvestBatchId}>
               <Select
                 size="lg"
                 placeholder="Elige el lote que entra al tanque"
@@ -262,7 +274,7 @@ export function NewTankForm() {
             <Field
               label="Código del tanque"
               required
-              error={errors.tankCode}
+              error={errors.tankCode ?? server.tankCode}
               help={`Siguiente libre: ${suggestedCode}.`}
             >
               <Input size="lg" value={tankCode} onChange={(e) => set("tankCode", e.target.value)} />
@@ -270,7 +282,7 @@ export function NewTankForm() {
             <Field label="Material">
               <Input size="lg" value={values.material} onChange={(e) => set("material", e.target.value)} />
             </Field>
-            <Field label="Capacidad" required error={errors.capacityLiters}>
+            <Field label="Capacidad" required error={errors.capacityLiters ?? server.capacityLiters}>
               <Input
                 size="lg"
                 numeric
@@ -282,7 +294,7 @@ export function NewTankForm() {
             <Field
               label="Volumen llenado"
               required
-              error={errors.volumeFilledLiters}
+              error={errors.volumeFilledLiters ?? server.volumeFilledLiters}
               help={
                 parseDecimal(values.capacityLiters) && parseDecimal(values.volumeFilledLiters) !== null
                   ? `${fmtNumber(Math.round((parseDecimal(values.volumeFilledLiters)! / parseDecimal(values.capacityLiters)!) * 100))} % de la capacidad.`
@@ -311,7 +323,7 @@ export function NewTankForm() {
                 ]}
               />
             </Field>
-            <Field label="Fecha de inicio" required error={errors.startDate}>
+            <Field label="Fecha de inicio" required error={errors.startDate ?? server.startDate}>
               <Input
                 size="lg"
                 type="date"
@@ -374,7 +386,7 @@ export function NewTankForm() {
         confirmLabel="Confirmar destino y llenar"
         onConfirm={confirm}
         confirming={createTank.isPending}
-        error={createTank.error ? <FormErrorAlert error={createTank.error} /> : undefined}
+        error={createTank.error ? <FormErrorAlert error={createTank.error} fields={SERVER_FIELDS} /> : undefined}
       />
     </div>
   );

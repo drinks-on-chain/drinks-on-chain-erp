@@ -4,10 +4,12 @@ import { useState, type FormEvent } from "react";
 import { Button, Field, Input, SlideOver, Textarea, toast } from "@drinks-on-chain/ui";
 import { useAddTankLog } from "@/lib/erp/hooks";
 import { today } from "@/lib/erp/today";
-import { dateTimeInputToIso, hasErrors, parseDecimal, toDateTimeInput } from "../form-utils";
+import { dateTimeInputToIso, hasErrors, toDateTimeInput } from "../form-utils";
+import { parseDecimal } from "@/lib/format";
 import { TEMP_ALERT_C, validateLog, type LogField, type LogValues } from "../tank-model";
 import { FormErrorAlert } from "./form-error";
 import { useReturnFocus } from "@/lib/use-return-focus";
+import { fieldErrorsFrom } from "@/lib/api/field-errors";
 
 const empty = (): LogValues => ({
   temperatureCelsius: "",
@@ -17,6 +19,9 @@ const empty = (): LogValues => ({
   recordedAt: toDateTimeInput(today()),
   notes: "",
 });
+
+/** Campos del formulario que el backend puede marcar en un 422. */
+const SERVER_FIELDS: readonly LogField[] = ["temperatureCelsius", "specificGravity", "phValue", "recordedAt"];
 
 /**
  * "Añadir registro diario" (09 §3 fila 4.2): pantalla táctil de planta, objetivos de 56 px,
@@ -34,6 +39,8 @@ export function LogForm({
   onOpenChange: (open: boolean) => void;
 }) {
   const addLog = useAddTankLog();
+  // 422 del backend: cada mensaje junto a su campo (details[].field).
+  const server = fieldErrorsFrom(addLog.error, SERVER_FIELDS).fieldErrors;
   useReturnFocus(open);
   const [values, setValues] = useState<LogValues>(empty);
   const [errors, setErrors] = useState<Partial<Record<LogField, string>>>({});
@@ -111,7 +118,7 @@ export function LogForm({
         <Field
           label="Temperatura"
           required
-          error={errors.temperatureCelsius}
+          error={errors.temperatureCelsius ?? server.temperatureCelsius}
           help={
             temp !== null && temp > TEMP_ALERT_C
               ? `Por encima de ${TEMP_ALERT_C} °C: se avisará en el panel.`
@@ -128,23 +135,32 @@ export function LogForm({
           />
         </Field>
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Densidad" error={errors.specificGravity} help="Gravedad específica, p. ej. 1,048.">
+          <Field
+            label="Densidad"
+            error={errors.specificGravity ?? server.specificGravity}
+            help="Gravedad específica, p. ej. 1,048."
+          >
             <Input size="lg" numeric value={values.specificGravity} onChange={set("specificGravity")} />
           </Field>
-          <Field label="pH" error={errors.phValue}>
+          <Field label="pH" error={errors.phValue ?? server.phValue}>
             <Input size="lg" numeric value={values.phValue} onChange={set("phValue")} />
           </Field>
         </div>
         <Field label="Observaciones de CO₂" help="Burbujeo, sombrero, olores.">
           <Input size="lg" value={values.co2Observations} onChange={set("co2Observations")} />
         </Field>
-        <Field label="Fecha y hora" required error={errors.recordedAt} help="Hora UTC; por defecto, ahora.">
+        <Field
+          label="Fecha y hora"
+          required
+          error={errors.recordedAt ?? server.recordedAt}
+          help="Hora UTC; por defecto, ahora."
+        >
           <Input size="lg" type="datetime-local" value={values.recordedAt} onChange={set("recordedAt")} />
         </Field>
         <Field label="Notas">
           <Textarea value={values.notes} onChange={set("notes")} rows={2} />
         </Field>
-        <FormErrorAlert error={addLog.error} />
+        <FormErrorAlert error={addLog.error} fields={SERVER_FIELDS} />
       </form>
     </SlideOver>
   );

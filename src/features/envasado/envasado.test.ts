@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { LotChain } from "@drinks-on-chain/mocks";
 import { erpFixtures as fx } from "@drinks-on-chain/mocks/fixtures";
-import { lockMessage, parseDecimal, validateBottling } from "./bottling-form-model";
+import { lockMessage, validateBottling } from "./bottling-form-model";
 import { computeYield, SHRINKAGE_WARN_PCT, yieldInputFromSource } from "./bottling-summary";
 import { bottleCodes, bottleCodesCsv, marketplaceOrigin, passportUrl, serialWidth } from "./qr-codes";
 import { bottlingSources, resolvePreselected, sourceKey } from "./sources";
@@ -220,14 +220,5 @@ describe("validateBottling", () => {
     expect(errors.bottles).toBeDefined();
     expect(errors.bottlingDate).toBeDefined();
     expect(validateBottling(null, values).errors.source).toBeDefined();
-  });
-
-  it("parseDecimal entiende miles y decimales en es-BO", () => {
-    expect(parseDecimal("1.500")).toBe(1500);
-    expect(parseDecimal("1 500")).toBe(1500);
-    expect(parseDecimal("40,5")).toBe(40.5);
-    expect(parseDecimal("40.5")).toBe(40.5);
-    expect(parseDecimal("")).toBeNull();
-    expect(parseDecimal("abc")).toBeNull();
   });
 });

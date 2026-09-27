@@ -60,6 +60,10 @@ describe("validateLab", () => {
 });
 
 describe("dagSteps", () => {
+  const T = "36cf86bf-e2a7-5af1-a370-5ba573d0bdcc";
+  const P = "e58a7714-0a95-5cc4-8fd8-07999cb576e3";
+  const B = "c95f78e7-f72a-556c-8bae-e6670da39e8b";
+
   it("ordena por etapa y enlaza cada nodo con su módulo", () => {
     const node = (id: string, type: TraceabilityDag["nodes"][number]["type"]) => ({
       id,
@@ -71,17 +75,22 @@ describe("dagSteps", () => {
     const dag: TraceabilityDag = {
       bottlingBatchId: "b",
       lotCode: "L",
-      nodes: [
-        node("b", "BOTTLING_BATCH"),
-        node("lab", "LAB_ANALYSIS"),
-        node("t", "TERROIR"),
-        node("p", "PRODUCTION_BATCH"),
-      ],
+      nodes: [node(B, "BOTTLING_BATCH"), node("lab", "LAB_ANALYSIS"), node(T, "TERROIR"), node(P, "PRODUCTION_BATCH")],
       edges: [],
     };
     const steps = dagSteps(dag);
     expect(steps.map((s) => s.type)).toEqual(["TERROIR", "PRODUCTION_BATCH", "BOTTLING_BATCH", "LAB_ANALYSIS"]);
-    expect(steps.map((s) => s.href)).toEqual(["/origen/t", "/destilacion/p", "/envasado/b", null]);
+    expect(steps.map((s) => s.href)).toEqual([`/origen/${T}`, `/destilacion/${P}`, `/envasado/${B}`, null]);
     expect(steps[1]!.stage).toBe("Destilación");
+  });
+
+  it("sin enlace cuando el nodo no es un id de la base (hashes de la cadena del backend)", () => {
+    const dag: TraceabilityDag = {
+      bottlingBatchId: "0x36cb",
+      lotCode: "L",
+      nodes: [{ id: "0xdc58", type: "TERROIR", label: "Parcela", date: null, data: {} }],
+      edges: [],
+    };
+    expect(dagSteps(dag)[0]!.href).toBeNull();
   });
 });

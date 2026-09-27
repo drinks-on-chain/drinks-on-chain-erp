@@ -14,7 +14,8 @@ import type {
   WineAgingResponse,
 } from "@drinks-on-chain/mocks";
 import { TEMP_ALERT_C } from "@/features/dashboard/build-dashboard";
-import { isAfter, parseDecimal, type FieldErrors } from "./form-utils";
+import { isAfter, type FieldErrors } from "./form-utils";
+import { parseDecimal } from "@/lib/format";
 
 // Cálculos puros de vinificación (03 §4, 1C; 09 §3 filas 4.1–4.3): mapa de tanques,
 // bitácora, aptitud para singani y validación de los formularios.

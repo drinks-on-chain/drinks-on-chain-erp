@@ -1,8 +1,7 @@
 "use client";
 
 import { Field, Input, cn } from "@drinks-on-chain/ui";
-import { parseDecimal } from "@/features/vinificacion/form-utils";
-import { fmtNumber } from "@/lib/format";
+import { parseDecimal, fmtNumber } from "@/lib/format";
 
 export type CutsField = "headDiscardLiters" | "heartYieldLiters" | "tailDiscardLiters" | "initialAlcoholPercentage";
 export type CutsValues = Record<CutsField, string>;
@@ -59,7 +58,7 @@ export function StillCutsForm({
         {cut("tailDiscardLiters", "Cola", "Descarte final.")}
         {cut("initialAlcoholPercentage", "Grado inicial", "Del destilado al salir.")}
       </div>
-      <p className={cn("m-0 text-sm tabular-nums", over ? "text-danger" : "text-fg-muted")} aria-live="polite">
+      <p className={cn("m-0 text-sm tabular-nums", over ? "text-danger-text" : "text-fg-muted")} aria-live="polite">
         Cortes: {fmtNumber(total)} L
         {inputVolumeLiters !== null && inputVolumeLiters > 0
           ? ` de ${fmtNumber(inputVolumeLiters)} L de entrada${over ? " · superan la entrada" : ""}`

@@ -1,6 +1,6 @@
 import { CreateHarvestBatchSchema, type CreateHarvestBatchDto } from "@drinks-on-chain/mocks";
 import { parseDecimal } from "@/lib/format";
-import { detailPairs } from "@/features/origen/api-details";
+import { fieldErrorsFrom } from "@/lib/api/field-errors";
 
 // Pesaje (3.1): valores del formulario tal como se escriben, neto en vivo y conversión al
 // DTO de POST /v1/harvest-batches. Brix, pH y acidez son obligatorios (09 §8 punto 6).
@@ -109,11 +109,8 @@ export function toHarvestDto(v: WeighInValues, now: Date): Result {
 
 const FIELDS = new Set<string>(Object.keys(emptyWeighIn(new Date(0))));
 
-/** Asigna los `details` de un 400/422 del backend a los campos del pesaje. */
-export function weighInFieldErrors(details: unknown): WeighInErrors {
-  const errors: WeighInErrors = {};
-  for (const [field, message] of detailPairs(details)) {
-    if (FIELDS.has(field)) errors[field as WeighInField] ??= message;
-  }
-  return errors;
+/** Lleva los `details[].field` de un 422 del backend a los campos del pesaje. */
+export function weighInFieldErrors(error: unknown): WeighInErrors {
+  return fieldErrorsFrom<WeighInField>(error, (field) => (FIELDS.has(field) ? (field as WeighInField) : undefined))
+    .fieldErrors;
 }

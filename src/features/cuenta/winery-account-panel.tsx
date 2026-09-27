@@ -8,6 +8,7 @@ import { PageChrome } from "@/components/page-chrome";
 import { ScreenTitle } from "@/components/screen-title";
 import { errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
+import { isPlatform } from "@/lib/erp/permissions";
 import { useBottlings, useWinery } from "@/lib/erp/hooks";
 import { CERTIFICATION_STATUS, PRODUCT_TYPE } from "@/lib/erp/labels";
 import { fmtDate, fmtNumber } from "@/lib/format";
@@ -77,7 +78,7 @@ export function WineryAccountPanel({ winery }: { winery: WineryResponse & { stel
 
 export function AccountPage() {
   const me = useMe();
-  const platform = me.data?.userRole === "PLATFORM_ADMIN";
+  const platform = isPlatform(me.data);
   const winery = useWinery(!!me.data && !platform);
   const bottlings = useBottlings();
   const crumbs = [{ label: "Cuenta Stellar" }];

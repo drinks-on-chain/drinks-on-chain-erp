@@ -1,19 +1,43 @@
 "use client";
 
 import { useMemo } from "react";
-import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { deriveLotViews, type LotChain, type LotView } from "@drinks-on-chain/mocks";
+import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { deriveLotViews, type LotChain, type LotView, type TerroirResponse } from "@drinks-on-chain/mocks";
+import type { Page } from "@/lib/api/envelope";
 import { ApiError } from "@/lib/api/errors";
+import { useMe } from "@/lib/auth/hooks";
 import { erpKeys } from "./keys";
-import { erpApi, type HarvestQuery, type ProductionQuery, type TankQuery, type TerroirQuery } from "./resources";
+import { can } from "./permissions";
+import {
+  erpApi,
+  type AuditQuery,
+  type HarvestQuery,
+  type ProductionQuery,
+  type TankQuery,
+  type TerroirQuery,
+} from "./resources";
 import { today } from "./today";
 
 // Hooks de datos del ERP. Las pantallas solo importan de aquí.
 
 // ---------- Lecturas ----------
 
-export const useTerroirs = (q: TerroirQuery = {}) =>
-  useQuery({ queryKey: erpKeys.terroirs(q), queryFn: ({ signal }) => erpApi.terroirs(q, signal) });
+const NO_TERROIRS: Page<TerroirResponse> = { items: [], total: 0, limit: 0, offset: 0 };
+
+/**
+ * Parcelas de la bodega. El operario no las lee (matriz del backend: 403), pero vendimia y
+ * vinificación las usan para poner nombre a la parcela: para ese rol no se piden y la lista llega
+ * vacía (con otra clave, para no mezclarla con la de quien sí las lee).
+ */
+export function useTerroirs(q: TerroirQuery = {}) {
+  const me = useMe();
+  const allowed = can(me.data, "terroir.read");
+  return useQuery({
+    queryKey: allowed ? erpKeys.terroirs(q) : [...erpKeys.terroirs(q), "sin-permiso"],
+    queryFn: ({ signal }) => (allowed ? erpApi.terroirs(q, signal) : Promise.resolve(NO_TERROIRS)),
+    enabled: !!me.data,
+  });
+}
 export const useTerroir = (id: string) =>
   useQuery({ queryKey: erpKeys.terroir(id), queryFn: ({ signal }) => erpApi.terroir(id, signal) });
 
@@ -68,38 +92,73 @@ export const useTraceabilityDag = (bottlingId: string) =>
 
 export const useWinery = (enabled = true) =>
   useQuery({ queryKey: erpKeys.winery(), queryFn: ({ signal }) => erpApi.winery(signal), enabled });
-export const useMembers = () =>
-  useQuery({ queryKey: erpKeys.members(), queryFn: ({ signal }) => erpApi.members(signal) });
+export const useMembers = (enabled = true) =>
+  useQuery({ queryKey: erpKeys.members(), queryFn: ({ signal }) => erpApi.members(signal), enabled });
+/** Invitaciones de la bodega activa (solo el dueño). */
+export const useInvitations = (enabled = true) =>
+  useQuery({ queryKey: erpKeys.invitations(), queryFn: ({ signal }) => erpApi.invitations(signal), enabled });
+/** Valor efectivo de los parámetros para la bodega activa (lectura). */
+export const useEffectiveSettings = (enabled = true) =>
+  useQuery({ queryKey: erpKeys.settings(), queryFn: ({ signal }) => erpApi.settings(signal), enabled });
+/** Bitácora propia (dueño), paginada en el servidor; la página anterior sigue visible mientras carga. */
+export const useAudit = (q: AuditQuery, enabled = true) =>
+  useQuery({
+    queryKey: erpKeys.audit(q),
+    queryFn: ({ signal }) => erpApi.audit(q, signal),
+    enabled,
+    placeholderData: keepPreviousData,
+  });
 
 /**
  * Vista derivada "Lote" (09 §2): une toda la cadena de la bodega y calcula etapa y candado
  * de cada lote de vendimia. Carga las seis colecciones completas.
  */
+const NONE: never[] = [];
+
 export function useLotViews() {
+  // Cada rol lee solo parte de la cadena (matriz del backend): lo que no puede leer no se pide y
+  // cuenta como vacío, así el panel del operario o de agronomía no falla con un 403.
+  const me = useMe();
+  const allowed = [
+    can(me.data, "harvest.read"),
+    can(me.data, "terroir.read"),
+    can(me.data, "tank.read"),
+    can(me.data, "aging.read"),
+    can(me.data, "distillation.read"),
+    can(me.data, "bottling.read"),
+  ];
   const results = useQueries({
     queries: [
-      { queryKey: erpKeys.harvestBatches(), queryFn: ({ signal }) => erpApi.harvestBatches({}, signal) },
-      { queryKey: erpKeys.terroirs(), queryFn: ({ signal }) => erpApi.terroirs({}, signal) },
-      { queryKey: erpKeys.tanks(), queryFn: ({ signal }) => erpApi.tanks({}, signal) },
-      { queryKey: erpKeys.agings(), queryFn: ({ signal }) => erpApi.agings({}, signal) },
-      { queryKey: erpKeys.productions(), queryFn: ({ signal }) => erpApi.productions({}, signal) },
-      { queryKey: erpKeys.bottlings(), queryFn: ({ signal }) => erpApi.bottlings({}, signal) },
+      {
+        queryKey: erpKeys.harvestBatches(),
+        queryFn: ({ signal }) => erpApi.harvestBatches({}, signal),
+        enabled: allowed[0],
+      },
+      { queryKey: erpKeys.terroirs(), queryFn: ({ signal }) => erpApi.terroirs({}, signal), enabled: allowed[1] },
+      { queryKey: erpKeys.tanks(), queryFn: ({ signal }) => erpApi.tanks({}, signal), enabled: allowed[2] },
+      { queryKey: erpKeys.agings(), queryFn: ({ signal }) => erpApi.agings({}, signal), enabled: allowed[3] },
+      { queryKey: erpKeys.productions(), queryFn: ({ signal }) => erpApi.productions({}, signal), enabled: allowed[4] },
+      { queryKey: erpKeys.bottlings(), queryFn: ({ signal }) => erpApi.bottlings({}, signal), enabled: allowed[5] },
     ],
   });
-  const [harvest, terroirs, tanks, agings, productions, bottlings] = results;
-  const ready = results.every((r) => r.isSuccess);
+  const used = results.filter((_, i) => allowed[i]);
+  // Lo que el rol no lee cuenta como vacío (una misma lista para no recalcular); lo que lee, cuando llega.
+  const items = <T>(i: number, page: { items: T[] } | undefined): T[] | undefined =>
+    me.data ? (allowed[i] ? page?.items : (NONE as T[])) : undefined;
+  const harvestBatches = items(0, results[0].data);
+  const terroirs = items(1, results[1].data);
+  const tanks = items(2, results[2].data);
+  const wineAgings = items(3, results[3].data);
+  const productionBatches = items(4, results[4].data);
+  const bottlings = items(5, results[5].data);
 
-  const chain = useMemo<LotChain | undefined>(() => {
-    if (!ready) return undefined;
-    return {
-      harvestBatches: harvest.data!.items,
-      terroirs: terroirs.data!.items,
-      tanks: tanks.data!.items,
-      wineAgings: agings.data!.items,
-      productionBatches: productions.data!.items,
-      bottlings: bottlings.data!.items,
-    };
-  }, [ready, harvest.data, terroirs.data, tanks.data, agings.data, productions.data, bottlings.data]);
+  const chain = useMemo<LotChain | undefined>(
+    () =>
+      harvestBatches && terroirs && tanks && wineAgings && productionBatches && bottlings
+        ? { harvestBatches, terroirs, tanks, wineAgings, productionBatches, bottlings }
+        : undefined,
+    [harvestBatches, terroirs, tanks, wineAgings, productionBatches, bottlings],
+  );
 
   const data = useMemo<LotView[] | undefined>(
     () => (chain ? deriveLotViews(chain, { today: today() }) : undefined),
@@ -109,11 +168,11 @@ export function useLotViews() {
   return {
     data,
     chain,
-    isPending: results.some((r) => r.isPending),
-    isError: results.some((r) => r.isError),
-    error: results.find((r) => r.error)?.error ?? null,
-    isFetching: results.some((r) => r.isFetching),
-    refetch: () => Promise.all(results.map((r) => r.refetch())),
+    isPending: !me.data || used.some((r) => r.isPending),
+    isError: used.some((r) => r.isError),
+    error: used.find((r) => r.error)?.error ?? null,
+    isFetching: used.some((r) => r.isFetching),
+    refetch: () => Promise.all(used.map((r) => r.refetch())),
   };
 }
 
@@ -172,6 +231,17 @@ export const useCreateDistillation = () => useErpMutation(erpApi.createDistillat
 export const useCreateBottling = () => useErpMutation(erpApi.createBottling);
 export const useCreateLabAnalysis = () => useErpMutation(erpApi.createLabAnalysis);
 export const useUpdateWinery = () => useErpMutation(erpApi.updateWinery);
-export const useCreateMember = () => useErpMutation(erpApi.createMember);
+
+// Equipo: cada cambio deja una entrada en la bitácora, que también se invalida (cuelga de "erp").
+export const useUpdateMemberRole = () =>
+  useErpMutation((v: { membershipId: string; body: Parameters<typeof erpApi.updateMemberRole>[1] }) =>
+    erpApi.updateMemberRole(v.membershipId, v.body),
+  );
+export const useBlockMember = () =>
+  useErpMutation((v: { membershipId: string; reason: string | null }) => erpApi.blockMember(v.membershipId, v.reason));
+export const useUnblockMember = () => useErpMutation((membershipId: string) => erpApi.unblockMember(membershipId));
+export const useCreateInvitation = () => useErpMutation(erpApi.createInvitation);
+export const useResendInvitation = () => useErpMutation((id: string) => erpApi.resendInvitation(id));
+export const useRevokeInvitation = () => useErpMutation((id: string) => erpApi.revokeInvitation(id));
 export const useUpload = () =>
   useMutation({ mutationFn: (v: Parameters<typeof erpApi.upload>) => erpApi.upload(...v) });

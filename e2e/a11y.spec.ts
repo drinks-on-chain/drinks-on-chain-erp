@@ -16,7 +16,7 @@ const CINTI = {
 const ALTOS_FERMENTING_TANK = "f87af6c0-197d-5fa3-b85e-29d7b27f00d9";
 
 // Un embotellado sin certificado responde 404 en su certificado: es el estado "sin certificado".
-const EXPECTED = [/^404 \/v1\/lab-analyses\/batch\//];
+const EXPECTED = [/^404 \/api\/v1\/lab-analyses\/batch\//];
 
 async function audit(page: Page, { dialog = false } = {}) {
   await settled(page);
@@ -66,6 +66,8 @@ const ADMIN_ROUTES = [
   "/cuenta",
   "/perfil",
   "/ajustes",
+  "/equipo",
+  "/ajustes/bitacora",
 ];
 
 test.describe("administración de Cinti Viejo", () => {
@@ -79,12 +81,12 @@ test.describe("administración de Cinti Viejo", () => {
     });
   }
 
-  test("axe con el modal de alta de miembro abierto", async ({ page }) => {
+  test("axe con el modal de invitación abierto", async ({ page }) => {
     await login(page, "admin@cintiviejo.test");
-    await page.goto("/ajustes");
+    await page.goto("/equipo");
     await settled(page);
-    await page.getByRole("button", { name: "Añadir miembro" }).first().click();
-    await expect(page.getByRole("dialog", { name: "Añadir miembro" })).toBeVisible();
+    await page.getByRole("button", { name: "Invitar" }).first().click();
+    await expect(page.getByRole("dialog", { name: "Invitar al equipo" })).toBeVisible();
     await audit(page, { dialog: true });
   });
 });

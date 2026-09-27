@@ -9,8 +9,10 @@ S1 · ERP de trazabilidad de las bodegas (`erp.`). Nace de `drinks-on-chain-app-
 - Datos: solo por los hooks de `src/lib/erp/hooks.ts` (sobre `src/lib/erp/resources.ts`, un acceso por endpoint del OpenAPI). Las pantallas nunca llaman a `fetch` ni escriben URLs del backend.
 - El backend no tiene entidad "Lote": la vista `LotView` se deriva con `useLotViews()` (`deriveLotViews` de `@drinks-on-chain/mocks`).
 - "Hoy" siempre con `today()` de `src/lib/erp/today.ts` (con mocks es 2026-09-25, la fecha de los fixtures).
-- Permisos con `can(user, acción)` de `src/lib/erp/permissions.ts` (09 §3): ocultar o desactivar lo que el rol no puede hacer. PLATFORM_ADMIN entra en solo lectura.
-- Estados y textos de enumeraciones en `src/lib/erp/labels.ts`; cifras y fechas con `src/lib/format.ts` (es-BO, fechas en UTC).
+- Permisos con `can(me, acción)` de `src/lib/erp/permissions.ts` (09 §3): salen de la membresía de la **organización activa** (`erpRole(me)`), no del rol global; ocultar o desactivar lo que el rol no puede hacer. La plataforma entra en solo lectura.
+- Sesión (contrato de la Ola 0, heredada de la plantilla): acceso solo en memoria, renovación con la cookie `doc_rt`; nunca guardar tokens en `sessionStorage`/`localStorage`. La API se llama en `/api/v1/*` del propio origen (Next reescribe a `API_ORIGIN`). `useMe()` devuelve `{ user, memberships, activeOrganizationId }`.
+- Listas con `limit` ≤ 100: las colecciones que se cargan enteras pasan por `fetchAllPages()`. Errores de formulario con `fieldErrorsFrom()` (`details[].field`).
+- Estados y textos de enumeraciones en `src/lib/erp/labels.ts`; cifras y fechas con `src/lib/format.ts` de la plantilla (único `parseDecimal`, es-BO, fechas en UTC).
 - Cada página fija sus migas y su única acción principal con `<PageChrome breadcrumbs actions />`.
 - Código por módulo en `src/features/<módulo>/` (componentes, cálculos puros con pruebas) y rutas en `src/app/(app)/<módulo>/`.
 - Reglas de 01-erp §11: una acción principal en oro arriba a la derecha; etiquetas encima, ayuda debajo, unidades como sufijo; candados en ámbar con motivo y fecha; confirmación explícita antes de decisiones irreversibles; nada de rojo fuera de rechazar/eliminar/alertas; objetivos táctiles de 56 px en pesaje, análisis y bitácora.

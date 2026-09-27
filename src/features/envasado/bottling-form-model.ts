@@ -20,8 +20,6 @@ export type BottlingErrors = Partial<Record<BottlingField, string>>;
 // Una sola lectura de cifras para todo el ERP (miles con punto en es-BO).
 import { parseDecimal } from "@/lib/format";
 
-export { parseDecimal };
-
 /** Mensaje del candado de una fuente (ámbar, con motivo y fecha: 01-erp §11). */
 export function lockMessage(source: BottlingSource): string {
   const reason = source.kind === "crianza" ? "Crianza en curso" : "Reposo obligatorio de 180 días en curso";
