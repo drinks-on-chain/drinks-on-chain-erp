@@ -12,7 +12,6 @@ import {
   RestStatusResponseSchema,
   TerroirDetailSchema,
   TerroirResponseSchema,
-  TraceabilityDagSchema,
   WineAgingResponseSchema,
   AuditEventSchema,
   EffectiveSettingSchema,
@@ -37,6 +36,7 @@ import {
 import { api } from "@/lib/api/client";
 import { pageSchema, type Page } from "@/lib/api/envelope";
 import { fetchAllPages, MAX_PAGE_SIZE } from "@/lib/api/pagination";
+import { DagResponseSchema } from "./dag";
 
 // Acceso a los endpoints del ERP (09 §3). Una función por operación; las pantallas usan
 // los hooks de hooks.ts, nunca estas funciones directamente.
@@ -130,7 +130,7 @@ export const erpApi = {
   createLabAnalysis: (body: CreateBatchLabAnalysisDto) =>
     api("/v1/lab-analyses", { method: "POST", body, schema: BatchLabAnalysisResponseSchema }),
   dag: (bottlingId: string, signal?: AbortSignal) =>
-    api(`/v1/traceability/dag/${bottlingId}`, { schema: TraceabilityDagSchema, signal }),
+    api(`/v1/traceability/dag/${bottlingId}`, { schema: DagResponseSchema, signal }),
 
   // Bodega
   winery: (signal?: AbortSignal) => api("/v1/wineries/my", { schema: WineryResponseSchema, signal }),
