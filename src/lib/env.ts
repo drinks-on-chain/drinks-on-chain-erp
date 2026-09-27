@@ -7,6 +7,7 @@ const schema = z.object({
   urlLanding: z.string().url().or(z.literal("")),
   urlBodegas: z.string().url().or(z.literal("")),
   urlApp: z.string().url().or(z.literal("")),
+  turnstileSiteKey: z.string(),
 });
 
 export const env = schema.parse({
@@ -14,7 +15,34 @@ export const env = schema.parse({
   urlLanding: process.env.NEXT_PUBLIC_URL_LANDING ?? "",
   urlBodegas: process.env.NEXT_PUBLIC_URL_BODEGAS ?? "",
   urlApp: process.env.NEXT_PUBLIC_URL_APP ?? "",
+  turnstileSiteKey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "",
 });
+
+/** Clave de prueba pública de Cloudflare Turnstile: siempre valida (widget visible). */
+export const TURNSTILE_TEST_SITE_KEY = "1x00000000000000000000AA";
+
+/** Token de captcha para los mocks: cualquier valor no vacío vale (salvo si contiene `fail`). */
+export const MOCK_CAPTCHA_TOKEN = "mocks-captcha-ok";
+
+export type CaptchaMode = { kind: "mock" } | { kind: "turnstile"; siteKey: string } | { kind: "missing" };
+
+/**
+ * Captcha de los formularios públicos (contrato de la Ola 1 §0): Turnstile con
+ * `NEXT_PUBLIC_TURNSTILE_SITE_KEY`; sin clave, con mocks se envía un valor de prueba y en
+ * desarrollo se usa la clave de prueba de Cloudflare. En producción sin clave no hay captcha.
+ */
+export function captchaMode(
+  vars: { siteKey: string; mocks: boolean; production: boolean } = {
+    siteKey: env.turnstileSiteKey,
+    mocks: env.mocks,
+    production: process.env.NODE_ENV === "production",
+  },
+): CaptchaMode {
+  if (vars.siteKey) return { kind: "turnstile", siteKey: vars.siteKey };
+  if (vars.mocks) return { kind: "mock" };
+  if (!vars.production) return { kind: "turnstile", siteKey: TURNSTILE_TEST_SITE_KEY };
+  return { kind: "missing" };
+}
 
 /** Las herramientas de desarrollo (/__mocks) existen en local y en demos con mocks. */
 export const devToolsEnabled = process.env.NODE_ENV !== "production" || env.mocks;
