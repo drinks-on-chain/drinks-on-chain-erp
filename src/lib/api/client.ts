@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { API_BASE } from "@/lib/env";
+import { CLIENT_APP, CLIENT_APP_HEADER } from "@/lib/client-app";
 import { ApiError, ContractError, NetworkError } from "./errors";
 import { errorEnvelope, successEnvelope } from "./envelope";
 import {
@@ -56,6 +57,8 @@ async function send(path: string, opts: RequestOptions<unknown>, token: string |
     Accept: "application/json",
     "Accept-Language": "es",
     "X-Correlation-ID": crypto.randomUUID(),
+    // App de origen para la bitácora (contrato de la Ola 1 §7), en todas las peticiones.
+    [CLIENT_APP_HEADER]: CLIENT_APP,
   };
   let body: BodyInit | undefined;
   if (opts.body instanceof FormData) {

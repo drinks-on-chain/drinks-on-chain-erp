@@ -4,6 +4,7 @@ import { api, bootstrapSession, logoutSession, setSessionEndedHandler } from "./
 import { ApiError, ContractError, NetworkError } from "./errors";
 import { toPage } from "./envelope";
 import { fetchAllPages } from "./pagination";
+import { CLIENT_APP } from "@/lib/client-app";
 import {
   clearSession,
   getAccessToken,
@@ -72,6 +73,17 @@ describe("api", () => {
     expect(call!.url).toBe("/api/v1/terroirs?limit=10&offset=0");
     expect(auth(call!)).toBe("Bearer a1");
     expect(call!.init.credentials).toBe("include");
+  });
+
+  it("identifica la app con X-Client-App en todas las peticiones, también las públicas", async () => {
+    clearSession();
+    fetchMock.mockResolvedValueOnce(ok(null));
+    fetchMock.mockResolvedValueOnce(ok(null));
+    await api("/v1/public/x", { auth: false });
+    await api("/v1/x");
+    for (const call of calls()) {
+      expect((call.init.headers as Record<string, string>)["X-Client-App"]).toBe(CLIENT_APP);
+    }
   });
 
   it("convierte el envoltorio de error en ApiError con sus details", async () => {
