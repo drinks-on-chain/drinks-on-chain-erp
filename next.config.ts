@@ -1,20 +1,25 @@
 import type { NextConfig } from "next";
 import { API_BASE, resolveApiOrigin } from "./src/lib/env";
 
-// `next typegen` (pnpm typecheck) también carga la configuración y evalúa las reescrituras;
-// ahí no se exige API_ORIGIN, porque no se sirve ni se despliega nada.
+// `next typegen` (pnpm typecheck) también carga la configuración; ahí no se exige API_ORIGIN,
+// porque no se sirve ni se despliega nada.
 const typegenOnly = process.argv.includes("typegen");
 
+// P-1 (contrato de la Ola 0 §7): la app llama a /api/v1/* de su propio origen y `src/proxy.ts`
+// lo reescribe a ${API_ORIGIN}/v1/* con la IP del cliente firmada (O1-OPS-1), así la cookie de
+// renovación `doc_rt` es de primera parte. API_ORIGIN se valida también al construir para que un
+// despliegue sin ella falle en el build y no en la primera petición.
+if (!typegenOnly) resolveApiOrigin();
+
 const nextConfig: NextConfig = {
-  // P-1 (contrato de la Ola 0 §7): la app llama a /api/v1/* de su propio origen y Next lo
-  // reenvía a ${API_ORIGIN}/v1/*, así la cookie de renovación `doc_rt` es de primera parte.
-  // Con NEXT_PUBLIC_MOCKS=1 no hay reescritura: MSW responde en el navegador. Las reescrituras
-  // se fijan en el build: API_ORIGIN tiene que estar definida al construir.
-  async rewrites() {
-    if (typegenOnly && !process.env.API_ORIGIN) return [];
-    const origin = resolveApiOrigin();
-    if (!origin) return [];
-    return [{ source: `${API_BASE}/v1/:path*`, destination: `${origin}/v1/:path*` }];
+  async headers() {
+    // Las respuestas de la API reescrita nunca se guardan en la caché de Vercel
+    return [
+      {
+        source: `${API_BASE}/v1/:path*`,
+        headers: [{ key: "x-vercel-enable-rewrite-caching", value: "0" }],
+      },
+    ];
   },
 };
 
