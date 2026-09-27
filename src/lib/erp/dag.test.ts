@@ -26,6 +26,11 @@ const chainDag = {
       stageName: "Harvest",
       parents: ["0xdc58"],
       timestamp: "2025-03-10T00:00:00.000Z",
+      volumeOrUnits: 0,
+      metrics: [],
+      metadataHash: "0x2",
+      isCertified: true,
+      operator: { name: "Enóloga", role: "Enologist", wineryName: "Destilería Cinti Viejo" },
       details: { harvestBatchCode: "HARV-2025-VIEJO-02" },
     },
     {
@@ -34,6 +39,11 @@ const chainDag = {
       stageName: "Distillation",
       parents: ["0xaa01"],
       timestamp: "2025-05-20T00:00:00.000Z",
+      volumeOrUnits: 0,
+      metrics: [],
+      metadataHash: "0x2",
+      isCertified: true,
+      operator: { name: "Enóloga", role: "Enologist", wineryName: "Destilería Cinti Viejo" },
       details: { equipmentIdentifier: "Alambique de cobre Charentais AL-01" },
     },
     {
@@ -42,6 +52,11 @@ const chainDag = {
       stageName: "Bottling",
       parents: ["0xbb02"],
       timestamp: "2026-03-01T00:00:00.000Z",
+      volumeOrUnits: 0,
+      metrics: [],
+      metadataHash: "0x2",
+      isCertified: true,
+      operator: { name: "Enóloga", role: "Enologist", wineryName: "Destilería Cinti Viejo" },
       details: {
         internationalLotCode: "CVJ-2026-SINGANI-001",
         labAnalysis: {
@@ -51,12 +66,11 @@ const chainDag = {
         },
       },
     },
-    { batchId: "0xzz", stage: 9, stageName: "Desconocida", parents: [], timestamp: null, details: null },
   ],
 };
 
 describe("DagResponseSchema", () => {
-  it("normaliza el grafo del backend (etapas, nombres, fechas y aristas)", () => {
+  it("convierte el grafo del backend en pasos (etapas, nombres, fechas y aristas)", () => {
     const dag = DagResponseSchema.parse(chainDag);
     expect(dag.lotCode).toBe("CVJ-2026-SINGANI-001");
     expect(dag.bottlingBatchId).toBe("0x36cb");
@@ -80,17 +94,15 @@ describe("DagResponseSchema", () => {
     expect(DagResponseSchema.parse(bottlingOnly).nodes.map((n) => n.type)).toEqual(["BOTTLING_BATCH"]);
   });
 
-  it("acepta también la forma de los mocks tal cual", () => {
-    const mock = {
+  it("rechaza la forma antigua de los mocks y las etapas desconocidas (contrato estricto)", () => {
+    const old = {
       bottlingBatchId: "b",
       lotCode: "L",
       nodes: [{ id: "b", type: "BOTTLING_BATCH", label: "L", date: "2026-01-01T00:00:00.000Z", data: {} }],
       edges: [],
     };
-    expect(DagResponseSchema.parse(mock)).toEqual(mock);
-  });
-
-  it("rechaza lo que no es ninguna de las dos formas", () => {
-    expect(DagResponseSchema.safeParse({ nodes: [] }).success).toBe(false);
+    expect(DagResponseSchema.safeParse(old).success).toBe(false);
+    const unknownStage = { ...chainDag, nodes: [{ ...chainDag.nodes[0]!, stageName: "Desconocida" }] };
+    expect(DagResponseSchema.safeParse(unknownStage).success).toBe(false);
   });
 });

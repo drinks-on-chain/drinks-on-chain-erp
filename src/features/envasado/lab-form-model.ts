@@ -1,5 +1,6 @@
 import { CreateBatchLabAnalysisSchema, type CreateBatchLabAnalysisDto } from "@drinks-on-chain/mocks";
 import { parseDecimal } from "@/lib/format";
+import { omitNulls } from "@/lib/erp/omit-nulls";
 
 // Certificado de laboratorio del lote embotellado (ISO 17025 / SENASAG): validación del
 // formulario con el DTO del backend. El PDF se sube antes (uploads?folder=lab-reports).
@@ -99,8 +100,10 @@ export function validateLab(
     conformsToEuStandards: v.conformsToEuStandards,
     conformsToUsaStandards: v.conformsToUsaStandards,
   };
-  // Comprobación final con el esquema del backend (con una URL provisional).
-  const parsed = CreateBatchLabAnalysisSchema.safeParse({ ...dto, laboratoryReportPdfUrl: "pendiente" });
+  // Comprobación final con el esquema del backend (con una URL provisional): los opcionales
+  // vacíos no se envían.
+  const body = omitNulls<CreateBatchLabAnalysisDto>({ ...dto, laboratoryReportPdfUrl: "pendiente" });
+  const parsed = CreateBatchLabAnalysisSchema.safeParse(body);
   if (!parsed.success) return { errors: { pdf: parsed.error.issues.map((i) => i.message).join(" ") }, dto: null };
-  return { errors, dto };
+  return { errors, dto: omitNulls<Omit<CreateBatchLabAnalysisDto, "laboratoryReportPdfUrl">>(dto) };
 }

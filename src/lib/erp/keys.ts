@@ -17,6 +17,7 @@ export const erpKeys = {
   bottling: (id: string) => ["erp", "bottling", "detail", id] as const,
   lab: (bottlingId: string) => ["erp", "lab", bottlingId] as const,
   dag: (bottlingId: string) => ["erp", "dag", bottlingId] as const,
+  fileUrl: (key: string) => ["erp", "file-url", key] as const,
   winery: () => ["erp", "winery"] as const,
   members: () => ["erp", "winery", "members"] as const,
   invitations: () => ["erp", "winery", "invitations"] as const,

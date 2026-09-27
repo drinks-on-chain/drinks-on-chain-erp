@@ -1,16 +1,39 @@
-import { z } from "zod";
-import { TraceabilityDagSchema, type DagNodeType, type TraceabilityDag } from "@drinks-on-chain/mocks";
+import { DagGraphSchema, type DagGraph, type DagStageName } from "@drinks-on-chain/mocks";
 
-// Grafo de `GET /v1/traceability/dag/:bottlingBatchId`. El OpenAPI del backend (`DagGraphResponseDto`,
-// desde b9e8b68) fija la forma de la cadena: `{ rootBatchId, internationalLotCode, productType,
+// Grafo de `GET /v1/traceability/dag/:bottlingBatchId`: `DagGraphResponseDto` del backend (el mismo
+// que sirven los mocks desde 0.4.0-rc.1): `{ rootBatchId, internationalLotCode, productType,
 // nodes[{ batchId, stage, stageName, parents, timestamp, details, … }] }`, con ids que son hashes
 // de la cadena y no ids de la base; el certificado de laboratorio va en `details.labAnalysis` del
-// embotellado (o `null`). Los mocks 0.3.0-rc.2 aún sirven su propuesta (`{ bottlingBatchId,
-// lotCode, nodes[{ id, type, label, date, data }], edges }`): se aceptan las dos y se normalizan a
-// la de los mocks, que es la que usa la línea de tiempo, hasta que los mocks se alineen.
+// embotellado (o `null`). Se valida con `DagGraphSchema` y se convierte a los pasos que pinta la
+// línea de tiempo del lote.
 
-/** `stageName` del backend (enumeración del OpenAPI) → tipo de nodo del ERP. Otro valor se descarta. */
-const STAGE_TYPE: Record<string, DagNodeType> = {
+/** Tipo de paso de la línea de tiempo: una etapa de la cadena o el certificado de laboratorio. */
+export type TraceNodeType =
+  | "TERROIR"
+  | "HARVEST_BATCH"
+  | "FERMENTATION_TANK"
+  | "WINE_AGING"
+  | "PRODUCTION_BATCH"
+  | "BOTTLING_BATCH"
+  | "LAB_ANALYSIS";
+
+export type TraceNode = {
+  id: string;
+  type: TraceNodeType;
+  label: string;
+  date: string | null;
+  data: Record<string, unknown>;
+};
+
+export type TraceGraph = {
+  bottlingBatchId: string;
+  lotCode: string;
+  nodes: TraceNode[];
+  edges: { from: string; to: string }[];
+};
+
+/** `stageName` del backend → tipo de paso del ERP. */
+const STAGE_TYPE: Record<DagStageName, TraceNodeType> = {
   Plot: "TERROIR",
   Harvest: "HARVEST_BATCH",
   Vinification: "FERMENTATION_TANK",
@@ -19,8 +42,8 @@ const STAGE_TYPE: Record<string, DagNodeType> = {
   Bottling: "BOTTLING_BATCH",
 };
 
-/** Campo de `details` que nombra el nodo en cada etapa (como `label` en los mocks). */
-const LABEL_KEYS: Record<DagNodeType, readonly string[]> = {
+/** Campo de `details` que nombra el paso en cada etapa. */
+const LABEL_KEYS: Record<TraceNodeType, readonly string[]> = {
   TERROIR: ["parcelName"],
   HARVEST_BATCH: ["harvestBatchCode"],
   FERMENTATION_TANK: ["tankCode"],
@@ -30,22 +53,7 @@ const LABEL_KEYS: Record<DagNodeType, readonly string[]> = {
   LAB_ANALYSIS: ["accreditedLabCertificationCode", "certifiedLaboratoryName"],
 };
 
-const chainDagSchema = z.looseObject({
-  rootBatchId: z.string(),
-  internationalLotCode: z.string(),
-  nodes: z.array(
-    z.looseObject({
-      batchId: z.string(),
-      stageName: z.string(),
-      parents: z.array(z.string()).default([]),
-      timestamp: z.string().nullish(),
-      details: z.record(z.string(), z.unknown()).nullish(),
-    }),
-  ),
-});
-type ChainDag = z.infer<typeof chainDagSchema>;
-
-function labelOf(type: DagNodeType, details: Record<string, unknown>, fallback: string): string {
+function labelOf(type: TraceNodeType, details: Record<string, unknown>, fallback: string): string {
   for (const key of LABEL_KEYS[type]) {
     const value = details[key];
     if (typeof value === "string" && value.trim()) return value;
@@ -53,24 +61,22 @@ function labelOf(type: DagNodeType, details: Record<string, unknown>, fallback: 
   return fallback;
 }
 
-/** Convierte el grafo del backend a la forma que usa el ERP. */
-export function fromChainDag(dag: ChainDag): TraceabilityDag {
-  const nodes: TraceabilityDag["nodes"] = [];
-  const edges: TraceabilityDag["edges"] = [];
+/** Convierte el grafo del backend en los pasos de la línea de tiempo (con el certificado aparte). */
+export function fromDagGraph(dag: DagGraph): TraceGraph {
+  const nodes: TraceNode[] = [];
+  const edges: TraceGraph["edges"] = [];
   for (const n of dag.nodes) {
     const type = STAGE_TYPE[n.stageName];
-    if (!type) continue;
-    const details = n.details ?? {};
     nodes.push({
       id: n.batchId,
       type,
-      label: labelOf(type, details, n.stageName),
-      date: n.timestamp ?? null,
-      data: details,
+      label: labelOf(type, n.details, n.stageName),
+      date: n.timestamp,
+      data: n.details,
     });
     for (const parent of n.parents) edges.push({ from: parent, to: n.batchId });
-    // Certificado de laboratorio del embotellado: un nodo más de la línea de tiempo.
-    const lab = type === "BOTTLING_BATCH" ? details.labAnalysis : null;
+    // Certificado de laboratorio del embotellado: un paso más de la línea de tiempo.
+    const lab = type === "BOTTLING_BATCH" ? n.details.labAnalysis : null;
     if (lab && typeof lab === "object") {
       const data = lab as Record<string, unknown>;
       const id = `${n.batchId}:lab`;
@@ -85,7 +91,7 @@ export function fromChainDag(dag: ChainDag): TraceabilityDag {
       edges.push({ from: n.batchId, to: id });
     }
   }
-  const bottling = dag.nodes.find((n) => STAGE_TYPE[n.stageName] === "BOTTLING_BATCH");
+  const bottling = dag.nodes.find((n) => n.stageName === "Bottling");
   return {
     bottlingBatchId: bottling?.batchId ?? dag.rootBatchId,
     lotCode: dag.internationalLotCode,
@@ -94,8 +100,5 @@ export function fromChainDag(dag: ChainDag): TraceabilityDag {
   };
 }
 
-/** Esquema de la respuesta: la forma de los mocks o la del backend, siempre normalizada. */
-export const DagResponseSchema: z.ZodType<TraceabilityDag> = z.union([
-  TraceabilityDagSchema,
-  chainDagSchema.transform(fromChainDag),
-]) as unknown as z.ZodType<TraceabilityDag>;
+/** Esquema de la respuesta: el grafo del backend, convertido a los pasos de la línea de tiempo. */
+export const DagResponseSchema = DagGraphSchema.transform(fromDagGraph);

@@ -2,18 +2,9 @@
 
 import { use } from "react";
 import Link from "next/link";
-import { FileText, Pencil, Scale } from "lucide-react";
-import {
-  Button,
-  Card,
-  CardHeader,
-  EmptyState,
-  ErrorState,
-  KeyValueList,
-  Skeleton,
-  Tag,
-  TextLink,
-} from "@drinks-on-chain/ui";
+import { Pencil, Scale } from "lucide-react";
+import { Button, Card, CardHeader, EmptyState, ErrorState, KeyValueList, Skeleton, Tag } from "@drinks-on-chain/ui";
+import { StoredFileLink } from "@/components/stored-file-link";
 import { PageChrome } from "@/components/page-chrome";
 import { ScreenTitle } from "@/components/screen-title";
 import { DoBadge } from "@/features/origen/components/do-badge";
@@ -147,16 +138,7 @@ export default function TerroirDetailPage({ params }: PageProps<"/origen/[id]">)
                   ]}
                 />
                 {t.doCertificateUrl ? (
-                  <TextLink
-                    variant="inline"
-                    href={t.doCertificateUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex gap-1"
-                  >
-                    <FileText aria-hidden size={16} />
-                    Ver certificado D.O.
-                  </TextLink>
+                  <StoredFileLink reference={t.doCertificateUrl}>Ver certificado D.O.</StoredFileLink>
                 ) : (
                   <p className="m-0 text-sm text-fg-subtle">Sin certificado adjunto.</p>
                 )}

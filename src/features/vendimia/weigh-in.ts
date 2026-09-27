@@ -1,6 +1,7 @@
 import { CreateHarvestBatchSchema, type CreateHarvestBatchDto } from "@drinks-on-chain/mocks";
 import { parseDecimal } from "@/lib/format";
 import { fieldErrorsFrom } from "@/lib/api/field-errors";
+import { omitNulls } from "@/lib/erp/omit-nulls";
 
 // Pesaje (3.1): valores del formulario tal como se escriben, neto en vivo y conversión al
 // DTO de POST /v1/harvest-batches. Brix, pH y acidez son obligatorios (09 §8 punto 6).
@@ -84,7 +85,7 @@ export function toHarvestDto(v: WeighInValues, now: Date): Result {
   }
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
-  const dto: CreateHarvestBatchDto = {
+  const dto = omitNulls<CreateHarvestBatchDto>({
     terroirId: v.terroirId,
     intakeDate: intake!.toISOString(),
     harvestYear: year!,
@@ -95,7 +96,7 @@ export function toHarvestDto(v: WeighInValues, now: Date): Result {
     initialAcidityGl: acidity!,
     temperatureAtIntakeC: temperature,
     notes: v.notes.trim() || null,
-  };
+  });
   const parsed = CreateHarvestBatchSchema.safeParse(dto);
   if (!parsed.success) {
     for (const issue of parsed.error.issues) {

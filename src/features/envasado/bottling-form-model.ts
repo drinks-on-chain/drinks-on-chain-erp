@@ -1,5 +1,6 @@
 import { CreateBottlingBatchSchema, type CreateBottlingBatchDto } from "@drinks-on-chain/mocks";
 import { fmtDate, fmtNumber } from "@/lib/format";
+import { omitNulls, type Nullable } from "@/lib/erp/omit-nulls";
 import type { BottlingSource } from "./sources";
 
 // Validación del formulario de embotellado: el DTO del backend (CreateBottlingBatchSchema)
@@ -57,7 +58,7 @@ export function validateBottling(
 
   if (Object.keys(errors).length > 0 || !source) return { errors, dto: null };
 
-  const body: CreateBottlingBatchDto = {
+  const body: Nullable<CreateBottlingBatchDto> = {
     wineAgingBatchId: source.kind === "crianza" ? source.id : null,
     productionBatchId: source.kind === "destilacion" ? source.id : null,
     productType: source.productType,
@@ -68,7 +69,7 @@ export function validateBottling(
     bottleType: v.bottleType.trim() || null,
     bottlingDate: v.bottlingDate,
   };
-  const parsed = CreateBottlingBatchSchema.safeParse(body);
+  const parsed = CreateBottlingBatchSchema.safeParse(omitNulls<CreateBottlingBatchDto>(body));
   if (!parsed.success) {
     return { errors: { source: parsed.error.issues.map((i) => i.message).join(" ") }, dto: null };
   }
