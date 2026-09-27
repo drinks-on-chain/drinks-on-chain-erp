@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { Building2, MoreHorizontal, UserPlus } from "lucide-react";
 import type { Invitation, Member } from "@drinks-on-chain/mocks";
 import {
@@ -245,16 +245,7 @@ function RoleModal({ member, open, onClose }: { member: Member; open: boolean; o
 // Página
 // ---------------------------------------------------------------------------
 
-const actionsTrigger = (label: string) => (
-  <IconButton label={label} variant="ghost" size="md">
-    <MoreHorizontal aria-hidden size={18} />
-  </IconButton>
-);
-
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-
-/** Abre un diálogo después de que el menú se cierre (evita que Radix deje la página sin puntero). */
-const later = (fn: () => void) => () => window.setTimeout(fn, 0);
 
 export function TeamPage() {
   const me = useMe();
@@ -272,6 +263,26 @@ export function TeamPage() {
     setOpen(Boolean(next));
   };
   const [blockReason, setBlockReason] = useState("");
+  // Un diálogo pedido desde el menú de una fila se abre cuando el menú devuelve el foco a su botón:
+  // así el diálogo lo recuerda y lo devuelve al cerrarse (y Radix no deja la página sin puntero).
+  const queued = useRef<Dialog>(null);
+  const fallback = useRef<number | undefined>(undefined);
+  const flushQueued = () => {
+    window.clearTimeout(fallback.current);
+    const next = queued.current;
+    queued.current = null;
+    if (next) setDialog(next);
+  };
+  const openFromMenu = (next: Dialog) => () => {
+    queued.current = next;
+    window.clearTimeout(fallback.current);
+    fallback.current = window.setTimeout(flushQueued, 400);
+  };
+  const actionsTrigger = (label: string) => (
+    <IconButton label={label} variant="ghost" size="md" onFocus={() => queued.current && flushQueued()}>
+      <MoreHorizontal aria-hidden size={18} />
+    </IconButton>
+  );
   const block = useBlockMember();
   const unblock = useUnblockMember();
   const resend = useResendInvitation();
@@ -316,24 +327,27 @@ export function TeamPage() {
       return (
         <Menu
           trigger={actionsTrigger(`Acciones para ${m.fullName}`)}
-          items={[{ type: "label", label: <span className="block max-w-64 font-normal">{LOCKED_TEXT.PLATFORM}</span> }]}
+          items={[
+            {
+              type: "label",
+              label: (
+                <span className="block max-w-64 font-normal tracking-normal normal-case">{LOCKED_TEXT.PLATFORM}</span>
+              ),
+            },
+          ]}
         />
       );
     }
     const items: MenuEntry[] = [
-      ...(actions.changeRole
-        ? [{ label: "Cambiar rol", onSelect: later(() => setDialog({ kind: "role", member: m })) }]
-        : []),
-      ...(actions.unblock
-        ? [{ label: "Desbloquear", onSelect: later(() => setDialog({ kind: "unblock", member: m })) }]
-        : []),
+      ...(actions.changeRole ? [{ label: "Cambiar rol", onSelect: openFromMenu({ kind: "role", member: m }) }] : []),
+      ...(actions.unblock ? [{ label: "Desbloquear", onSelect: openFromMenu({ kind: "unblock", member: m }) }] : []),
       ...(actions.block
         ? [
             { type: "separator" as const },
             {
               label: "Bloquear acceso",
               destructive: true,
-              onSelect: later(() => setDialog({ kind: "block", member: m })),
+              onSelect: openFromMenu({ kind: "block", member: m }),
             },
           ]
         : []),
@@ -369,7 +383,7 @@ export function TeamPage() {
       ...(actions.revoke
         ? [
             { type: "separator" as const },
-            { label: "Anular", destructive: true, onSelect: later(() => setDialog({ kind: "revoke", invitation: i })) },
+            { label: "Anular", destructive: true, onSelect: openFromMenu({ kind: "revoke", invitation: i }) },
           ]
         : []),
     ];
@@ -456,7 +470,7 @@ export function TeamPage() {
                   {
                     id: "last",
                     header: "Último acceso",
-                    hideBelow: "lg" as const,
+                    hideBelow: "xl" as const,
                     cell: (m: Member) => (
                       <span className="whitespace-nowrap">{m.lastLoginAt ? fmtDateTime(m.lastLoginAt) : "—"}</span>
                     ),
@@ -466,7 +480,7 @@ export function TeamPage() {
             {
               id: "joined",
               header: "Desde",
-              hideBelow: "md",
+              hideBelow: "lg",
               cell: (m) => <span className="whitespace-nowrap">{fmtDate(m.joinedAt)}</span>,
             },
           ]}
