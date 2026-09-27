@@ -175,8 +175,12 @@ test("Ajustes: solo lectura para la enóloga; perfil editable", async ({ page })
   await expect(page.getByText("Modo consulta")).toBeVisible();
   await expect(page.getByText("Bodega Altos de Calamuchita").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Editar datos" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Añadir miembro" })).toHaveCount(0);
-  await expect(page.getByText("agronomo@altos.test")).toBeVisible();
+  // Equipo: ve nombres y roles, sin correos ni acciones de gestión.
+  await nav(page, "Equipo");
+  await expect(page.getByRole("cell", { name: "Ing. Diego Paredes" })).toBeVisible();
+  await expect(page.getByText("agronomo@altos.test")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Invitar" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^Acciones para/ })).toHaveCount(0);
 
   await page.goto("/perfil");
   await page.getByLabel("Teléfono").fill("+591 71000999");
@@ -185,7 +189,7 @@ test("Ajustes: solo lectura para la enóloga; perfil editable", async ({ page })
   expect(errors).toEqual([]);
 });
 
-test("Ajustes: la administración edita la bodega y añade un miembro", async ({ page }) => {
+test("Ajustes: la administración edita la bodega y ve la configuración efectiva", async ({ page }) => {
   const errors = trackErrors(page, []);
   await login(page, "admin@cintiviejo.test");
   await nav(page, "Ajustes");
@@ -197,15 +201,8 @@ test("Ajustes: la administración edita la bodega y añade un miembro", async ({
   await expect(page.getByText("Datos de la bodega guardados", { exact: true })).toBeVisible();
   await expect(page.getByText("+591 4 6660000")).toBeVisible();
 
-  await page.getByRole("button", { name: "Añadir miembro" }).click();
-  const dialog = page.getByRole("dialog", { name: "Añadir miembro" });
-  await dialog.getByLabel("Nombre completo").fill("Rosa Mamani");
-  await dialog.getByLabel("Correo electrónico").fill("rosa@cintiviejo.test");
-  await dialog.getByLabel("Contraseña inicial").fill("demo12345");
-  await dialog.getByRole("combobox", { name: "Rol en la bodega" }).click();
-  await page.getByRole("option", { name: "Agronomía" }).click();
-  await dialog.getByRole("button", { name: "Añadir miembro" }).click();
-  await expect(page.getByText("Rosa Mamani ya es parte de la bodega", { exact: true })).toBeVisible();
-  await expect(page.getByRole("cell", { name: /rosa@cintiviejo.test/ })).toBeVisible();
+  // Configuración efectiva: valores de la plataforma, solo lectura.
+  await expect(page.getByText("Configuración efectiva", { exact: true })).toBeVisible();
+  await expect(page.getByRole("row", { name: /Reposo mínimo tras la destilación.*180 días/ })).toBeVisible();
   expect(errors).toEqual([]);
 });
