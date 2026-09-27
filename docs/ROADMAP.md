@@ -5,11 +5,11 @@ Detalle de `docs/03-roadmap-frontend.md` §4. Se marca con fecha cuando la sub-e
 ## 1A · Acceso y panel
 
 - [x] Proyecto desde la plantilla (puerto 3002, capa de datos de las 45 operaciones, permisos por rol) · 2026-09-25
-- [x] Login dividido y recuperación de acceso (informativa: el backend no tiene endpoint) · 2026-09-25
+- [x] Login dividido y recuperación de acceso (informativa: el backend no tiene endpoint) · 2026-09-25 (recuperación real en la Ola 1)
 - [x] AppShell con módulos, bodega activa, usuario y control de acceso por rol · 2026-09-25
 - [x] Panel: cifras, tareas pendientes derivadas y candados activos · 2026-09-25
 - [x] Perfil (`GET/PATCH /v1/users/me`) · 2026-09-25
-- [x] Ajustes de la bodega y miembros (`/v1/wineries/my`, `/members`, alta con `/members/create`) · 2026-09-25
+- [x] Ajustes de la bodega y miembros (`/v1/wineries/my`, `/members`, alta con `/members/create`) · 2026-09-25 (el equipo pasa a `/equipo` con invitaciones en la Ola 1)
 - [x] Selector de organización en la cabecera con varias membresías (`POST /v1/auth/switch-organization`), probado con mocks 0.2 (`sofia@aramayo.test`) · 2026-09-27. Contra el backend real, pendiente de O0-BE-4
 
 ## 1B · Origen
@@ -60,3 +60,19 @@ Contrato: `plan/contratos/o0-sesiones-y-estandares.md` del plan maestro. La base
 - [x] Login con `BrandSeal` (`feat/login-marca`, necesita `ui` 0.2.0) · 2026-09-27
 - [x] Pruebas unitarias y todas las E2E con mocks en verde (humo con recarga, cambio de organización, cierre de sesión y error por campo) · 2026-09-27
 - [ ] Integración real: login, cambio de organización y parcelas contra el backend de desarrollo (`e2e/backend-real.spec.ts`, excluida por defecto) — pendiente de O0-BE-4 (O0-ERP-2)
+
+## Ola 1 · Cuenta, organización y equipo (O1-ERP-1, sub-etapa 1I)
+
+Contrato: `plan/contratos/o1-backoffice-y-bodegas.md` del plan maestro (§1, §2, §4–§7, §11 bis, §12).
+
+- [x] `@drinks-on-chain/ui` 0.3.0-rc.1 y `@drinks-on-chain/mocks` 0.3.0-rc.2: estado de bodega `INVITED | ACTIVE | SUSPENDED | REVOKED`; `StatusBadge`, `ConfirmDialog`, `DataTable` (paginación y error), `FilterBar` y `DateRangePicker` · 2026-09-27
+- [x] Permisos por la membresía activa con la matriz del backend (operario, contabilidad, agronomía, dirección) y navegación por permiso de lectura · 2026-09-27
+- [x] `X-Client-App: ERP` en todas las peticiones (plantilla `ba303d4`) y refresco de la misma sesión en `switch-organization` y espera de `Retry-After` en los 429 (plantilla `da38404`) · 2026-09-27
+- [x] Aceptar invitación `/invitacion/[token]`: cuenta nueva o existente, caducada, no encontrada, correo distinto; entra con la bodega invitada activa · 2026-09-27
+- [x] Recuperar contraseña con `captchaToken` (Turnstile tras `NEXT_PUBLIC_TURNSTILE_SITE_KEY`) y `/restablecer/[token]`; verificación de correo · 2026-09-27
+- [x] Perfil: cambiar contraseña y preferencias (idioma, avisos del lote, promociones); `PATCH /users/me` en las dos formas · 2026-09-27
+- [x] Equipo: miembros con estado y quién bloqueó, invitaciones pendientes con caducidad, invitar, reenviar, anular, cambiar rol, bloquear y desbloquear · 2026-09-27
+- [x] Configuración efectiva (lectura) en Ajustes y bitácora propia de la dirección con filtros y paginación · 2026-09-27
+- [x] Pantalla de bodega no activa (`ORG_NOT_ACTIVE`: invitada, suspendida, revocada) sin romper la navegación · 2026-09-27
+- [x] Pruebas: unitarias de reglas de equipo, contraseñas, estado de la organización, configuración, bitácora y cuenta; e2e con el buzón simulado (invitación nueva y existente, recuperación), equipo, bodega no activa, axe y teclado · 2026-09-27
+- [ ] Contra el backend real cuando publique O1-BE-1 (todo el §6 de los mocks está pendiente del backend)

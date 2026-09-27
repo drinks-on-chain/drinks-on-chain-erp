@@ -66,6 +66,8 @@ const ADMIN_ROUTES = [
   "/cuenta",
   "/perfil",
   "/ajustes",
+  "/equipo",
+  "/ajustes/bitacora",
 ];
 
 test.describe("administración de Cinti Viejo", () => {
@@ -79,12 +81,12 @@ test.describe("administración de Cinti Viejo", () => {
     });
   }
 
-  test("axe con el modal de alta de miembro abierto", async ({ page }) => {
+  test("axe con el modal de invitación abierto", async ({ page }) => {
     await login(page, "admin@cintiviejo.test");
-    await page.goto("/ajustes");
+    await page.goto("/equipo");
     await settled(page);
-    await page.getByRole("button", { name: "Añadir miembro" }).first().click();
-    await expect(page.getByRole("dialog", { name: "Añadir miembro" })).toBeVisible();
+    await page.getByRole("button", { name: "Invitar" }).first().click();
+    await expect(page.getByRole("dialog", { name: "Invitar al equipo" })).toBeVisible();
     await audit(page, { dialog: true });
   });
 });

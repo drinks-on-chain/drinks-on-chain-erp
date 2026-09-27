@@ -192,16 +192,16 @@ test("bitácora diaria del tanque solo con teclado", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test("Esc cierra el alta de miembro y el foco vuelve al botón", async ({ page }) => {
+test("Esc cierra la invitación al equipo y el foco vuelve al botón", async ({ page }) => {
   await login(page, "admin@cintiviejo.test");
-  await page.goto("/ajustes");
+  await page.goto("/equipo");
   await settled(page);
-  await tabTo(page, "Añadir miembro");
+  await tabTo(page, "Invitar");
   await page.keyboard.press("Enter");
-  const dialog = page.getByRole("dialog", { name: "Añadir miembro" });
+  const dialog = page.getByRole("dialog", { name: "Invitar al equipo" });
   await expect(dialog).toBeVisible();
-  await tabTo(page, "Nombre completo", { max: 3 });
+  await tabTo(page, "Correo electrónico", { max: 3 });
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
-  await expectFocus(page, "Añadir miembro");
+  await expectFocus(page, "Invitar");
 });

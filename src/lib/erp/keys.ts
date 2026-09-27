@@ -19,4 +19,7 @@ export const erpKeys = {
   dag: (bottlingId: string) => ["erp", "dag", bottlingId] as const,
   winery: () => ["erp", "winery"] as const,
   members: () => ["erp", "winery", "members"] as const,
+  invitations: () => ["erp", "winery", "invitations"] as const,
+  settings: () => ["erp", "winery", "settings"] as const,
+  audit: (params?: object) => ["erp", "winery", "audit", params ?? {}] as const,
 };

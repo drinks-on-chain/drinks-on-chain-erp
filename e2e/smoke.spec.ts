@@ -57,12 +57,16 @@ test("la recarga mantiene la sesión (renovación con la cookie al arrancar)", a
   expect(errors).toEqual([]);
 });
 
-test("cambio de organización: Sofía pasa de enóloga en Altos a dueña de Casa Uriondo", async ({ page }) => {
-  const errors = trackErrors(page);
+test("cambio de organización: Sofía pasa de enóloga en Altos a dueña de Casa Uriondo (suspendida)", async ({
+  page,
+}) => {
+  // Al cambiar, las consultas de la pantalla que se deja se relanzan con la bodega nueva: en una
+  // bodega suspendida responden 403 ORG_NOT_ACTIVE, que es justo lo que lleva a la pantalla dedicada.
+  const errors = trackErrors(page, [/^403 \/api\/v1\/terroirs/]);
   await login(page, "sofia@aramayo.test");
   await expect(shellUser(page)).toContainText("Enología · Bodega Altos de Calamuchita");
 
-  // Desde una pantalla interior: al cambiar vuelve al panel con los datos de la otra bodega.
+  // Desde una pantalla interior: al cambiar vuelve al inicio con la otra bodega activa.
   await page.getByRole("link", { name: "Origen y terroirs", exact: true }).first().click();
   await expect(page.getByRole("heading", { name: "Origen y terroirs" })).toBeVisible();
   const selector = page.getByRole("combobox", { name: "Organización activa" });
@@ -72,15 +76,13 @@ test("cambio de organización: Sofía pasa de enóloga en Altos a dueña de Casa
   await expect(page.getByText("Ahora trabajas en Casa Uriondo.", { exact: true })).toBeVisible();
   await expect(page).toHaveURL(/\/$/);
   await expect(shellUser(page)).toContainText("Dirección · Casa Uriondo");
-  await expect(page.getByText("Tareas pendientes", { exact: true })).toBeVisible();
-
-  // Como dueña ve los ajustes de la bodega como editables.
-  await page.getByRole("link", { name: "Ajustes", exact: true }).first().click();
-  await expect(page.getByText(/puede ver los ajustes; los cambia la administración/)).toHaveCount(0);
+  // Casa Uriondo está suspendida (mocks 0.3): pantalla dedicada en lugar del panel.
+  await expect(page.getByRole("heading", { level: 1, name: "La bodega está suspendida" })).toBeVisible();
 
   // La organización elegida sobrevive a la recarga.
   await page.reload();
   await expect(shellUser(page)).toContainText("Dirección · Casa Uriondo");
+  await expect(page.getByRole("heading", { level: 1, name: "La bodega está suspendida" })).toBeVisible();
   expect(errors).toEqual([]);
 });
 

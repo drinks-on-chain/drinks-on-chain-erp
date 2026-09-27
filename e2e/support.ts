@@ -53,3 +53,30 @@ export async function axe(page: Page) {
     nodes: v.nodes.map((n) => `${n.target.join(" ")} :: ${n.failureSummary?.split("\n").slice(1).join(" ")}`),
   }));
 }
+
+type MockMail = { to: string; subject: string; template: string; link: string | null; token: string | null };
+
+/**
+ * Último correo del buzón simulado de los mocks (`window.__docMocks.mailbox`, como Mailpit) para
+ * `to` y la plantilla. Devuelve la ruta del enlace dentro de la app (sin el origen).
+ */
+export async function mailLink(page: Page, to: string, template: string): Promise<string> {
+  await page.waitForFunction(() => "__docMocks" in window);
+  const mail = await page.evaluate(
+    ({ to, template }) =>
+      (
+        window as unknown as { __docMocks: { mailbox: { latest: (f: object) => MockMail | null } } }
+      ).__docMocks.mailbox.latest({ to, template }),
+    { to, template },
+  );
+  expect(mail?.link, `correo ${template} para ${to}`).toBeTruthy();
+  const url = new URL(mail!.link!);
+  return `${url.pathname}${url.search}`;
+}
+
+/** Cierra la sesión desde el menú de usuario del shell. */
+export async function logout(page: Page) {
+  await page.getByRole("button", { name: /Menú de usuario/ }).click();
+  await page.getByRole("menuitem", { name: "Cerrar sesión" }).click();
+  await expect(page).toHaveURL(/\/login$/);
+}

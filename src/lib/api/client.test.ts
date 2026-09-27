@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { api, bootstrapSession, logoutSession, setSessionEndedHandler } from "./client";
-import { ApiError, ContractError, NetworkError } from "./errors";
+import { ApiError, ContractError, NetworkError, errorMessage } from "./errors";
 import { toPage } from "./envelope";
 import { fetchAllPages } from "./pagination";
+import { CLIENT_APP } from "@/lib/client-app";
 import {
   clearSession,
   getAccessToken,
@@ -74,6 +75,17 @@ describe("api", () => {
     expect(call!.init.credentials).toBe("include");
   });
 
+  it("identifica la app con X-Client-App en todas las peticiones, también las públicas", async () => {
+    clearSession();
+    fetchMock.mockResolvedValueOnce(ok(null));
+    fetchMock.mockResolvedValueOnce(ok(null));
+    await api("/v1/public/x", { auth: false });
+    await api("/v1/x");
+    for (const call of calls()) {
+      expect((call.init.headers as Record<string, string>)["X-Client-App"]).toBe(CLIENT_APP);
+    }
+  });
+
   it("convierte el envoltorio de error en ApiError con sus details", async () => {
     setSession({ accessToken: "a1", expiresIn: 900 });
     fetchMock.mockResolvedValueOnce(
@@ -85,6 +97,18 @@ describe("api", () => {
     expect(err).toBeInstanceOf(ApiError);
     expect(err).toMatchObject({ status: 422, code: "VALIDATION_ERROR", isValidation: true });
     expect(err.details).toEqual([{ field: "grossWeightKg", message: "Debe ser mayor que la tara" }]);
+  });
+
+  it("un 429 lleva la espera de Retry-After y el mensaje la muestra", async () => {
+    clearSession();
+    const res = fail(429, "AUTH_TOO_MANY_ATTEMPTS", "Demasiados intentos");
+    res.headers.set("Retry-After", "300");
+    fetchMock.mockResolvedValueOnce(res);
+    const err = (await api("/v1/auth/login", { method: "POST", body: {}, auth: false }).catch(
+      (e: unknown) => e,
+    )) as ApiError;
+    expect(err).toMatchObject({ status: 429, code: "AUTH_TOO_MANY_ATTEMPTS", retryAfter: 300 });
+    expect(errorMessage(err)).toBe("Demasiados intentos. Vuelve a intentarlo en 5 minutos.");
   });
 
   describe("arranque", () => {

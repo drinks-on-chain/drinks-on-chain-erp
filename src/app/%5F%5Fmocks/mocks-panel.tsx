@@ -3,18 +3,23 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import {
   SCENARIOS,
   expireAccessTokens,
   getScenario,
+  mockMailbox,
   resetErpDb,
   setScenario,
   type ScenarioName,
 } from "@drinks-on-chain/mocks/browser";
+import type { MockEmail } from "@drinks-on-chain/mocks";
 import { DEMO_PASSWORD, demoUsers } from "@drinks-on-chain/mocks/fixtures";
 import { Alert, Badge, Button, Card, CardHeader, DataTable, Field, Select, toast } from "@drinks-on-chain/ui";
 import { env } from "@/lib/env";
-import { errorMessage } from "@/lib/api/errors";
+import { ApiError, errorMessage } from "@/lib/api/errors";
+import { MFA_NOT_SUPPORTED } from "@/lib/auth/api";
+import { fmtDateTime } from "@/lib/format";
 import { useLogin } from "@/lib/auth/hooks";
 import { es } from "@/lib/i18n/es";
 
@@ -25,6 +30,58 @@ const SCENARIO_LABELS: Record<ScenarioName, string> = {
   slow: "Lento (+2,5 s)",
   offline: "Sin conexión",
 };
+
+/** Enlace del correo: dentro de la app si es de este origen; si no, a la otra app. */
+function MailLink({ email }: { email: MockEmail }) {
+  if (!email.link) return <span className="text-fg-subtle">—</span>;
+  const url = new URL(email.link);
+  if (typeof window !== "undefined" && url.origin === window.location.origin) {
+    return (
+      <Link href={`${url.pathname}${url.search}`} className="text-accent-text hover:underline">
+        Abrir enlace
+      </Link>
+    );
+  }
+  return (
+    <a href={email.link} className="text-accent-text hover:underline">
+      Abrir en {email.app ?? "otra app"}
+    </a>
+  );
+}
+
+/** Buzón simulado de los mocks (como Mailpit): invitaciones, recuperación, avisos. */
+function Mailbox() {
+  const [emails, setEmails] = useState<MockEmail[]>(() => mockMailbox.list().slice(0, 15));
+  return (
+    <Card className="grid gap-4 p-6">
+      <CardHeader
+        title="Buzón simulado"
+        description="Los correos que enviaría el backend. Los enlaces llevan a la pantalla correspondiente."
+        action={
+          <Button size="sm" variant="secondary" onClick={() => setEmails(mockMailbox.list().slice(0, 15))}>
+            Actualizar
+          </Button>
+        }
+      />
+      <DataTable<MockEmail>
+        caption="Últimos correos"
+        density="compact"
+        getRowId={(m) => m.id}
+        data={emails}
+        columns={[
+          {
+            id: "date",
+            header: "Fecha",
+            cell: (m) => <span className="whitespace-nowrap">{fmtDateTime(m.createdAt)}</span>,
+          },
+          { id: "to", header: "Para", cell: (m) => <span className="break-all">{m.to}</span> },
+          { id: "subject", header: "Asunto", cell: (m) => m.subject },
+          { id: "link", header: "Enlace", cell: (m) => <MailLink email={m} /> },
+        ]}
+      />
+    </Card>
+  );
+}
 
 export function MocksPanel() {
   const router = useRouter();
@@ -44,7 +101,11 @@ export function MocksPanel() {
       { email, password: DEMO_PASSWORD },
       {
         onSuccess: () => router.push("/"),
-        onError: (e) => toast({ title: errorMessage(e), tone: "danger" }),
+        onError: (e) =>
+          toast({
+            title: e instanceof ApiError && e.code === MFA_NOT_SUPPORTED ? e.message : errorMessage(e),
+            tone: "danger",
+          }),
       },
     );
   }
@@ -126,6 +187,8 @@ export function MocksPanel() {
           ]}
         />
       </Card>
+
+      {env.mocks && <Mailbox />}
     </main>
   );
 }

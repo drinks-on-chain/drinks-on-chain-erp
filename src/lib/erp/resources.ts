@@ -1,4 +1,4 @@
-import type { z } from "zod";
+import { z } from "zod";
 import {
   BatchLabAnalysisResponseSchema,
   BottlingBatchResponseSchema,
@@ -14,7 +14,10 @@ import {
   TerroirResponseSchema,
   TraceabilityDagSchema,
   WineAgingResponseSchema,
-  WineryMemberItemSchema,
+  AuditEventSchema,
+  EffectiveSettingSchema,
+  InvitationSchema,
+  MemberSchema,
   WineryResponseSchema,
   type CreateBatchLabAnalysisDto,
   type CreateBottlingBatchDto,
@@ -23,11 +26,12 @@ import {
   type CreateFermentationLogDto,
   type CreateFermentationTankDto,
   type CreateHarvestBatchDto,
-  type CreateMemberDto,
+  type CreateInvitationDto,
   type CreateTerroirDto,
   type CreateWineAgingBatchDto,
   type UpdatePhytoStatusDto,
   type UpdateTerroirDto,
+  type UpdateMemberRoleDto,
   type UpdateWineryDto,
 } from "@drinks-on-chain/mocks";
 import { api } from "@/lib/api/client";
@@ -63,6 +67,8 @@ export type TerroirQuery = PageQuery & { varietyName?: string; isDoEligible?: bo
 export type HarvestQuery = PageQuery & { terroirId?: string; phytosanitaryStatus?: string; harvestYear?: number };
 export type TankQuery = PageQuery & { status?: string; destinationType?: string; harvestBatchId?: string };
 export type ProductionQuery = PageQuery & { restStatus?: string };
+/** Filtros de la bitácora propia (contrato de la Ola 1 §7): fechas `AAAA-MM-DD` y código de acción. */
+export type AuditQuery = { from?: string; to?: string; action?: string; limit: number; offset: number };
 export type UploadFolder = "certificates" | "inspections" | "labels" | "lab-reports";
 
 export type UploadResult = { url: string; key: string; originalName: string; mimeType: string; sizeBytes: number };
@@ -130,10 +136,37 @@ export const erpApi = {
   winery: (signal?: AbortSignal) => api("/v1/wineries/my", { schema: WineryResponseSchema, signal }),
   updateWinery: (body: UpdateWineryDto) =>
     api("/v1/wineries/my", { method: "PATCH", body, schema: WineryResponseSchema }),
+
+  // Equipo de la organización activa (contrato de la Ola 1 §2 y §5)
   members: (signal?: AbortSignal) =>
-    list("/v1/wineries/my/members", WineryMemberItemSchema, {}, signal).then((p) => p.items),
-  createMember: (body: CreateMemberDto) =>
-    api("/v1/wineries/my/members/create", { method: "POST", body, schema: WineryMemberItemSchema }),
+    list("/v1/organizations/current/members", MemberSchema, {}, signal).then((p) => p.items),
+  updateMemberRole: (membershipId: string, body: UpdateMemberRoleDto) =>
+    api(`/v1/organizations/current/members/${membershipId}`, { method: "PATCH", body, schema: MemberSchema }),
+  blockMember: (membershipId: string, reason: string | null) =>
+    api(`/v1/organizations/current/members/${membershipId}/block`, {
+      method: "POST",
+      body: { reason },
+      schema: MemberSchema,
+    }),
+  unblockMember: (membershipId: string) =>
+    api(`/v1/organizations/current/members/${membershipId}/unblock`, {
+      method: "POST",
+      body: {},
+      schema: MemberSchema,
+    }),
+  invitations: (signal?: AbortSignal) =>
+    list("/v1/organizations/current/invitations", InvitationSchema, {}, signal).then((p) => p.items),
+  createInvitation: (body: CreateInvitationDto) =>
+    api("/v1/organizations/current/invitations", { method: "POST", body, schema: InvitationSchema }),
+  resendInvitation: (id: string) =>
+    api(`/v1/invitations/${id}/resend`, { method: "POST", body: {}, schema: InvitationSchema }),
+  revokeInvitation: (id: string) =>
+    api(`/v1/invitations/${id}/revoke`, { method: "POST", body: {}, schema: InvitationSchema }),
+
+  // Configuración efectiva (solo lectura) y bitácora propia (dueño)
+  settings: (signal?: AbortSignal) =>
+    api("/v1/organizations/current/settings", { schema: z.array(EffectiveSettingSchema), signal }),
+  audit: (q: AuditQuery, signal?: AbortSignal) => page("/v1/organizations/current/audit", AuditEventSchema, q, signal),
 
   // Archivos: devuelve la URL que luego se pasa en los DTO
   upload: (file: File, folder: UploadFolder) => {

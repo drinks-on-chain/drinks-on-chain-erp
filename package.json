@@ -16,8 +16,8 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
-    "@drinks-on-chain/mocks": "https://github.com/drinks-on-chain/drinks-on-chain-mocks/releases/download/v0.2.0-rc.1/drinks-on-chain-mocks-0.2.0-rc.1.tgz",
-    "@drinks-on-chain/ui": "https://github.com/drinks-on-chain/drinks-on-chain-design-system/releases/download/v0.2.0/drinks-on-chain-ui-0.2.0.tgz",
+    "@drinks-on-chain/mocks": "https://github.com/drinks-on-chain/drinks-on-chain-mocks/releases/download/v0.3.0-rc.2/drinks-on-chain-mocks-0.3.0-rc.2.tgz",
+    "@drinks-on-chain/ui": "https://github.com/drinks-on-chain/drinks-on-chain-design-system/releases/download/v0.3.0-rc.1/drinks-on-chain-ui-0.3.0-rc.1.tgz",
     "@tanstack/react-query": "^5.103.2",
     "fflate": "^0.8.3",
     "lucide-react": "^1.48.0",

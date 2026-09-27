@@ -93,9 +93,9 @@ export const TREATMENT_TYPE: Record<TreatmentType, string> = {
 };
 
 export const CERTIFICATION_STATUS: Record<CertificationStatus, Label> = {
-  PENDING: { label: "Pendiente de aprobación", tone: "warning" },
+  INVITED: { label: "Invitada: pendiente de activación", tone: "info" },
   ACTIVE: { label: "Activa", tone: "success" },
-  SUSPENDED: { label: "Suspendida", tone: "danger" },
+  SUSPENDED: { label: "Suspendida", tone: "warning" },
   REVOKED: { label: "Revocada", tone: "danger" },
 };
 

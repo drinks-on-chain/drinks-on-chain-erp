@@ -4,14 +4,24 @@ export class ApiError extends Error {
   readonly code: string;
   readonly details: unknown;
   readonly path: string | undefined;
+  /** Segundos de espera de la cabecera `Retry-After` (429 `AUTH_TOO_MANY_ATTEMPTS`), si llega. */
+  readonly retryAfter: number | undefined;
 
-  constructor(opts: { status: number; code: string; message: string; details?: unknown; path?: string }) {
+  constructor(opts: {
+    status: number;
+    code: string;
+    message: string;
+    details?: unknown;
+    path?: string;
+    retryAfter?: number;
+  }) {
     super(opts.message);
     this.name = "ApiError";
     this.status = opts.status;
     this.code = opts.code;
     this.details = opts.details;
     this.path = opts.path;
+    this.retryAfter = opts.retryAfter;
   }
 
   get isUnauthorized() {
@@ -27,6 +37,13 @@ export class ApiError extends Error {
   get isValidation() {
     return this.status === 400 || this.status === 422;
   }
+}
+
+/** "1 minuto", "5 minutos"… para el tiempo de espera de un 429 (redondeado hacia arriba). */
+export function waitText(seconds: number): string {
+  if (seconds < 60) return seconds <= 1 ? "1 segundo" : `${Math.ceil(seconds)} segundos`;
+  const minutes = Math.ceil(seconds / 60);
+  return minutes === 1 ? "1 minuto" : `${minutes} minutos`;
 }
 
 /** Fallo de red (sin conexión, CORS, DNS). No hay respuesta del servidor. */
@@ -52,6 +69,11 @@ export function errorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status >= 500) return "El servidor tuvo un problema. Inténtalo de nuevo en unos minutos.";
     if (error.isForbidden) return "No tienes permiso para esta acción.";
+    if (error.status === 429) {
+      return error.retryAfter
+        ? `Demasiados intentos. Vuelve a intentarlo en ${waitText(error.retryAfter)}.`
+        : "Demasiados intentos. Espera unos minutos y vuelve a intentarlo.";
+    }
     return error.message;
   }
   if (error instanceof NetworkError) return error.message;

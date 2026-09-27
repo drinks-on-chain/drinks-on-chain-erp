@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Alert, Button, Field, Input } from "@drinks-on-chain/ui";
 import { ApiError, errorMessage } from "@/lib/api/errors";
 import { fieldErrorsFrom } from "@/lib/api/field-errors";
+import { MFA_NOT_SUPPORTED } from "@/lib/auth/api";
 import { useIsAuthenticated, useLogin } from "@/lib/auth/hooks";
 import { es } from "@/lib/i18n/es";
 
@@ -29,12 +30,15 @@ export function LoginForm() {
   const error = loginMutation.error;
   // 422 del backend: cada mensaje junto a su campo (details[].field).
   const { fieldErrors, formErrors } = fieldErrorsFrom(error, ["email", "password"]);
+  // 429 AUTH_TOO_MANY_ATTEMPTS tras 5 fallos: errorMessage() muestra la espera de `Retry-After`.
   const message =
-    error instanceof ApiError && error.isUnauthorized
-      ? es.auth.invalid
-      : error instanceof ApiError && error.isValidation
-        ? formErrors.join(" ")
-        : error && errorMessage(error);
+    error instanceof ApiError && error.code === MFA_NOT_SUPPORTED
+      ? error.message
+      : error instanceof ApiError && error.isUnauthorized
+        ? es.auth.invalid
+        : error instanceof ApiError && error.isValidation
+          ? formErrors.join(" ")
+          : error && errorMessage(error);
 
   return (
     <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4" noValidate>
