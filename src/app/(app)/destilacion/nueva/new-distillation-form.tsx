@@ -344,7 +344,7 @@ export function NewDistillationForm() {
             <CardHeader title="Reposo obligatorio" />
             <div className="flex items-center gap-3">
               <Lock aria-hidden size={28} strokeWidth={1.5} className="text-warning" />
-              <span className="font-display text-3xl text-warning">
+              <span className="font-display text-3xl text-warning-text">
                 {restUntil ? fmtDate(restUntil.toISOString()) : "—"}
               </span>
             </div>

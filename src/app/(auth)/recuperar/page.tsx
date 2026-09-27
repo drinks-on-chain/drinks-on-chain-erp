@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Alert, AuthLayout, Button } from "@drinks-on-chain/ui";
+import { Alert, AuthLayout, BrandSeal, Button, VineyardScene } from "@drinks-on-chain/ui";
 
 export const metadata: Metadata = { title: "Recuperar contraseña" };
 
@@ -8,7 +8,12 @@ export const metadata: Metadata = { title: "Recuperar contraseña" };
 // 25-09-2026). Mientras tanto, la administración de la bodega restablece el acceso.
 export default function RecoverPage() {
   return (
-    <AuthLayout variant="split" eyebrow="ERP de trazabilidad" title="Recuperar contraseña">
+    <AuthLayout
+      variant="split"
+      brand={<BrandSeal tagline="ERP de trazabilidad" />}
+      image={<VineyardScene />}
+      title="Recuperar contraseña"
+    >
       <div className="grid grid-cols-1 gap-4">
         <Alert tone="info">
           Pide a la persona que administra tu bodega en el ERP que restablezca tu acceso. Si eres tú, escribe al equipo

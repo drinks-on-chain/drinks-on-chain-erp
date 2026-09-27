@@ -59,7 +59,7 @@ export function StillCutsForm({
         {cut("tailDiscardLiters", "Cola", "Descarte final.")}
         {cut("initialAlcoholPercentage", "Grado inicial", "Del destilado al salir.")}
       </div>
-      <p className={cn("m-0 text-sm tabular-nums", over ? "text-danger" : "text-fg-muted")} aria-live="polite">
+      <p className={cn("m-0 text-sm tabular-nums", over ? "text-danger-text" : "text-fg-muted")} aria-live="polite">
         Cortes: {fmtNumber(total)} L
         {inputVolumeLiters !== null && inputVolumeLiters > 0
           ? ` de ${fmtNumber(inputVolumeLiters)} L de entrada${over ? " · superan la entrada" : ""}`
