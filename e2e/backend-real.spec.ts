@@ -109,6 +109,8 @@ test("dueña de Cinti Viejo: sesión por cookie, módulos, alta de parcela, 422 
     // Línea de tiempo desde el grafo del backend (forma de la cadena, normalizada en el ERP).
     await expect(page.getByText("Destilación · Alambique de cobre Charentais AL-01")).toBeVisible();
     await expect(page.getByText(/^Parcela · Parcela 2 · Cañón Viejo/)).toBeVisible();
+    // El certificado llega en `details.labAnalysis` del embotellado: hecho, no "Pendiente".
+    await expect(page.getByText(/^Certificado de laboratorio · /)).toBeVisible();
     await openModule(page, "Cuenta Stellar", "Cuenta Stellar");
     await expect(page.getByRole("link", { name: /Ver en stellar.expert/ })).toBeVisible();
     await openModule(page, "Ajustes", "Ajustes de la bodega");
