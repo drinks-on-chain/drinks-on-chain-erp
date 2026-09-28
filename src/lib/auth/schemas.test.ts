@@ -9,15 +9,10 @@ const session = {
 };
 
 describe("esquemas de sesión (H1)", () => {
-  it("el login es una sesión sin refreshToken ni campos de 0.1, o un reto de segundo factor", () => {
-    const parsed = LoginResponseSchema.parse({
-      ...session,
-      user: { ...session.user, userRole: "PLATFORM_ADMIN", memberRole: null },
-      tokens: { ...session.tokens, refreshToken: "sid.1.x" },
-    });
+  it("el login es una sesión (solo el acceso en tokens) o un reto de segundo factor", () => {
+    const parsed = LoginResponseSchema.parse(session);
     expect(isMfaChallenge(parsed)).toBe(false);
-    expect(parsed).not.toHaveProperty("user.userRole");
-    expect(parsed).not.toHaveProperty("tokens.refreshToken");
+    expect(parsed).toEqual(session);
 
     const challenge = LoginResponseSchema.parse({ mfa: { required: true, enrolled: true, mfaToken: "t" } });
     expect(isMfaChallenge(challenge)).toBe(true);

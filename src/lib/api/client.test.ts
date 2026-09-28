@@ -28,12 +28,12 @@ const fail = (status: number, code: string, message = code, details: unknown = n
     { status },
   );
 /** Respuesta de login/refresh/switch del contrato (§5). */
-const session = (accessToken: string, refreshToken?: string) =>
+const session = (accessToken: string) =>
   ok({
     user: { id: "u1" },
     memberships: [],
     activeOrganizationId: null,
-    tokens: { accessToken, tokenType: "Bearer", expiresIn: 900, ...(refreshToken ? { refreshToken } : {}) },
+    tokens: { accessToken, tokenType: "Bearer", expiresIn: 900 },
   });
 
 type Call = { url: string; init: RequestInit };
@@ -206,11 +206,11 @@ describe("api", () => {
       expect(auth(calls()[1]!)).toBe("Bearer fresco");
     });
 
-    it("ignora un refreshToken en el cuerpo (retirado en H1): la renovación va solo en la cookie", async () => {
+    it("la renovación va solo en la cookie: cuerpo vacío y nada guardado en el navegador", async () => {
       setSession({ accessToken: "viejo", expiresIn: 900 });
       fetchMock
         .mockResolvedValueOnce(fail(401, "UNAUTHORIZED"))
-        .mockResolvedValueOnce(session("nuevo", "r2"))
+        .mockResolvedValueOnce(session("nuevo"))
         .mockResolvedValueOnce(ok({ ok: true }))
         .mockResolvedValueOnce(fail(401, "UNAUTHORIZED"))
         .mockResolvedValueOnce(session("otro"))

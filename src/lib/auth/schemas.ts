@@ -1,34 +1,33 @@
 import {
   AuthTokensSchema,
-  AuthUserSchema,
   MfaChallengeSchema,
-  MeResponseSchema as MocksMeResponseSchema,
-  MeUserSchema as MocksMeUserSchema,
   SessionResponseSchema as MocksSessionResponseSchema,
   type MfaChallenge,
 } from "@drinks-on-chain/mocks";
 import { z } from "zod";
 
-// Respuestas de sesión y de `me` tal como quedan al cerrar la Ola 1 (H1, contrato de la Ola 1
-// §11): sin `tokens.refreshToken` (la renovación viaja solo en la cookie `doc_rt`) ni
-// `user.userRole`, `user.wineryId` y `user.memberRole` (los permisos salen de la membresía
-// activa). Se omiten del esquema para que la app no los exija si el backend ya no los envía ni
-// pueda leerlos si aún llegan (zod descarta las claves desconocidas). Cuando los esquemas de
-// `@drinks-on-chain/mocks` los quiten, este archivo se reduce a reexportarlos.
+// Respuestas de sesión y de `me` tras la retirada de H1 (contrato de la Ola 1 §11): los esquemas
+// de `@drinks-on-chain/mocks` 0.4.0-rc.2 ya no llevan `userRole`, `wineryId` ni `memberRole`
+// (los permisos salen de la membresía activa) y se reexportan tal cual. Lo único propio es que
+// la app no lee `tokens.refreshToken`: los mocks lo mantienen opcional y obsoleto hasta 0.5, y
+// la renovación viaja solo en la cookie `doc_rt`. Cuando los mocks lo borren, `SessionTokensSchema`
+// y los esquemas de sesión también se reducen a reexportarlos.
+
+export {
+  AuthUserSchema as SessionUserSchema,
+  MeResponseSchema,
+  MeUserSchema,
+  type AuthUser as SessionUser,
+  type MeResponse,
+  type MeUser,
+} from "@drinks-on-chain/mocks";
 
 /** Tokens de login, refresh y switch-organization: solo el acceso (15 min). */
 export const SessionTokensSchema = AuthTokensSchema.omit({ refreshToken: true });
 export type SessionTokensResponse = z.infer<typeof SessionTokensSchema>;
 
-/** Persona en la respuesta de sesión. */
-export const SessionUserSchema = AuthUserSchema.omit({ userRole: true, wineryId: true, memberRole: true });
-export type SessionUser = z.infer<typeof SessionUserSchema>;
-
 /** Respuesta de login (sin segundo factor), refresh, switch-organization y aceptar invitación. */
-export const SessionResponseSchema = MocksSessionResponseSchema.extend({
-  user: SessionUserSchema,
-  tokens: SessionTokensSchema,
-});
+export const SessionResponseSchema = MocksSessionResponseSchema.extend({ tokens: SessionTokensSchema });
 export type SessionResponse = z.infer<typeof SessionResponseSchema>;
 
 /**
@@ -48,11 +47,3 @@ export const MfaEnrollConfirmResponseSchema = SessionResponseSchema.extend({
   recoveryCodes: z.array(z.string()).length(10),
 });
 export type MfaEnrollConfirmResponse = z.infer<typeof MfaEnrollConfirmResponseSchema>;
-
-/** Persona de `GET/PATCH /v1/users/me`. */
-export const MeUserSchema = MocksMeUserSchema.omit({ userRole: true });
-export type MeUser = z.infer<typeof MeUserSchema>;
-
-/** `GET/PATCH /v1/users/me`: `{ user, memberships, activeOrganizationId }`. */
-export const MeResponseSchema = MocksMeResponseSchema.extend({ user: MeUserSchema });
-export type MeResponse = z.infer<typeof MeResponseSchema>;
