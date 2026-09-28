@@ -86,6 +86,19 @@ test("cambio de organización: Sofía pasa de enóloga en Altos a dueña de Casa
   expect(errors).toEqual([]);
 });
 
+test("el enlace Perfil del menú de usuario navega sin recargar la página", async ({ page }) => {
+  const errors = trackErrors(page);
+  await login(page, "enologa@cintiviejo.test");
+  // Una marca en `window` sobrevive a la navegación del cliente y desaparece con una recarga.
+  await page.evaluate(() => ((window as unknown as { __sinRecarga?: boolean }).__sinRecarga = true));
+  await shellUser(page).click();
+  await page.getByRole("menuitem", { name: "Perfil" }).click();
+  await expect(page).toHaveURL(/\/perfil$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Lic. Lucía Rojas" })).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { __sinRecarga?: boolean }).__sinRecarga)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test("una sesión revocada avisa en el login, también al recargar", async ({ page }) => {
   await login(page, "enologa@cintiviejo.test");
   // Revoca en los mocks las sesiones abiertas (como un bloqueo desde el Backoffice).

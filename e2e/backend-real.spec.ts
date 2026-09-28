@@ -341,8 +341,7 @@ async function stubTurnstile(page: Page) {
 /**
  * La sesión revocada en el backend cae en la siguiente petición: se abre el perfil y, si todo sale
  * de la caché, se cambia y guarda una preferencia (siempre va a la red). El backend responde 401
- * `AUTH_SESSION_REVOKED` (a la petición o a la renovación: el enlace "Perfil" del menú de usuario
- * recarga la página) y la app lleva al login.
+ * `AUTH_SESSION_REVOKED` (a la petición o a la renovación) y la app lleva al login.
  */
 async function expectSessionRevoked(page: Page) {
   const revoked = page.waitForResponse((r) => r.url().includes("/api/v1/") && r.status() === 401);
