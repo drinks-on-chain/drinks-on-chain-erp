@@ -1,4 +1,5 @@
-import type { Audience, MeResponse, Membership } from "@drinks-on-chain/mocks";
+import type { Audience, Membership } from "@drinks-on-chain/mocks";
+import type { MeResponse } from "./schemas";
 
 // Organización activa y audiencia (contrato de la Ola 0 §4 y §6).
 

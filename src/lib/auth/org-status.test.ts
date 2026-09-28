@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import type { MeResponse, Membership } from "@drinks-on-chain/mocks";
+import type { Membership } from "@drinks-on-chain/mocks";
+import type { MeResponse } from "./schemas";
 import { ApiError } from "@/lib/api/errors";
 import {
   canReadAuditWhileInactive,

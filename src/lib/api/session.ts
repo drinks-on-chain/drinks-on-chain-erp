@@ -4,28 +4,28 @@
 //   sessionStorage ni localStorage.
 // - La renovación viaja en la cookie HttpOnly `doc_rt` de primera parte (P-1). Para sobrevivir
 //   a una recarga, la app llama a `POST /api/v1/auth/refresh` al arrancar (bootstrapSession).
-// - Tolerancia transitoria (*retirada* en H1): si el backend aún devuelve `tokens.refreshToken`
-//   en el cuerpo, se guarda en memoria y se reenvía en el cuerpo de `refresh`. Así un backend
-//   anterior a O0-BE-4 (sin cookie) sigue funcionando mientras la pestaña no se recargue.
+//   Un `refreshToken` en el cuerpo de la respuesta (retirado en H1) se ignora.
 
 export type SessionStatus = "unknown" | "authenticated" | "anonymous";
+
+/** `expired`: la renovación caducó o no existe. `revoked`: reutilización, bloqueo o revocación. */
+export type SessionEndReason = "expired" | "revoked";
 
 export type SessionTokens = {
   accessToken: string;
   /** Segundos de vida del acceso (900 en el contrato). */
   expiresIn: number;
-  /** Solo por compatibilidad hasta H1. */
-  refreshToken?: string | null;
 };
 
 type State = {
   status: SessionStatus;
   accessToken: string | null;
   expiresAt: number;
-  legacyRefreshToken: string | null;
+  /** Por qué terminó la última sesión (el login lo avisa); `null` si se cerró a propósito. */
+  endReason: SessionEndReason | null;
 };
 
-const initial: State = { status: "unknown", accessToken: null, expiresAt: 0, legacyRefreshToken: null };
+const initial: State = { status: "unknown", accessToken: null, expiresAt: 0, endReason: null };
 let state: State = initial;
 const listeners = new Set<() => void>();
 
@@ -46,24 +46,28 @@ export function getAccessExpiresAt(): number {
   return state.expiresAt;
 }
 
-/** Refresco recibido en el cuerpo (backend anterior al contrato). *Retirada* en H1. */
-export function getLegacyRefreshToken(): string | null {
-  return state.legacyRefreshToken;
+/** Motivo del último cierre involuntario de la sesión; `null` con sesión o tras cerrarla a propósito. */
+export function getSessionEndReason(): SessionEndReason | null {
+  return state.endReason;
 }
 
+/** Guarda solo el acceso: la renovación la gestiona el navegador con la cookie `doc_rt`. */
 export function setSession(tokens: SessionTokens) {
   state = {
     status: "authenticated",
     accessToken: tokens.accessToken,
     expiresAt: Date.now() + tokens.expiresIn * 1000,
-    legacyRefreshToken: tokens.refreshToken ?? null,
+    endReason: null,
   };
   emit();
 }
 
-/** Sin sesión (tras cerrar sesión, fallar la renovación o no tener cookie al arrancar). */
-export function clearSession() {
-  state = { ...initial, status: "anonymous" };
+/**
+ * Sin sesión (tras cerrar sesión, fallar la renovación o no tener cookie al arrancar). Con
+ * `reason`, el login avisa de por qué terminó (p. ej. "Tu sesión se cerró por seguridad").
+ */
+export function clearSession(reason: SessionEndReason | null = null) {
+  state = { ...initial, status: "anonymous", endReason: reason };
   emit();
 }
 

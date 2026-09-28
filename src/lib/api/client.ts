@@ -7,11 +7,13 @@ import {
   clearSession,
   getAccessExpiresAt,
   getAccessToken,
-  getLegacyRefreshToken,
   getSessionStatus,
   purgeLegacyStorage,
   setSession,
+  type SessionEndReason,
 } from "./session";
+
+export type { SessionEndReason } from "./session";
 
 type Query = Record<string, string | number | boolean | null | undefined>;
 
@@ -29,9 +31,6 @@ export type RequestOptions<T> = {
 
 /** Códigos con los que el backend da la sesión por terminada (contrato de la Ola 0 §5). */
 export const SESSION_ENDED_CODES: readonly string[] = ["AUTH_REFRESH_REUSED", "AUTH_SESSION_REVOKED"];
-
-/** `expired`: la renovación caducó o no existe. `revoked`: reutilización, bloqueo o revocación. */
-export type SessionEndReason = "expired" | "revoked";
 
 /** Se llama una vez cuando la sesión termina sin poder renovarse (la app avisa y lleva al login). */
 let onSessionEnded: (reason: SessionEndReason) => void = () => {};
@@ -126,24 +125,21 @@ async function parseError(res: Response, path: string): Promise<ApiError> {
 // Renovación
 // ---------------------------------------------------------------------------
 
-// `refresh` responde como el login (`data.tokens`); un backend anterior al contrato devolvía
-// los tokens sueltos en `data`. Se aceptan las dos formas.
-const tokensSchema = z.object({
-  accessToken: z.string().min(1),
-  expiresIn: z.number().positive().optional(),
-  refreshToken: z.string().nullish(),
+// `refresh` responde como el login; aquí solo interesa el acceso. El refresco rotado llega en la
+// cookie `doc_rt` (un `refreshToken` en el cuerpo, retirado en H1, se ignora).
+const refreshDataSchema = z.object({
+  tokens: z.object({ accessToken: z.string().min(1), expiresIn: z.number().positive() }),
 });
-const refreshDataSchema = z.union([z.object({ tokens: tokensSchema }), tokensSchema]);
 
 export type RefreshOutcome = { ok: true } | { ok: false; reason: SessionEndReason | "network"; error?: unknown };
 
 let refreshing: Promise<RefreshOutcome> | null = null;
 
 async function doRefresh(): Promise<RefreshOutcome> {
-  const legacy = getLegacyRefreshToken();
   let res: Response;
   try {
-    res = await send("/v1/auth/refresh", { method: "POST", body: legacy ? { refreshToken: legacy } : {} }, null);
+    // Solo la cookie `doc_rt`: el cuerpo va vacío.
+    res = await send("/v1/auth/refresh", { method: "POST", body: {} }, null);
   } catch (error) {
     return { ok: false, reason: "network", error };
   }
@@ -153,13 +149,8 @@ async function doRefresh(): Promise<RefreshOutcome> {
   }
   try {
     const envelope = successEnvelope.parse(await res.json());
-    const data = refreshDataSchema.parse(envelope.data);
-    const tokens = "tokens" in data ? data.tokens : data;
-    setSession({
-      accessToken: tokens.accessToken,
-      expiresIn: tokens.expiresIn ?? 900,
-      refreshToken: tokens.refreshToken,
-    });
+    const { tokens } = refreshDataSchema.parse(envelope.data);
+    setSession({ accessToken: tokens.accessToken, expiresIn: tokens.expiresIn });
     return { ok: true };
   } catch (error) {
     return { ok: false, reason: "expired", error };
@@ -181,7 +172,10 @@ let booting: Promise<void> | null = null;
 
 /**
  * Arranque: sin acceso en memoria, intenta renovar con la cookie para recuperar la sesión tras
- * una recarga. Sin cookie válida la sesión queda anónima (sin aviso). Idempotente.
+ * una recarga. Sin cookie válida la sesión queda anónima sin aviso; si la sesión de la cookie fue
+ * revocada (bloqueo, reutilización del refresco), queda anónima con el motivo para que el login
+ * avise "Tu sesión se cerró por seguridad". No redirige: una página pública sigue donde está.
+ * Idempotente.
  */
 export function bootstrapSession(): Promise<void> {
   if (getSessionStatus() !== "unknown") return Promise.resolve();
@@ -189,7 +183,9 @@ export function bootstrapSession(): Promise<void> {
     purgeLegacyStorage();
     const outcome = await refreshSession();
     // Si mientras tanto alguien inició sesión, no se toca.
-    if (!outcome.ok && getSessionStatus() === "unknown") clearSession();
+    if (!outcome.ok && getSessionStatus() === "unknown") {
+      clearSession(outcome.reason === "revoked" ? "revoked" : null);
+    }
   })().finally(() => {
     booting = null;
   });
@@ -199,7 +195,7 @@ export function bootstrapSession(): Promise<void> {
 /** Cierra la sesión local y avisa a la app una sola vez aunque fallen varias peticiones. */
 function endSession(reason: SessionEndReason) {
   if (getSessionStatus() === "anonymous") return;
-  clearSession();
+  clearSession(reason);
   onSessionEnded(reason);
 }
 

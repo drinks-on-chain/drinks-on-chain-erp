@@ -82,3 +82,13 @@ Contrato: `plan/contratos/o1-backoffice-y-bodegas.md` del plan maestro (§1, §2
   - Corregido en el ERP: el operario lee parcelas (§11 bis); códigos de acción de la bitácora de trazabilidad con los del backend (`FERMENTATION_LOG_ADDED`, `BOTTLING_BATCH_CREATED`…)
 - [x] `@drinks-on-chain/mocks` 0.4.0-rc.1 (contrato estricto del backend): grafo `DagGraphResponseDto` sin la forma antigua, altas sin `null` en opcionales, archivos por `key` con URL firmada al mostrarlos (`GET /v1/uploads/url`) · 2026-09-27
 - [x] IP real del cliente detrás del proxy (O1-OPS-1): `rewrites` sustituidos por `src/proxy.ts`, que reescribe `/api/v1/*` a `${API_ORIGIN}/v1/*` con `X-DOC-Client-IP` firmada (HMAC con `PROXY_SHARED_SECRET`, variable de servidor) · 2026-09-27
+
+## Cierre de la Ola 1 (H1) · retirada de la compatibilidad transitoria
+
+Contrato: `plan/contratos/o1-backoffice-y-bodegas.md` §11 y `o0-sesiones-y-estandares.md` §5. Llega con la plantilla (`git merge template/dev`).
+
+- [x] Sin `refreshToken` en el cuerpo: ni se guarda ni se reenvía en `refresh` ni en `switch-organization` (aceptar una invitación ya no lo enviaba); el de la respuesta se ignora · 2026-09-27
+- [x] Esquemas de sesión, login con segundo factor y `me` sin `tokens.refreshToken` ni `user.userRole/wineryId/memberRole` (`src/lib/auth/schemas.ts` de la plantilla); ninguna pantalla los lee · 2026-09-27
+- [x] `PATCH /v1/users/me` solo con `{ user, memberships, activeOrganizationId }` (fuera `meFromUpdate` y la relectura); `details` solo como `{ field, message }` · 2026-09-27
+- [x] Aviso "Tu sesión se cerró por seguridad" en el login también al recargar con una sesión revocada (E2E de humo) · 2026-09-27
+- [ ] Enlace "Perfil" del menú de usuario con `linkComponent`: el fallo está en `@drinks-on-chain/ui` (`SidebarShell` no pasa `linkComponent` al `Menu` del bloque de usuario); se corrige en el paquete y aquí solo se actualiza la versión

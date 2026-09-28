@@ -1,23 +1,22 @@
-import { z } from "zod";
 import {
   InvitationPreviewSchema,
-  LoginResponseSchema,
-  MeResponseSchema,
-  MeUserSchema,
-  SessionResponseSchema,
-  isMfaChallenge,
   type AcceptInvitationDto,
   type ChangePasswordDto,
   type ForgotPasswordDto,
   type LoginDto,
-  type MeResponse,
   type ResetPasswordDto,
-  type SessionResponse,
   type UpdateUserDto,
 } from "@drinks-on-chain/mocks";
 import { api, logoutSession } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
-import { getLegacyRefreshToken, setSession } from "@/lib/api/session";
+import { setSession } from "@/lib/api/session";
+import {
+  LoginResponseSchema,
+  MeResponseSchema,
+  SessionResponseSchema,
+  isMfaChallenge,
+  type SessionResponse,
+} from "./schemas";
 
 // Sesión, perfil y cuenta (contratos de la Ola 0 §5 y de la Ola 1 §1–§2). Las pantallas usan
 // los hooks de hooks.ts.
@@ -55,14 +54,13 @@ export function logout() {
 
 /**
  * `POST /v1/auth/switch-organization`: tokens nuevos de la misma sesión con otra organización
- * activa. El backend exige el refresco de esa sesión (O0-BE-4) y lo rota: viaja en la cookie
- * `doc_rt` (`credentials: 'include'`) y, hasta H1, también en el cuerpo si llegó así en el login.
+ * activa. El backend exige el refresco de esa sesión (O0-BE-4) y lo rota: viaja solo en la
+ * cookie `doc_rt` (`credentials: 'include'`).
  */
 export async function switchOrganization(organizationId: string) {
-  const refreshToken = getLegacyRefreshToken();
   const res = await api("/v1/auth/switch-organization", {
     method: "POST",
-    body: refreshToken ? { organizationId, refreshToken } : { organizationId },
+    body: { organizationId },
     schema: SessionResponseSchema,
   });
   setSession(res.tokens);
@@ -75,22 +73,11 @@ export function fetchMe(signal?: AbortSignal) {
 }
 
 /**
- * Respuesta de `PATCH /v1/users/me`: el contrato de la Ola 1 §1 devuelve
- * `{ user, memberships, activeOrganizationId }`; los mocks 0.3.0-rc.1 (y el backend anterior)
- * devuelven solo el perfil. Se aceptan las dos formas (§11 bis).
+ * `PATCH /v1/users/me`: perfil y preferencias (idioma, avisos, promociones). Devuelve lo mismo
+ * que `GET` (`{ user, memberships, activeOrganizationId }`, contrato de la Ola 1 §1).
  */
-const updateMeResponseSchema = z.union([MeResponseSchema, MeUserSchema.partial().passthrough()]);
-
-/** `me` completo si la respuesta lo trae; `null` si solo trae el perfil (hay que volver a leer). */
-export function meFromUpdate(data: unknown): MeResponse | null {
-  const parsed = MeResponseSchema.safeParse(data);
-  return parsed.success ? parsed.data : null;
-}
-
-/** `PATCH /v1/users/me`: perfil y preferencias (idioma, avisos, promociones). */
-export async function updateMe(body: UpdateUserDto): Promise<MeResponse | null> {
-  const data = await api("/v1/users/me", { method: "PATCH", body, schema: updateMeResponseSchema });
-  return meFromUpdate(data);
+export function updateMe(body: UpdateUserDto) {
+  return api("/v1/users/me", { method: "PATCH", body, schema: MeResponseSchema });
 }
 
 /** `POST /v1/users/me/password` → 204. Revoca las demás sesiones de la persona. */

@@ -8,7 +8,7 @@ import { CLIENT_APP } from "@/lib/client-app";
 import {
   clearSession,
   getAccessToken,
-  getLegacyRefreshToken,
+  getSessionEndReason,
   getSessionStatus,
   resetSessionForTests,
   setSession,
@@ -117,7 +117,6 @@ describe("api", () => {
       await bootstrapSession();
       expect(getSessionStatus()).toBe("authenticated");
       expect(getAccessToken()).toBe("nuevo");
-      expect(getLegacyRefreshToken()).toBeNull();
       expect(body(refreshCalls()[0]!)).toEqual({});
       expect(window.sessionStorage.length).toBe(0);
     });
@@ -126,7 +125,27 @@ describe("api", () => {
       fetchMock.mockResolvedValueOnce(fail(401, "UNAUTHORIZED"));
       await bootstrapSession();
       expect(getSessionStatus()).toBe("anonymous");
+      expect(getSessionEndReason()).toBeNull();
       expect(ended).not.toHaveBeenCalled();
+    });
+
+    it.each(["AUTH_SESSION_REVOKED", "AUTH_REFRESH_REUSED"])(
+      "con la sesión de la cookie revocada (%s) queda anónima con el aviso para el login, sin redirigir",
+      async (code) => {
+        fetchMock.mockResolvedValueOnce(fail(401, code));
+        await bootstrapSession();
+        expect(getSessionStatus()).toBe("anonymous");
+        expect(getSessionEndReason()).toBe("revoked");
+        // No llama al manejador (que lleva al login): una página pública sigue donde está.
+        expect(ended).not.toHaveBeenCalled();
+      },
+    );
+
+    it("un login nuevo borra el aviso de la sesión anterior", async () => {
+      fetchMock.mockResolvedValueOnce(fail(401, "AUTH_SESSION_REVOKED"));
+      await bootstrapSession();
+      setSession({ accessToken: "a1", expiresIn: 900 });
+      expect(getSessionEndReason()).toBeNull();
     });
 
     it("borra la sesión que guardaba la plantilla 0.1 en sessionStorage", async () => {
@@ -187,27 +206,31 @@ describe("api", () => {
       expect(auth(calls()[1]!)).toBe("Bearer fresco");
     });
 
-    it("tolerancia hasta H1: guarda en memoria el refresco del cuerpo y lo reenvía", async () => {
-      setSession({ accessToken: "viejo", expiresIn: 900, refreshToken: "r1" });
+    it("ignora un refreshToken en el cuerpo (retirado en H1): la renovación va solo en la cookie", async () => {
+      setSession({ accessToken: "viejo", expiresIn: 900 });
       fetchMock
         .mockResolvedValueOnce(fail(401, "UNAUTHORIZED"))
         .mockResolvedValueOnce(session("nuevo", "r2"))
+        .mockResolvedValueOnce(ok({ ok: true }))
+        .mockResolvedValueOnce(fail(401, "UNAUTHORIZED"))
+        .mockResolvedValueOnce(session("otro"))
         .mockResolvedValueOnce(ok({ ok: true }));
       await api("/v1/users/me");
-      expect(body(refreshCalls()[0]!)).toEqual({ refreshToken: "r1" });
-      expect(getLegacyRefreshToken()).toBe("r2");
+      await api("/v1/users/me");
+      expect(refreshCalls().map(body)).toEqual([{}, {}]);
+      expect(getAccessToken()).toBe("otro");
       expect(window.sessionStorage.length).toBe(0);
       expect(window.localStorage.length).toBe(0);
     });
 
-    it("acepta el refresh anterior al contrato (tokens sueltos en data)", async () => {
-      setSession({ accessToken: "viejo", expiresIn: 900, refreshToken: "r1" });
+    it("un refresh con los tokens sueltos en data (forma anterior al contrato) no vale", async () => {
+      setSession({ accessToken: "viejo", expiresIn: 900 });
       fetchMock
         .mockResolvedValueOnce(fail(401, "UNAUTHORIZED"))
-        .mockResolvedValueOnce(ok({ accessToken: "nuevo", refreshToken: "r2", tokenType: "Bearer", expiresIn: 60 }))
-        .mockResolvedValueOnce(ok({ ok: true }));
-      await expect(api("/v1/users/me")).resolves.toEqual({ ok: true });
-      expect(getAccessToken()).toBe("nuevo");
+        .mockResolvedValueOnce(ok({ accessToken: "nuevo", tokenType: "Bearer", expiresIn: 60 }));
+      await expect(api("/v1/users/me")).rejects.toBeInstanceOf(ApiError);
+      expect(getSessionStatus()).toBe("anonymous");
+      expect(ended).toHaveBeenCalledWith("expired");
     });
   });
 
@@ -223,6 +246,7 @@ describe("api", () => {
       expect(getSessionStatus()).toBe("anonymous");
       expect(ended).toHaveBeenCalledTimes(1);
       expect(ended).toHaveBeenCalledWith("revoked");
+      expect(getSessionEndReason()).toBe("revoked");
       expect(refreshCalls()).toHaveLength(1);
     });
 
@@ -264,6 +288,7 @@ describe("api", () => {
       expect(call!.init.method).toBe("POST");
       expect(auth(call!)).toBe("Bearer a1");
       expect(getSessionStatus()).toBe("anonymous");
+      expect(getSessionEndReason()).toBeNull();
       expect(ended).not.toHaveBeenCalled();
     });
   });

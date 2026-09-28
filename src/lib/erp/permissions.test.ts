@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { MeResponse, Membership } from "@drinks-on-chain/mocks";
+import type { Membership } from "@drinks-on-chain/mocks";
+import type { MeResponse } from "@/lib/auth/schemas";
 import { can, canUseErp, erpRole, isPlatform } from "./permissions";
 
 const membership = (m: Partial<Membership> & Pick<Membership, "organizationId" | "role">): Membership => ({
@@ -13,7 +14,7 @@ const membership = (m: Partial<Membership> & Pick<Membership, "organizationId" |
 
 const me = (memberships: Membership[], activeOrganizationId: string | null, audience: "STAFF" | "CONSUMER" = "STAFF") =>
   ({
-    user: { audience, userRole: "ENOLOGIST" },
+    user: { audience },
     memberships,
     activeOrganizationId,
   }) as unknown as MeResponse;

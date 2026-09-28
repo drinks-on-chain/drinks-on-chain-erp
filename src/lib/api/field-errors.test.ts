@@ -18,20 +18,8 @@ describe("validationIssues", () => {
     ]);
   });
 
-  it("tolera las cadenas del backend anterior (retirada en H1)", () => {
-    expect(
-      validationIssues([
-        "brixDegrees: debe ser un número",
-        "initialPh es obligatorio",
-        "El refreshToken es requerido",
-        "Algo general",
-      ]),
-    ).toEqual([
-      { field: "brixDegrees", message: "debe ser un número" },
-      { field: "initialPh", message: "es obligatorio" },
-      { field: "refreshToken", message: "El refreshToken es requerido" },
-      { field: null, message: "Algo general" },
-    ]);
+  it('ignora lo que no tiene la forma del contrato (las cadenas "campo: mensaje" se retiraron en H1)', () => {
+    expect(validationIssues(["brixDegrees: debe ser un número", { field: "x" }])).toEqual([]);
     expect(validationIssues(null)).toEqual([]);
     expect(validationIssues({ email: "x" })).toEqual([]);
   });

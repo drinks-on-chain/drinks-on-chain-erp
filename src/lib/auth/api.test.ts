@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api/errors";
 import { clearSession, getAccessToken, resetSessionForTests, setSession } from "@/lib/api/session";
-import { MFA_NOT_SUPPORTED, acceptInvitation, login, meFromUpdate, switchOrganization, updateMe } from "./api";
+import { MFA_NOT_SUPPORTED, acceptInvitation, login, switchOrganization, updateMe } from "./api";
 
 const ok = (data: unknown, status = 200) =>
   new Response(JSON.stringify({ success: true, statusCode: status, timestamp: "", path: "/x", data }), { status });
@@ -10,24 +10,34 @@ const user = {
   id: "u1",
   email: "ana@altos.test",
   fullName: "Ana",
-  userRole: "ENOLOGIST",
   preferredLocale: "es",
   isActive: true,
   createdAt: "2026-01-01T00:00:00Z",
   wineryMemberships: [],
   audience: "STAFF",
 };
-const meResponse = { user, memberships: [], activeOrganizationId: null };
+const membership = {
+  id: "m1",
+  organizationId: "w1",
+  organizationType: "WINERY",
+  organizationName: "Bodega Altos de Calamuchita",
+  organizationStatus: "ACTIVE",
+  role: "ENOLOGIST",
+  status: "ACTIVE",
+};
+const meResponse = { user, memberships: [membership], activeOrganizationId: "w1" };
+/** Respuesta de sesión tal como queda en H1: sin `refreshToken` ni `userRole/wineryId/memberRole`. */
 const session = {
-  user: { ...user, wineryId: null },
-  memberships: [],
+  user: { id: "u1", email: "ana@altos.test", fullName: "Ana", preferredLocale: "es", audience: "STAFF" },
+  memberships: [membership],
   activeOrganizationId: "w1",
-  tokens: { accessToken: "a2", tokenType: "Bearer", expiresIn: 900, refreshToken: "r2" },
+  tokens: { accessToken: "a2", tokenType: "Bearer", expiresIn: 900 },
 };
 
-describe("cuenta (contrato de la Ola 1 §1–§2)", () => {
+describe("cuenta (contrato de la Ola 1 §1–§2, tras H1)", () => {
   const fetchMock = vi.fn<typeof fetch>();
   const calls = () => fetchMock.mock.calls.map(([url, init]) => ({ url: String(url), init: init! }));
+  const bodyOf = (i: number) => JSON.parse(String(calls()[i]!.init.body));
 
   beforeEach(() => {
     vi.stubGlobal("fetch", fetchMock);
@@ -38,13 +48,28 @@ describe("cuenta (contrato de la Ola 1 §1–§2)", () => {
     vi.unstubAllGlobals();
   });
 
-  it("PATCH /users/me acepta el perfil suelto o `me` completo", async () => {
+  it("PATCH /users/me devuelve `me` completo; el perfil suelto ya no vale", async () => {
     setSession({ accessToken: "a1", expiresIn: 900 });
-    fetchMock.mockResolvedValueOnce(ok(user));
-    expect(await updateMe({ preferredLocale: "en" })).toBeNull();
     fetchMock.mockResolvedValueOnce(ok(meResponse));
-    expect(await updateMe({ preferredLocale: "en" })).toMatchObject({ user: { id: "u1" }, activeOrganizationId: null });
-    expect(meFromUpdate({ id: "u1" })).toBeNull();
+    expect(await updateMe({ preferredLocale: "en" })).toMatchObject({ user: { id: "u1" }, activeOrganizationId: "w1" });
+    fetchMock.mockResolvedValueOnce(ok(user));
+    await expect(updateMe({ preferredLocale: "en" })).rejects.toThrow(/contrato/);
+  });
+
+  it("el login vale sin refreshToken ni campos de 0.1, y los ignora si aún llegan", async () => {
+    clearSession();
+    fetchMock.mockResolvedValueOnce(
+      ok({
+        ...session,
+        user: { ...session.user, userRole: "WINERY_ADMIN", wineryId: "w1", memberRole: "OWNER" },
+        tokens: { ...session.tokens, refreshToken: "sid.1.secreto" },
+      }),
+    );
+    const res = await login({ email: "ana@altos.test", password: "demo1234" });
+    expect(res.user).not.toHaveProperty("userRole");
+    expect(res.user).not.toHaveProperty("wineryId");
+    expect(res.tokens).not.toHaveProperty("refreshToken");
+    expect(getAccessToken()).toBe("a2");
   });
 
   it("el reto de segundo factor no abre sesión en el ERP", async () => {
@@ -63,20 +88,26 @@ describe("cuenta (contrato de la Ola 1 §1–§2)", () => {
     const [call] = calls();
     expect(call!.url).toBe("/api/v1/invitations/tok%2F1/accept");
     expect((call!.init.headers as Record<string, string>).Authorization).toBeUndefined();
+    expect(bodyOf(0)).toEqual({ fullName: "Rosa", password: "vendimia-2026" });
     expect(getAccessToken()).toBe("a2");
   });
 
-  it("cambiar de organización envía el refresco de la sesión (cookie y, hasta H1, cuerpo)", async () => {
-    setSession({ accessToken: "a1", expiresIn: 900, refreshToken: "sid.1.secreto" });
+  it("aceptar con cuenta existente envía `{}` con la sesión (sin refresco en el cuerpo)", async () => {
+    setSession({ accessToken: "a1", expiresIn: 900 });
+    fetchMock.mockResolvedValueOnce(ok(session));
+    await acceptInvitation("tok", {}, true);
+    expect(calls()[0]!.init.credentials).toBe("include");
+    expect(bodyOf(0)).toEqual({});
+  });
+
+  it("cambiar de organización envía solo { organizationId }: el refresco va en la cookie", async () => {
+    setSession({ accessToken: "a1", expiresIn: 900 });
     fetchMock.mockResolvedValueOnce(ok(session));
     await switchOrganization("w1");
     const [call] = calls();
+    expect(call!.url).toBe("/api/v1/auth/switch-organization");
     expect(call!.init.credentials).toBe("include");
-    expect(JSON.parse(String(call!.init.body))).toEqual({ organizationId: "w1", refreshToken: "sid.1.secreto" });
-
-    setSession({ accessToken: "a3", expiresIn: 900 });
-    fetchMock.mockResolvedValueOnce(ok(session));
-    await switchOrganization("w2");
-    expect(JSON.parse(String(calls()[1]!.init.body))).toEqual({ organizationId: "w2" });
+    expect(bodyOf(0)).toEqual({ organizationId: "w1" });
+    expect(getAccessToken()).toBe("a2");
   });
 });

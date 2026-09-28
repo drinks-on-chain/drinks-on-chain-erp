@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { MeResponse } from "@drinks-on-chain/mocks";
+import type { MeResponse } from "@/lib/auth/schemas";
 import { Select, toast } from "@drinks-on-chain/ui";
 import { errorMessage } from "@/lib/api/errors";
 import { useSwitchOrganization } from "@/lib/auth/hooks";

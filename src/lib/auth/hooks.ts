@@ -2,8 +2,14 @@
 
 import { useSyncExternalStore } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AcceptInvitationDto, LoginDto, MeResponse } from "@drinks-on-chain/mocks";
-import { getSessionStatus, subscribeSession, type SessionStatus } from "@/lib/api/session";
+import type { AcceptInvitationDto, LoginDto } from "@drinks-on-chain/mocks";
+import {
+  getSessionEndReason,
+  getSessionStatus,
+  subscribeSession,
+  type SessionEndReason,
+  type SessionStatus,
+} from "@/lib/api/session";
 import { meQueryKey } from "./keys";
 import { clearOrgInactive, getOrgInactiveFlag, subscribeOrgInactive } from "./org-status";
 import {
@@ -19,10 +25,16 @@ import {
   updateMe,
   verifyEmail,
 } from "./api";
+import type { MeResponse } from "./schemas";
 
 /** Estado de la sesión; `null` durante el render del servidor (desconocido). */
 export function useSessionStatus(): SessionStatus | null {
   return useSyncExternalStore(subscribeSession, getSessionStatus, () => null);
+}
+
+/** Por qué terminó la última sesión sin querer (el login lo avisa); `null` si no aplica. */
+export function useSessionEndReason(): SessionEndReason | null {
+  return useSyncExternalStore(subscribeSession, getSessionEndReason, () => null);
 }
 
 /** true / false en el cliente; null mientras se desconoce (servidor o renovando al arrancar). */
@@ -88,18 +100,12 @@ export function useSwitchOrganization() {
   });
 }
 
-/**
- * `PATCH /v1/users/me`: guarda perfil y preferencias. Si la respuesta trae `me` completo
- * (contrato de la Ola 1) se usa tal cual; si solo trae el perfil, se vuelve a leer `me`.
- */
+/** `PATCH /v1/users/me`: guarda perfil y preferencias y pone en caché el `me` que devuelve. */
 export function useUpdateMe() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: updateMe,
-    onSuccess: (me) => {
-      if (me) client.setQueryData<MeResponse>(meQueryKey, me);
-      return client.invalidateQueries({ queryKey: meQueryKey });
-    },
+    onSuccess: (me) => client.setQueryData<MeResponse>(meQueryKey, me),
   });
 }
 

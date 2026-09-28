@@ -1,4 +1,5 @@
-import type { MeResponse, WineryRole } from "@drinks-on-chain/mocks";
+import type { WineryRole } from "@drinks-on-chain/mocks";
+import type { MeResponse } from "@/lib/auth/schemas";
 import { activeMembership } from "@/lib/auth/organization";
 
 // Quién puede qué en el ERP: la matriz de los guards del backend por el rol de la membresía de la

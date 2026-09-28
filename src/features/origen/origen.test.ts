@@ -169,13 +169,13 @@ describe("formulario de terroir", () => {
       ],
     });
     expect(terroirFieldErrors(error)).toEqual({ altitudeMasl: "Too small", polygon: "Invalid" });
-    // Backend anterior a O0-BE-2: "campo: mensaje" (hasta H1).
+    // Las cadenas "campo: mensaje" del backend anterior a O0-BE-2 se retiraron en H1.
     const legacy = new ApiError({
       status: 400,
       code: "VALIDATION_ERROR",
       message: "x",
       details: ["altitudeMasl: Too small"],
     });
-    expect(terroirFieldErrors(legacy)).toEqual({ altitudeMasl: "Too small" });
+    expect(terroirFieldErrors(legacy)).toEqual({});
   });
 });
