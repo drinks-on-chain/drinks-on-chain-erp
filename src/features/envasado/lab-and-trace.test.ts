@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { TraceabilityDag } from "@drinks-on-chain/mocks";
+import type { TraceGraph } from "@/lib/erp/dag";
 import { emptyLabForm, validateLab } from "./lab-form-model";
 import { dagSteps } from "./traceability";
 
@@ -16,7 +16,7 @@ describe("validateLab", () => {
     conformsToSenasagStandards: true,
   };
 
-  it("arma el DTO con opcionales en null", () => {
+  it("arma el DTO sin los opcionales vacíos", () => {
     const { errors, dto } = validateLab("b1", filled, true);
     expect(errors).toEqual({});
     expect(dto).toMatchObject({
@@ -25,11 +25,11 @@ describe("validateLab", () => {
       actualAlcoholAbv: 40.1,
       totalAcidityTartaricGl: 0.35,
       methanolContentMgL: 180,
-      freeSulfurDioxideMgL: null,
-      analysisRequestDate: null,
       conformsToSenasagStandards: true,
       conformsToEuStandards: false,
     });
+    expect(dto).not.toHaveProperty("freeSulfurDioxideMgL");
+    expect(dto).not.toHaveProperty("analysisRequestDate");
   });
 
   it("exige laboratorio, fecha, lecturas obligatorias y el PDF", () => {
@@ -65,14 +65,14 @@ describe("dagSteps", () => {
   const B = "c95f78e7-f72a-556c-8bae-e6670da39e8b";
 
   it("ordena por etapa y enlaza cada nodo con su módulo", () => {
-    const node = (id: string, type: TraceabilityDag["nodes"][number]["type"]) => ({
+    const node = (id: string, type: TraceGraph["nodes"][number]["type"]) => ({
       id,
       type,
       label: id,
       date: "2026-01-01T00:00:00Z",
       data: {},
     });
-    const dag: TraceabilityDag = {
+    const dag: TraceGraph = {
       bottlingBatchId: "b",
       lotCode: "L",
       nodes: [node(B, "BOTTLING_BATCH"), node("lab", "LAB_ANALYSIS"), node(T, "TERROIR"), node(P, "PRODUCTION_BATCH")],
@@ -85,7 +85,7 @@ describe("dagSteps", () => {
   });
 
   it("sin enlace cuando el nodo no es un id de la base (hashes de la cadena del backend)", () => {
-    const dag: TraceabilityDag = {
+    const dag: TraceGraph = {
       bottlingBatchId: "0x36cb",
       lotCode: "L",
       nodes: [{ id: "0xdc58", type: "TERROIR", label: "Parcela", date: null, data: {} }],

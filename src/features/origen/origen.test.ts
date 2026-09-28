@@ -118,18 +118,17 @@ describe("formulario de terroir", () => {
     doType: "D.O. Singani",
   };
 
-  it("convierte cifras escritas en es-BO y deja null lo opcional vacío", () => {
+  it("convierte cifras escritas en es-BO y omite lo opcional vacío", () => {
     const r = toTerroirDto(valid);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.create).toMatchObject({
       surfaceHectares: 3.5,
       altitudeMasl: 2450,
-      latitude: null,
-      cadastreCode: null,
-      geographicPolygonGeojson: null,
       isDoEligible: true,
     });
+    for (const key of ["latitude", "cadastreCode", "geographicPolygonGeojson"])
+      expect(r.create).not.toHaveProperty(key);
     expect(r.update.isActive).toBe(true);
   });
 

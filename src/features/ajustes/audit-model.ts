@@ -6,7 +6,10 @@ import type { AuditQuery } from "@/lib/erp/resources";
 
 export const AUDIT_PAGE_SIZE = 20;
 
-/** Acciones que afectan a una bodega, agrupadas para el filtro. Una acción desconocida se muestra con su código. */
+/**
+ * Acciones que afectan a una bodega (códigos del backend y de los mocks 0.4), agrupadas para el
+ * filtro. Una acción desconocida se muestra con su código.
+ */
 export const AUDIT_ACTION_GROUPS: { label: string; actions: Record<string, string> }[] = [
   {
     label: "Equipo",
@@ -21,6 +24,7 @@ export const AUDIT_ACTION_GROUPS: { label: string; actions: Record<string, strin
       MEMBER_BLOCKED: "Miembro bloqueado",
       MEMBER_UNBLOCKED: "Miembro desbloqueado",
       USER_CREATED: "Cuenta creada",
+      USER_PROFILE_UPDATED: "Perfil actualizado",
     },
   },
   {
@@ -50,14 +54,14 @@ export const AUDIT_ACTION_GROUPS: { label: string; actions: Record<string, strin
       TERROIR_CREATED: "Terroir registrado",
       TERROIR_UPDATED: "Terroir editado",
       HARVEST_BATCH_CREATED: "Ingreso de uva",
-      PHYTOSANITARY_STATUS_CHANGED: "Dictamen fitosanitario",
+      HARVEST_BATCH_PHYTO_STATUS_CHANGED: "Dictamen fitosanitario",
       FERMENTATION_TANK_CREATED: "Tanque llenado",
-      FERMENTATION_LOG_RECORDED: "Lectura de tanque",
-      ENOLOGICAL_TREATMENT_RECORDED: "Tratamiento enológico",
-      WINE_AGING_STARTED: "Crianza iniciada",
-      DISTILLATION_RECORDED: "Destilación registrada",
-      BOTTLING_RECORDED: "Embotellado",
-      LAB_ANALYSIS_RECORDED: "Análisis de laboratorio",
+      FERMENTATION_LOG_ADDED: "Lectura de tanque",
+      ENOLOGICAL_TREATMENT_ADDED: "Tratamiento enológico",
+      WINE_AGING_BATCH_CREATED: "Crianza iniciada",
+      PRODUCTION_BATCH_CREATED: "Destilación registrada",
+      BOTTLING_BATCH_CREATED: "Embotellado",
+      LAB_ANALYSIS_CREATED: "Análisis de laboratorio",
       FILE_UPLOADED: "Archivo subido",
     },
   },

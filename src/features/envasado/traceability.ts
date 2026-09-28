@@ -1,10 +1,10 @@
-import type { DagNodeType, TraceabilityDag } from "@drinks-on-chain/mocks";
+import type { TraceGraph, TraceNodeType } from "@/lib/erp/dag";
 
-// Línea de tiempo del lote a partir del grafo de trazabilidad (GET /v1/traceability/dag/:id).
-// El grafo llega normalizado a la forma de los mocks (`src/lib/erp/dag.ts` acepta también la del
-// backend): se ordena por etapa y no por la posición en la respuesta.
+// Línea de tiempo del lote a partir del grafo de trazabilidad (GET /v1/traceability/dag/:id),
+// convertido en pasos por `src/lib/erp/dag.ts`: se ordena por etapa y no por la posición en la
+// respuesta.
 
-const ORDER: DagNodeType[] = [
+const ORDER: TraceNodeType[] = [
   "TERROIR",
   "HARVEST_BATCH",
   "FERMENTATION_TANK",
@@ -14,7 +14,7 @@ const ORDER: DagNodeType[] = [
   "LAB_ANALYSIS",
 ];
 
-export const DAG_NODE_LABEL: Record<DagNodeType, string> = {
+export const DAG_NODE_LABEL: Record<TraceNodeType, string> = {
   TERROIR: "Parcela",
   HARVEST_BATCH: "Vendimia",
   FERMENTATION_TANK: "Tanque",
@@ -24,7 +24,7 @@ export const DAG_NODE_LABEL: Record<DagNodeType, string> = {
   LAB_ANALYSIS: "Certificado de laboratorio",
 };
 
-const HREF: Partial<Record<DagNodeType, string>> = {
+const HREF: Partial<Record<TraceNodeType, string>> = {
   TERROIR: "/origen",
   HARVEST_BATCH: "/vendimia",
   FERMENTATION_TANK: "/vinificacion",
@@ -37,14 +37,14 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type TraceStep = {
   id: string;
-  type: DagNodeType;
+  type: TraceNodeType;
   stage: string;
   label: string;
   date: string | null;
   href: string | null;
 };
 
-export function dagSteps(dag: TraceabilityDag): TraceStep[] {
+export function dagSteps(dag: TraceGraph): TraceStep[] {
   return [...dag.nodes]
     .sort((a, b) => ORDER.indexOf(a.type) - ORDER.indexOf(b.type))
     .map((n) => ({

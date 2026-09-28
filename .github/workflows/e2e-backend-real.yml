@@ -1,8 +1,10 @@
 name: E2E contra el backend real
 
-# Solo manual (O0-ERP-2): recorre el ERP contra el backend de desarrollo con las personas de la
-# semilla. Lee la contraseña de demostración del secreto E2E_PASSWORD; sin él, solo corre la
-# prueba de credenciales inválidas y el resto se salta.
+# Solo manual (O0-ERP-2, O1-ERP-2): recorre el ERP contra el backend de desarrollo con las personas
+# de la semilla. Lee la contraseña de demostración del secreto E2E_PASSWORD; sin él, solo corre la
+# prueba de credenciales inválidas y el resto se salta. El recorrido de la Ola 1 (invitación,
+# recuperación) lee Mailpit con la llave restringida de comando forzado (secretos DEV_MAILPIT_SSH_KEY,
+# DEV_SSH_KNOWN_HOSTS, DEV_SSH_HOST y DEV_SSH_USER, los del repo de e2e); sin ella, se salta.
 on:
   workflow_dispatch:
     inputs:
@@ -28,6 +30,7 @@ jobs:
       E2E_API_ORIGIN: ${{ inputs.api_origin }}
       E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
       E2E_REAL_429: ${{ inputs.with_429 && '1' || '' }}
+      HAS_MAILPIT_KEY: ${{ secrets.DEV_MAILPIT_SSH_KEY != '' }}
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -40,5 +43,30 @@ jobs:
       - name: Aviso si falta el secreto
         if: env.E2E_PASSWORD == ''
         run: echo "::warning::Sin el secreto E2E_PASSWORD solo corre la prueba de credenciales inválidas."
+      - name: Llave del buzón (Mailpit, comando forzado)
+        if: env.HAS_MAILPIT_KEY == 'true'
+        env:
+          MAILPIT_KEY: ${{ secrets.DEV_MAILPIT_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEV_SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.DEV_SSH_HOST }}
+          SSH_USER: ${{ secrets.DEV_SSH_USER }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$MAILPIT_KEY" > ~/.ssh/e2e_mailpit
+          chmod 600 ~/.ssh/e2e_mailpit
+          printf '%s\n' "$KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          {
+            echo "Host e2e-mailpit"
+            echo "  HostName $SSH_HOST"
+            echo "  User $SSH_USER"
+            echo "  IdentityFile ~/.ssh/e2e_mailpit"
+            echo "  IdentitiesOnly yes"
+            echo "  StrictHostKeyChecking yes"
+            echo "  BatchMode yes"
+          } >> ~/.ssh/config
+          chmod 600 ~/.ssh/config
+          ssh e2e-mailpit "GET /api/v1/info" > /dev/null
+          echo "E2E_MAILPIT_SSH=e2e-mailpit" >> "$GITHUB_ENV"
+          echo "E2E_MAILPIT_SSH_MODE=api" >> "$GITHUB_ENV"
       - run: pnpm e2e --project=escritorio
       # Sin artefactos: el repo es público y las trazas o capturas podrían contener la contraseña.

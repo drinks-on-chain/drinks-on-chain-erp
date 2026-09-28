@@ -136,7 +136,7 @@ export function BottlingForm({ preselect }: { preselect: SourcePreselect }) {
     const { dto } = validateBottling(source, values);
     if (!dto) return;
     try {
-      const labelDesignUrl = labelFile ? (await upload.mutateAsync([labelFile, "labels"])).url : null;
+      const labelDesignUrl = labelFile ? (await upload.mutateAsync([labelFile, "labels"])).key : null;
       const created = await create.mutateAsync({ ...dto, labelDesignUrl });
       setDone(true);
       toast({ title: `Lote ${created.internationalLotCode} sellado`, tone: "success" });

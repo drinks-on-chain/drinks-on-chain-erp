@@ -19,13 +19,13 @@ import {
   Skeleton,
   toast,
 } from "@drinks-on-chain/ui";
+import { StoredFileLink } from "@/components/stored-file-link";
 import { ApiError, errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
 import { useCreateLabAnalysis, useLabAnalysis, useUpload } from "@/lib/erp/hooks";
 import { can } from "@/lib/erp/permissions";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import { useReturnFocus } from "@/lib/use-return-focus";
-import { ExternalLink } from "@/features/cuenta/stellar";
 import { FileInput, fileTooBig } from "./file-input";
 import { emptyLabForm, LAB_NUMBER_FIELDS, validateLab, type LabErrors, type LabFormValues } from "./lab-form-model";
 
@@ -109,7 +109,7 @@ export function LabCertificateCard({ bottlingId, lotCode }: { bottlingId: string
               { term: "Conformidad", value: <Conformity lab={lab.data} /> },
             ]}
           />
-          <ExternalLink href={lab.data.laboratoryReportPdfUrl}>Ver informe en PDF</ExternalLink>
+          <StoredFileLink reference={lab.data.laboratoryReportPdfUrl}>Ver informe en PDF</StoredFileLink>
         </>
       )}
       {canCreate && (
@@ -151,8 +151,9 @@ function LabAnalysisSlideOver({
     setErrors(next);
     if (!dto || Object.keys(next).length > 0 || !pdf) return;
     try {
-      const { url } = await upload.mutateAsync([pdf, "lab-reports"]);
-      await create.mutateAsync({ ...dto, laboratoryReportPdfUrl: url });
+      // Se guarda la clave del archivo privado; la URL firmada se pide al mostrarlo.
+      const { key } = await upload.mutateAsync([pdf, "lab-reports"]);
+      await create.mutateAsync({ ...dto, laboratoryReportPdfUrl: key });
       toast({ title: `Certificado registrado para ${lotCode}`, tone: "success" });
       onOpenChange(false);
       setValues(emptyLabForm());

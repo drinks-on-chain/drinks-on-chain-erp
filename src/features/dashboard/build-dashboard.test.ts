@@ -5,6 +5,16 @@ import { buildDashboard, TEMP_ALERT_C } from "./build-dashboard";
 
 const TODAY = new Date("2026-09-25T12:00:00Z");
 
+/** Filas de `fermentation-logs.json` (registro de la semilla) con la forma de la respuesta de la API. */
+const asLog = (l: (typeof fx.fermentationLogs)[number]) => ({
+  specificGravity: null,
+  phValue: null,
+  co2Observations: null,
+  notes: null,
+  ...l,
+  recordedByUserId: l.recordedByMemberId ?? "",
+});
+
 // La cadena de una bodega, filtrada como lo haría el backend con el token.
 function chainOf(wineryName: string): LotChain {
   const winery = fx.wineries.find((w) => w.commercialName.includes(wineryName))!;
@@ -24,7 +34,7 @@ function dashboardOf(wineryName: string) {
   const lots = deriveLotViews(chain, { today: TODAY });
   const tankDetails = chain.tanks
     .filter((t) => t.status === "FERMENTING")
-    .map((t) => ({ ...t, logs: fx.fermentationLogs.filter((l) => l.fermentationTankId === t.id) }));
+    .map((t) => ({ ...t, logs: fx.fermentationLogs.filter((l) => l.fermentationTankId === t.id).map(asLog) }));
   return { chain, lots, dashboard: buildDashboard({ chain, lots, tankDetails, today: TODAY }) };
 }
 

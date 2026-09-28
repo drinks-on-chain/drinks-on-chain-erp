@@ -110,8 +110,8 @@ export function WeighInForm({ initialTerroirId }: { initialTerroirId?: string })
             <Skeleton shape="block" className="h-20" />
           ) : !canReadTerroirs ? (
             <Alert tone="warning" title="Tu rol no puede consultar las parcelas">
-              El pesaje necesita elegir la parcela de origen y el backend aún no deja al operario leerlas. Pide a la
-              dirección, enología o agronomía que registren este ingreso.
+              El pesaje necesita elegir la parcela de origen. Pide a la dirección, enología o agronomía que registren
+              este ingreso.
             </Alert>
           ) : options.length === 0 ? (
             <Alert tone="warning" title="No hay terroirs activos">

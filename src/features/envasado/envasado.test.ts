@@ -193,8 +193,8 @@ describe("validateBottling", () => {
   it("arma el DTO de una destilación liberada", () => {
     const { errors, dto } = validateBottling(ready, values);
     expect(errors).toEqual({});
+    // Sin `wineAgingBatchId`: los opcionales vacíos no se envían (OpenAPI, mocks 0.4).
     expect(dto).toEqual({
-      wineAgingBatchId: null,
       productionBatchId: ready.id,
       productType: "SINGANI",
       finalAlcoholAbv: 40,
