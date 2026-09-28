@@ -26,7 +26,7 @@ const membership = {
   status: "ACTIVE",
 };
 const meResponse = { user, memberships: [membership], activeOrganizationId: "w1" };
-/** Respuesta de sesión tal como queda en H1: sin `refreshToken` ni `userRole/wineryId/memberRole`. */
+/** Respuesta de sesión tras H1: sin `refreshToken` ni `userRole/wineryId/memberRole`. */
 const session = {
   user: { id: "u1", email: "ana@altos.test", fullName: "Ana", preferredLocale: "es", audience: "STAFF" },
   memberships: [membership],
@@ -56,18 +56,11 @@ describe("cuenta (contrato de la Ola 1 §1–§2, tras H1)", () => {
     await expect(updateMe({ preferredLocale: "en" })).rejects.toThrow(/contrato/);
   });
 
-  it("el login vale sin refreshToken ni campos de 0.1, y los ignora si aún llegan", async () => {
+  it("el login guarda el acceso de la sesión (sin refreshToken en el cuerpo)", async () => {
     clearSession();
-    fetchMock.mockResolvedValueOnce(
-      ok({
-        ...session,
-        user: { ...session.user, userRole: "WINERY_ADMIN", wineryId: "w1", memberRole: "OWNER" },
-        tokens: { ...session.tokens, refreshToken: "sid.1.secreto" },
-      }),
-    );
+    fetchMock.mockResolvedValueOnce(ok(session));
     const res = await login({ email: "ana@altos.test", password: "demo1234" });
-    expect(res.user).not.toHaveProperty("userRole");
-    expect(res.user).not.toHaveProperty("wineryId");
+    expect(res).toMatchObject({ activeOrganizationId: "w1" });
     expect(res.tokens).not.toHaveProperty("refreshToken");
     expect(getAccessToken()).toBe("a2");
   });
