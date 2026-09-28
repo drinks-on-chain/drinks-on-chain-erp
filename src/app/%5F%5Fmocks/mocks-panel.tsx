@@ -14,7 +14,7 @@ import {
   type ScenarioName,
 } from "@drinks-on-chain/mocks/browser";
 import type { MockEmail } from "@drinks-on-chain/mocks";
-import { DEMO_PASSWORD, demoUsers, type DemoUser } from "@drinks-on-chain/mocks/fixtures";
+import { DEMO_PASSWORD, demoUsers } from "@drinks-on-chain/mocks/fixtures";
 import { Alert, Badge, Button, Card, CardHeader, DataTable, Field, Select, toast } from "@drinks-on-chain/ui";
 import { env } from "@/lib/env";
 import { ApiError, errorMessage } from "@/lib/api/errors";
@@ -82,9 +82,6 @@ function Mailbox() {
     </Card>
   );
 }
-
-/** Rol en la organización activa (los permisos salen de la membresía, no del rol global de 0.1). */
-const activeRoleOf = (u: DemoUser) => u.memberships.find((m) => m.organizationId === u.activeOrganizationId)?.role;
 
 export function MocksPanel() {
   const router = useRouter();
@@ -172,10 +169,8 @@ export function MocksPanel() {
             {
               id: "role",
               header: "Rol",
-              cell: (u) => {
-                const role = activeRoleOf(u);
-                return role ? <Badge>{es.roles[role] ?? role}</Badge> : "—";
-              },
+              // Rol en la organización activa (`DemoUser.role`, el de su membresía).
+              cell: (u) => (u.role ? <Badge>{es.roles[u.role] ?? u.role}</Badge> : "—"),
             },
             {
               id: "organization",
