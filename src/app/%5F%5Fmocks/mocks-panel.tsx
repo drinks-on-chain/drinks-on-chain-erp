@@ -166,8 +166,18 @@ export function MocksPanel() {
           columns={[
             { id: "name", header: "Nombre", cell: (u) => u.fullName },
             { id: "email", header: "Correo", cell: (u) => u.email },
-            { id: "role", header: "Rol", cell: (u) => <Badge>{u.memberRole ?? u.userRole}</Badge> },
-            { id: "winery", header: "Bodega activa", cell: (u) => u.wineryName ?? "—" },
+            {
+              id: "role",
+              header: "Rol",
+              // Rol en la organización activa (`DemoUser.role`, el de su membresía).
+              cell: (u) => (u.role ? <Badge>{es.roles[u.role] ?? u.role}</Badge> : "—"),
+            },
+            {
+              id: "organization",
+              header: "Organización activa",
+              cell: (u) =>
+                u.memberships.find((m) => m.organizationId === u.activeOrganizationId)?.organizationName ?? "—",
+            },
             {
               id: "memberships",
               header: "Membresías",

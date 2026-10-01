@@ -1,4 +1,5 @@
-import type { MeResponse, WineryRole } from "@drinks-on-chain/mocks";
+import type { WineryRole } from "@drinks-on-chain/mocks";
+import type { MeResponse } from "@/lib/auth/schemas";
 import { activeMembership } from "@/lib/auth/organization";
 
 // Quién puede qué en el ERP: la matriz de los guards del backend por el rol de la membresía de la
@@ -28,9 +29,12 @@ export type ErpAction =
 
 const ALL: WineryRole[] = ["OWNER", "ENOLOGIST", "AGRONOMIST", "OPERATOR", "ACCOUNTANT"];
 
-/** Matriz del backend: `OPERATOR` pesa y registra lecturas; `ACCOUNTANT` solo lee. */
+/**
+ * Matriz del backend: `OPERATOR` pesa y registra lecturas, y lee las parcelas (lista y ficha) para
+ * elegir la de cada pesaje (contrato de la Ola 1 §11 bis); `ACCOUNTANT` solo lee.
+ */
 const MATRIX: Record<ErpAction, readonly WineryRole[]> = {
-  "terroir.read": ["OWNER", "ENOLOGIST", "AGRONOMIST", "ACCOUNTANT"],
+  "terroir.read": ALL,
   "terroir.write": ["OWNER", "AGRONOMIST"],
   "harvest.read": ALL,
   "harvest.create": ["OWNER", "ENOLOGIST", "AGRONOMIST", "OPERATOR"],

@@ -17,6 +17,16 @@ import {
 } from "./tank-model";
 
 const TODAY = new Date("2026-09-25T12:00:00Z");
+
+/** Filas de `fermentation-logs.json` (registro de la semilla) con la forma de la respuesta de la API. */
+const asLog = (l: (typeof fx.fermentationLogs)[number]) => ({
+  specificGravity: null,
+  phValue: null,
+  co2Observations: null,
+  notes: null,
+  ...l,
+  recordedByUserId: l.recordedByMemberId ?? "",
+});
 const altos = fx.wineries.find((w) => w.commercialName.includes("Calamuchita"))!;
 const mine = <T extends { wineryId: string }>(xs: T[]) => xs.filter((x) => x.wineryId === altos.id);
 
@@ -24,7 +34,7 @@ describe("mapa de tanques", () => {
   const tanks = mine(fx.fermentationTanks);
   const lookup = lotLookup(mine(fx.harvestBatches), mine(fx.terroirs));
   const logsByTank = new Map(
-    tanks.map((t) => [t.id, fx.fermentationLogs.filter((l) => l.fermentationTankId === t.id)] as const),
+    tanks.map((t) => [t.id, fx.fermentationLogs.filter((l) => l.fermentationTankId === t.id).map(asLog)] as const),
   );
   const cards = buildTankCards({ tanks, lookup, logsByTank, today: TODAY });
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Ban, Clock, PauseCircle, ShieldAlert } from "lucide-react";
-import type { MeResponse } from "@drinks-on-chain/mocks";
+import type { MeResponse } from "@/lib/auth/schemas";
 import { Alert, Button, Card, CardHeader, ErrorState, KeyValueList, Skeleton, StatusBadge } from "@drinks-on-chain/ui";
 import { errorMessage } from "@/lib/api/errors";
 import { canReadAuditWhileInactive, type InactiveOrganization } from "@/lib/auth/org-status";

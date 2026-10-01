@@ -3,7 +3,9 @@
 import { useId, useState, type ReactNode } from "react";
 import { FileText, X } from "lucide-react";
 import { UPLOAD_MAX_BYTES, UPLOAD_MIME_TYPES } from "@drinks-on-chain/mocks";
-import { Button, Field, Spinner, TextLink } from "@drinks-on-chain/ui";
+import { Button, Field, Spinner } from "@drinks-on-chain/ui";
+import { StoredFileLink } from "@/components/stored-file-link";
+import { storedFileName } from "@/lib/erp/stored-file";
 import { errorMessage } from "@/lib/api/errors";
 import { useUpload } from "@/lib/erp/hooks";
 import type { UploadFolder } from "@/lib/erp/resources";
@@ -11,18 +13,16 @@ import type { UploadFolder } from "@/lib/erp/resources";
 type Props = {
   label: ReactNode;
   folder: UploadFolder;
-  /** URL devuelta por POST /v1/uploads (la que viaja en el DTO). */
+  /** Clave del archivo devuelta por POST /v1/uploads (la que viaja en el DTO, campo `*Url`). */
   value: string | null;
-  onChange: (url: string | null) => void;
+  onChange: (key: string | null) => void;
   onBusyChange?: (busy: boolean) => void;
   help?: ReactNode;
   accept?: string;
   disabled?: boolean;
 };
 
-const fileName = (url: string) => decodeURIComponent(url.split("/").at(-1) ?? url).replace(/^\d+-/, "");
-
-/** Sube un archivo (PDF o imagen, ≤ 15 MB) en cuanto se elige y guarda su URL (09 §1 "Archivos"). */
+/** Sube un archivo (PDF o imagen, ≤ 15 MB) en cuanto se elige y guarda su clave (09 §1 "Archivos"). */
 export function UploadField({ label, folder, value, onChange, onBusyChange, help, accept, disabled }: Props) {
   const upload = useUpload();
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +43,7 @@ export function UploadField({ label, folder, value, onChange, onBusyChange, help
     onBusyChange?.(true);
     try {
       const res = await upload.mutateAsync([file, folder]);
-      onChange(res.url);
+      onChange(res.key);
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -58,9 +58,9 @@ export function UploadField({ label, folder, value, onChange, onBusyChange, help
         {value && (
           <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-bg-sunken px-3 py-2 text-sm">
             <FileText aria-hidden size={16} className="text-fg-muted" />
-            <TextLink href={value} target="_blank" rel="noreferrer" variant="inline" className="min-w-0 truncate">
-              {fileName(value)}
-            </TextLink>
+            <span className="min-w-0 truncate">
+              <StoredFileLink reference={value}>{storedFileName(value)}</StoredFileLink>
+            </span>
             <Button
               type="button"
               size="sm"

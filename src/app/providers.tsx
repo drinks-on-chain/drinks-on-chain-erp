@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
-import { Spinner, Toaster, toast } from "@drinks-on-chain/ui";
+import { Spinner, Toaster } from "@drinks-on-chain/ui";
 import { bootstrapSession, setSessionEndedHandler } from "@/lib/api/client";
 import { env } from "@/lib/env";
 import { es } from "@/lib/i18n/es";
@@ -32,7 +32,8 @@ function MocksGate({ children }: { children: ReactNode }) {
 
 /**
  * Recupera la sesión al arrancar (renovación con la cookie) y reacciona cuando termina:
- * caducada o revocada (reutilización del refresco, bloqueo) → aviso y login.
+ * caducada o revocada (reutilización del refresco, bloqueo) → login, que muestra el aviso
+ * (`useSessionEndReason`). El aviso también aparece si la revocación se descubre al recargar.
  */
 function SessionLifecycle() {
   const router = useRouter();
@@ -41,9 +42,8 @@ function SessionLifecycle() {
     void bootstrapSession();
   }, []);
   useEffect(() => {
-    setSessionEndedHandler((reason) => {
+    setSessionEndedHandler(() => {
       queryClient.clear();
-      toast({ title: reason === "revoked" ? es.auth.revoked : es.auth.expired, tone: "warning" });
       router.replace("/login");
     });
   }, [router, queryClient]);

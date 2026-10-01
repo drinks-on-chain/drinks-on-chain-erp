@@ -38,6 +38,9 @@ test("Altos: ninguna crianza liberada, el embotellado queda bloqueado por el can
 });
 
 test("Cinti Viejo: embotella un singani con el reposo cumplido y exporta el lote de códigos QR", async ({ page }) => {
+  // Recorrido largo (alta, subida de la etiqueta, detalle y exportación): ~27 s en una tableta
+  // emulada; con dos workers en una máquina cargada rozaba los 30 s por defecto.
+  test.setTimeout(60_000);
   const errors = trackErrors(page, [NO_LAB]);
   await login(page, "enologa@cintiviejo.test");
   await nav(page, "Envasado y QR");

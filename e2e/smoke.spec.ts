@@ -86,6 +86,40 @@ test("cambio de organización: Sofía pasa de enóloga en Altos a dueña de Casa
   expect(errors).toEqual([]);
 });
 
+test("el enlace Perfil del menú de usuario navega sin recargar la página", async ({ page }) => {
+  const errors = trackErrors(page);
+  await login(page, "enologa@cintiviejo.test");
+  // Una marca en `window` sobrevive a la navegación del cliente y desaparece con una recarga.
+  await page.evaluate(() => ((window as unknown as { __sinRecarga?: boolean }).__sinRecarga = true));
+  await shellUser(page).click();
+  await page.getByRole("menuitem", { name: "Perfil" }).click();
+  await expect(page).toHaveURL(/\/perfil$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Lic. Lucía Rojas" })).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { __sinRecarga?: boolean }).__sinRecarga)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test("una sesión revocada avisa en el login, también al recargar", async ({ page }) => {
+  await login(page, "enologa@cintiviejo.test");
+  // Revoca en los mocks las sesiones abiertas (como un bloqueo desde el Backoffice).
+  await page.evaluate(() => {
+    const key = "doc-mocks:sessions";
+    const state = JSON.parse(localStorage.getItem(key) ?? "{}") as { sessions?: Record<string, { revoked: boolean }> };
+    for (const session of Object.values(state.sessions ?? {})) session.revoked = true;
+    localStorage.setItem(key, JSON.stringify(state));
+  });
+  const notice = page.getByText("Tu sesión se cerró por seguridad. Vuelve a entrar.");
+  await page.reload();
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(notice).toBeVisible();
+  // En el propio login, otra recarga sigue avisando (la cookie es de la sesión revocada).
+  await page.reload();
+  await expect(notice).toBeVisible();
+  // Entrar de nuevo lo quita.
+  await login(page, "enologa@cintiviejo.test");
+  await expect(notice).toHaveCount(0);
+});
+
 test("cerrar sesión revoca la sesión: la recarga ya no entra", async ({ page }) => {
   await login(page, "enologa@cintiviejo.test");
   await shellUser(page).click();

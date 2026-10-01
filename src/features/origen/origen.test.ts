@@ -118,18 +118,17 @@ describe("formulario de terroir", () => {
     doType: "D.O. Singani",
   };
 
-  it("convierte cifras escritas en es-BO y deja null lo opcional vacío", () => {
+  it("convierte cifras escritas en es-BO y omite lo opcional vacío", () => {
     const r = toTerroirDto(valid);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.create).toMatchObject({
       surfaceHectares: 3.5,
       altitudeMasl: 2450,
-      latitude: null,
-      cadastreCode: null,
-      geographicPolygonGeojson: null,
       isDoEligible: true,
     });
+    for (const key of ["latitude", "cadastreCode", "geographicPolygonGeojson"])
+      expect(r.create).not.toHaveProperty(key);
     expect(r.update.isActive).toBe(true);
   });
 
@@ -170,13 +169,13 @@ describe("formulario de terroir", () => {
       ],
     });
     expect(terroirFieldErrors(error)).toEqual({ altitudeMasl: "Too small", polygon: "Invalid" });
-    // Backend anterior a O0-BE-2: "campo: mensaje" (hasta H1).
+    // Las cadenas "campo: mensaje" del backend anterior a O0-BE-2 se retiraron en H1.
     const legacy = new ApiError({
       status: 400,
       code: "VALIDATION_ERROR",
       message: "x",
       details: ["altitudeMasl: Too small"],
     });
-    expect(terroirFieldErrors(legacy)).toEqual({ altitudeMasl: "Too small" });
+    expect(terroirFieldErrors(legacy)).toEqual({});
   });
 });

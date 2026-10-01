@@ -1,4 +1,5 @@
-import { DEFAULT_NOTIFICATION_PREFS, UpdateUserSchema, type MeUser, type UpdateUserDto } from "@drinks-on-chain/mocks";
+import { DEFAULT_NOTIFICATION_PREFS, UpdateUserSchema, type UpdateUserDto } from "@drinks-on-chain/mocks";
+import type { MeUser } from "@/lib/auth/schemas";
 
 export type ProfileValues = { fullName: string; phoneNumber: string };
 export type ProfileErrors = Partial<Record<keyof ProfileValues, string>>;

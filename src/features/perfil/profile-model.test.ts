@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { MeUser } from "@drinks-on-chain/mocks";
+import type { MeUser } from "@/lib/auth/schemas";
 import { preferenceValues, preferencesDto, validateProfile } from "./profile-model";
 
 describe("validateProfile", () => {

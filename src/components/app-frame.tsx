@@ -18,7 +18,7 @@ import {
   Wallet,
   Wine,
 } from "lucide-react";
-import type { MeResponse } from "@drinks-on-chain/mocks";
+import type { MeResponse } from "@/lib/auth/schemas";
 import { AppShell, Button, EmptyState, ErrorState, Spinner, type NavGroup, type NavItem } from "@drinks-on-chain/ui";
 import { errorMessage } from "@/lib/api/errors";
 import { useIsAuthenticated, useLogout, useMe, useOrgInactiveFlag } from "@/lib/auth/hooks";

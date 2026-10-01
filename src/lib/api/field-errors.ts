@@ -6,24 +6,13 @@ import { ApiError } from "./errors";
 
 export type ValidationIssue = { field: string | null; message: string };
 
-/**
- * Lee `details` de un error. Tolera las cadenas `"campo: mensaje"` del backend anterior a
- * O0-BE-2 (*retirada* en H1, cuando todos los backends devuelvan objetos).
- */
+/** Lee los `details: [{ field, message }]` de un error; lo que no tenga esa forma se ignora. */
 export function validationIssues(details: unknown): ValidationIssue[] {
   if (!Array.isArray(details)) return [];
   return details.flatMap((d): ValidationIssue[] => {
     if (d && typeof d === "object" && "message" in d && typeof d.message === "string") {
       const field = "field" in d && typeof d.field === "string" && d.field ? d.field : null;
       return [{ field, message: d.message }];
-    }
-    if (typeof d === "string") {
-      // "campo: mensaje" o "campo es obligatorio" (el nombre de propiedad empieza en minúscula).
-      const lead = /^([a-z][\w.]*)(?::\s*|\s+)(.+)$/.exec(d);
-      if (lead) return [{ field: lead[1]!, message: lead[2]! }];
-      // "El refreshToken es requerido": el campo es el identificador camelCase de la frase.
-      const inner = /\b([a-z]+[A-Z][\w.]*)\b/.exec(d);
-      return [{ field: inner ? inner[1]! : null, message: d }];
     }
     return [];
   });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import type { MeUser } from "@drinks-on-chain/mocks";
+import type { MeUser } from "@/lib/auth/schemas";
 import {
   Alert,
   Badge,

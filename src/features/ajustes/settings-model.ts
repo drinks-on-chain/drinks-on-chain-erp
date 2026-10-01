@@ -1,8 +1,7 @@
 import { UpdateWinerySchema, type UpdateWineryDto, type WineryResponse } from "@drinks-on-chain/mocks";
 
 // Validación del formulario de ajustes: datos de la bodega (UpdateWinerySchema). El equipo se
-// gestiona con invitaciones en /equipo (contrato de la Ola 1 §2 y §5): el alta con contraseña
-// (`/v1/wineries/my/members/create`) se retira en H1.
+// gestiona con invitaciones en /equipo (contrato de la Ola 1 §2 y §5).
 
 const PHONE = /^\+?[\d\s-]{7,20}$/;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

@@ -25,9 +25,9 @@ import { today } from "./today";
 const NO_TERROIRS: Page<TerroirResponse> = { items: [], total: 0, limit: 0, offset: 0 };
 
 /**
- * Parcelas de la bodega. El operario no las lee (matriz del backend: 403), pero vendimia y
- * vinificación las usan para poner nombre a la parcela: para ese rol no se piden y la lista llega
- * vacía (con otra clave, para no mezclarla con la de quien sí las lee).
+ * Parcelas de la bodega. Vendimia y vinificación las usan para poner nombre a la parcela: un rol
+ * sin lectura de parcelas no las pide y recibe la lista vacía (con otra clave, para no mezclarla
+ * con la de quien sí las lee). Hoy todos los roles de bodega las leen (Ola 1 §11 bis).
  */
 export function useTerroirs(q: TerroirQuery = {}) {
   const me = useMe();
@@ -245,3 +245,17 @@ export const useResendInvitation = () => useErpMutation((id: string) => erpApi.r
 export const useRevokeInvitation = () => useErpMutation((id: string) => erpApi.revokeInvitation(id));
 export const useUpload = () =>
   useMutation({ mutationFn: (v: Parameters<typeof erpApi.upload>) => erpApi.upload(...v) });
+
+/**
+ * URL firmada de un archivo guardado (`GET /v1/uploads/url?key=`). Solo para claves del
+ * almacenamiento (`isStorageKey`); caduca a los 15 min, así que se renueva pasados 10.
+ */
+export const useStoredFileUrl = (key: string | null) =>
+  useQuery({
+    queryKey: erpKeys.fileUrl(key ?? ""),
+    queryFn: ({ signal }) => erpApi.fileUrl(key!, signal),
+    enabled: !!key,
+    staleTime: 10 * 60_000,
+    refetchInterval: 10 * 60_000,
+    retry: false,
+  });

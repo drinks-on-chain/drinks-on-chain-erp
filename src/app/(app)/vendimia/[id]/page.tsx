@@ -2,7 +2,7 @@
 
 import { use } from "react";
 import Link from "next/link";
-import { Cylinder, FileText } from "lucide-react";
+import { Cylinder } from "lucide-react";
 import {
   Alert,
   Badge,
@@ -13,8 +13,8 @@ import {
   ErrorState,
   KeyValueList,
   Skeleton,
-  TextLink,
 } from "@drinks-on-chain/ui";
+import { StoredFileLink } from "@/components/stored-file-link";
 import { LabReadingCard } from "@/features/vendimia/components/lab-reading-card";
 import { PhytoBadge } from "@/features/vendimia/components/phyto-badge";
 import { PhytoDecisionPanel } from "@/features/vendimia/components/phyto-decision";
@@ -175,16 +175,7 @@ export default function HarvestDetailPage({ params }: PageProps<"/vendimia/[id]"
                   {
                     term: "Informe de inspección",
                     value: h.phytoInspectionPdfUrl ? (
-                      <TextLink
-                        variant="inline"
-                        href={h.phytoInspectionPdfUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex gap-1"
-                      >
-                        <FileText aria-hidden size={16} />
-                        Ver informe
-                      </TextLink>
+                      <StoredFileLink reference={h.phytoInspectionPdfUrl}>Ver informe</StoredFileLink>
                     ) : (
                       "—"
                     ),

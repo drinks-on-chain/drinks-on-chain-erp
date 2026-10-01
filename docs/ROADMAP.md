@@ -44,8 +44,8 @@ Detalle de `docs/03-roadmap-frontend.md` §4. Se marca con fecha cuando la sub-e
 
 - [x] Estados en todas las pantallas, teclado, lector de pantalla · 2026-09-25
 - [x] Playwright del flujo "Singani Gran Reserva 2026" de origen a QR (lote nuevo hasta el reposo + embotellado de un reposo cumplido y exportación de QR) · 2026-09-25
-- [x] Integración temprana contra el backend real: `e2e/backend-real.spec.ts` (manual, `E2E_REAL_API=1`, job `workflow_dispatch`) con las personas de la semilla · 2026-09-27 (pasa entera solo cuando el backend sirva los decimales como números: ver Ola 0)
-- [ ] Recorrido real en verde sin parches: pendiente de que el backend corrija los `Decimal` como texto
+- [x] Integración temprana contra el backend real: `e2e/backend-real.spec.ts` (manual, `E2E_REAL_API=1`, job `workflow_dispatch`) con las personas de la semilla · 2026-09-27
+- [x] Recorrido real en verde sin parches (backend `b9e8b68`: decimales como número, `null` en opcionales como omitido, DAG declarado en el OpenAPI): las 6 pruebas, incluido el 429 · 2026-09-27
 
 ## Ola 0 · Sesiones y estándares (O0-ERP-1)
 
@@ -62,7 +62,7 @@ Contrato: `plan/contratos/o0-sesiones-y-estandares.md` del plan maestro. La base
 - [x] Pruebas unitarias y todas las E2E con mocks en verde (humo con recarga, cambio de organización, cierre de sesión y error por campo) · 2026-09-27
 - [x] Integración real (O0-ERP-2): login y cookie `doc_rt` por la reescritura, recarga, cambio de organización, cierre que revoca, permisos de operario, 422 con `details[].field`, 429 con `Retry-After`, alta de parcela `E2E-…` · 2026-09-27
   - Corregido en el ERP: listas validadas como `ContractError` y sin reintentos ante un contrato roto (antes, 3 peticiones y ~4,5 s por pantalla); grafo de trazabilidad del backend normalizado (`src/lib/erp/dag.ts`); las altas no envían `null` en campos opcionales no anulables (`omitNulls`); el operario no pide parcelas (403); certificados del listado de envasado solo de la página visible
-  - Bloqueado por el backend: los campos `Decimal` llegan como texto (`"4.50"`) donde el OpenAPI dice `number`; con la conversión aplicada solo en local, todo el recorrido pasa y las pantallas cargan en 0,2–1 s
+  - Backend corregido en `b9e8b68` (decimales como número): el recorrido pasa sin parches; pantallas en 0,2–0,8 s navegando dentro de la app. La línea de tiempo toma el certificado de `details.labAnalysis` del embotellado
 
 ## Ola 1 · Cuenta, organización y equipo (O1-ERP-1, sub-etapa 1I)
 
@@ -78,4 +78,18 @@ Contrato: `plan/contratos/o1-backoffice-y-bodegas.md` del plan maestro (§1, §2
 - [x] Configuración efectiva (lectura) en Ajustes y bitácora propia de la dirección con filtros y paginación · 2026-09-27
 - [x] Pantalla de bodega no activa (`ORG_NOT_ACTIVE`: invitada, suspendida, revocada) sin romper la navegación · 2026-09-27
 - [x] Pruebas: unitarias de reglas de equipo, contraseñas, estado de la organización, configuración, bitácora y cuenta; e2e con el buzón simulado (invitación nueva y existente, recuperación), equipo, bodega no activa, axe y teclado · 2026-09-27
-- [ ] Contra el backend real cuando publique O1-BE-1 (todo el §6 de los mocks está pendiente del backend)
+- [x] Contra el backend real (O1-ERP-2, backend `eace713`): invitación con cuenta nueva desde Mailpit, preferencias, cambio y recuperación de contraseña, rol, bloqueo con la sesión revocada (401) y desbloqueo, reenviar y anular, configuración efectiva, bitácora con filtros, bodega suspendida (solo estado, perfil y bitácora), operario que lee parcelas y pesa, invitación aceptada con cuenta existente (acceso + refresco); `backend-real` 7/7 sin parches · 2026-09-27
+  - Corregido en el ERP: el operario lee parcelas (§11 bis); códigos de acción de la bitácora de trazabilidad con los del backend (`FERMENTATION_LOG_ADDED`, `BOTTLING_BATCH_CREATED`…)
+- [x] `@drinks-on-chain/mocks` 0.4.0-rc.1 (contrato estricto del backend): grafo `DagGraphResponseDto` sin la forma antigua, altas sin `null` en opcionales, archivos por `key` con URL firmada al mostrarlos (`GET /v1/uploads/url`) · 2026-09-27
+- [x] IP real del cliente detrás del proxy (O1-OPS-1): `rewrites` sustituidos por `src/proxy.ts`, que reescribe `/api/v1/*` a `${API_ORIGIN}/v1/*` con `X-DOC-Client-IP` firmada (HMAC con `PROXY_SHARED_SECRET`, variable de servidor) · 2026-09-27
+
+## Cierre de la Ola 1 (H1) · retirada de la compatibilidad transitoria
+
+Contrato: `plan/contratos/o1-backoffice-y-bodegas.md` §11 y `o0-sesiones-y-estandares.md` §5. Llega con la plantilla (`git merge template/dev`).
+
+- [x] Sin `refreshToken` en el cuerpo: ni se guarda ni se reenvía en `refresh` ni en `switch-organization` (aceptar una invitación ya no lo enviaba); el de la respuesta se ignora · 2026-09-27
+- [x] Esquemas de sesión, login con segundo factor y `me` sin `tokens.refreshToken` ni `user.userRole/wineryId/memberRole` (`src/lib/auth/schemas.ts` de la plantilla); ninguna pantalla los lee · 2026-09-27
+- [x] `PATCH /v1/users/me` solo con `{ user, memberships, activeOrganizationId }` (fuera `meFromUpdate` y la relectura); `details` solo como `{ field, message }` · 2026-09-27
+- [x] Aviso "Tu sesión se cerró por seguridad" en el login también al recargar con una sesión revocada (E2E de humo) · 2026-09-27
+- [x] Enlace "Perfil" del menú de usuario con `linkComponent`: el fallo estaba en `@drinks-on-chain/ui` (`SidebarShell` no pasaba `linkComponent` al `Menu` del bloque de usuario); corregido en `@drinks-on-chain/ui` 0.3.1-rc.1, que llega con la plantilla, y cubierto por el e2e de humo (navega sin recargar) · 2026-09-27
+- [x] `@drinks-on-chain/mocks` 0.4.0-rc.2 (retirada de H1 en los mocks) con la plantilla: esquemas de sesión y `me` reexportados salvo `tokens.refreshToken` (obsoleto hasta 0.5), panel `/__mocks` con `DemoUser.role` y pruebas sin campos de 0.1 · 2026-09-27

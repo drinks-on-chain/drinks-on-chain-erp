@@ -6,6 +6,7 @@ import {
 } from "@drinks-on-chain/mocks";
 import { numberToInput, parseDecimal } from "@/lib/format";
 import { fieldErrorsFrom } from "@/lib/api/field-errors";
+import { omitNulls } from "@/lib/erp/omit-nulls";
 import { outerRing } from "./parcel-shape";
 
 // Valores del formulario de terroir (texto tal como se escribe) y su conversión al DTO de
@@ -84,7 +85,7 @@ export function terroirToValues(t: TerroirResponse): TerroirFormValues {
 /** Polígono escrito en el textarea: vacío → null; JSON inválido → mensaje de error. */
 export function parsePolygon(
   text: string,
-): { value: CreateTerroirDto["geographicPolygonGeojson"] } | { error: string } {
+): { value: CreateTerroirDto["geographicPolygonGeojson"] | null } | { error: string } {
   if (!text.trim()) return { value: null };
   let json: unknown;
   try {
@@ -131,7 +132,7 @@ export function toTerroirDto(v: TerroirFormValues): Result {
   if ("error" in polygon) errors.polygon = polygon.error;
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
-  const create: CreateTerroirDto = {
+  const create = omitNulls<CreateTerroirDto>({
     parcelName: v.parcelName.trim(),
     cadastreCode: optionalText(v.cadastreCode),
     surfaceHectares: surface!,
@@ -146,7 +147,7 @@ export function toTerroirDto(v: TerroirFormValues): Result {
     isDoEligible: v.isDoEligible,
     doType: optionalText(v.doType),
     doCertificateUrl: v.doCertificateUrl,
-  };
+  });
   // Última red: el mismo esquema que aplica el backend.
   const parsed = CreateTerroirSchema.safeParse(create);
   if (!parsed.success) {

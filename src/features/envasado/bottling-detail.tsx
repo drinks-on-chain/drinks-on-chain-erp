@@ -14,6 +14,7 @@ import {
   Timeline,
   type TimelineItem,
 } from "@drinks-on-chain/ui";
+import { StoredFileLink } from "@/components/stored-file-link";
 import { PageChrome } from "@/components/page-chrome";
 import { ScreenTitle } from "@/components/screen-title";
 import { ApiError, errorMessage } from "@/lib/api/errors";
@@ -189,7 +190,11 @@ export function BottlingDetail({ id, justCreated }: { id: string; justCreated: b
                 { term: "Botella", value: b.bottleType ?? "—" },
                 {
                   term: "Etiqueta",
-                  value: b.labelDesignUrl ? <ExternalLink href={b.labelDesignUrl}>Ver diseño</ExternalLink> : "—",
+                  value: b.labelDesignUrl ? (
+                    <StoredFileLink reference={b.labelDesignUrl}>Ver diseño</StoredFileLink>
+                  ) : (
+                    "—"
+                  ),
                 },
               ]}
             />
