@@ -82,7 +82,9 @@ export function bottlingSources(chain: LotChain, today: Date): BottlingSource[] 
       const tank = tankOf(p.fermentationTankId);
       const harvest = harvestOf(tank);
       const rest = deriveRestStatus(p, { today });
-      const locked = p.restStatus !== "NOT_REQUIRED" && !rest.isRestCompleted;
+      // Una destilación sin cerrar no tiene corazón que embotellar (contrato de la Ola 2 §5.2).
+      const open = !p.processEndDate;
+      const locked = open || (p.restStatus !== "NOT_REQUIRED" && !rest.isRestCompleted);
       return {
         key: sourceKey("destilacion", p.id),
         kind: "destilacion",

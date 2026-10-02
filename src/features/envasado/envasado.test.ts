@@ -7,6 +7,9 @@ import { bottleCodes, bottleCodesCsv, marketplaceOrigin, passportUrl, serialWidt
 import { bottlingSources, resolvePreselected, sourceKey } from "./sources";
 
 const TODAY = new Date("2026-09-25T12:00:00Z");
+/** Con el reposo de la destilación del lote «Moscatel de Alejandría 2026» ya cumplido (13-10-2026). */
+const LATER = new Date("2026-10-20T12:00:00Z");
+const READY_ID = "e58a7714-0a95-5cc4-8fd8-07999cb576e3";
 
 function chainOf(wineryName: string): LotChain {
   const winery = fx.wineries.find((w) => w.commercialName.includes(wineryName))!;
@@ -31,13 +34,16 @@ describe("bottlingSources", () => {
     expect(first.productType).toBe("WINE");
   });
 
-  it("Cinti Viejo: una destilación con reposo cumplido y dos en reposo", () => {
+  it("Cinti Viejo: dos destilaciones en reposo y una abierta; el reposo se cumple el 13-10-2026", () => {
     const open = bottlingSources(chainOf("Cinti"), TODAY).filter((s) => !s.bottled);
-    const ready = open.filter((s) => !s.locked);
-    expect(ready.map((s) => s.id)).toEqual(["a6dd3060-8612-5595-b9b4-33a7d039159c"]);
-    expect(ready[0]!.productType).toBe("SINGANI");
-    const resting = open.filter((s) => s.locked);
+    expect(open.filter((s) => !s.locked)).toEqual([]);
+    // La destilación abierta (sin cerrar) no se puede embotellar aunque no tenga reposo pendiente.
+    const resting = open.filter((s) => s.production?.restStatus === "RESTING");
     expect(resting.map((s) => s.daysRemaining).sort((a, b) => a - b)).toEqual([18, 167]);
+    expect(open.filter((s) => !s.production?.processEndDate).every((s) => s.locked)).toBe(true);
+    const ready = bottlingSources(chainOf("Cinti"), LATER).filter((s) => !s.bottled && !s.locked);
+    expect(ready.map((s) => s.id)).toEqual([READY_ID]);
+    expect(ready[0]!.productType).toBe("SINGANI");
   });
 
   it("una crianza READY que ya tiene embotellado cuenta como embotellada", () => {
@@ -46,8 +52,8 @@ describe("bottlingSources", () => {
   });
 
   it("resuelve la fuente de la URL, y por lote prefiere la liberada sin embotellar", () => {
-    const sources = bottlingSources(chainOf("Cinti"), TODAY);
-    const id = "a6dd3060-8612-5595-b9b4-33a7d039159c";
+    const sources = bottlingSources(chainOf("Cinti"), LATER);
+    const id = READY_ID;
     expect(resolvePreselected(sources, { destilacion: id })?.key).toBe(sourceKey("destilacion", id));
     const harvestId = sources.find((s) => s.id === id)!.harvest!.id;
     expect(resolvePreselected(sources, { lote: harvestId })?.id).toBe(id);
@@ -187,8 +193,8 @@ describe("validateBottling", () => {
     bottleType: " Vidrio flint 750 ml ",
     bottlingDate: "2026-09-25",
   };
-  const sources = bottlingSources(chainOf("Cinti"), TODAY);
-  const ready = sources.find((s) => s.id === "a6dd3060-8612-5595-b9b4-33a7d039159c")!;
+  const sources = bottlingSources(chainOf("Cinti"), LATER);
+  const ready = sources.find((s) => s.id === READY_ID)!;
 
   it("arma el DTO de una destilación liberada", () => {
     const { errors, dto } = validateBottling(ready, values);
