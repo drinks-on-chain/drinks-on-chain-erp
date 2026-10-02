@@ -32,7 +32,15 @@ describe("tabla de destilaciones", () => {
   });
 
   it("primero la destilación abierta, luego las que reposan por días que faltan, al final lo embotellado", () => {
-    expect(rows.map((r) => r.rest.state)).toEqual(["open", "resting", "resting", "bottled", "bottled", "bottled"]);
+    expect(rows.map((r) => r.rest.state)).toEqual([
+      "open",
+      "resting",
+      "resting",
+      "bottled",
+      "bottled",
+      "bottled",
+      "bottled",
+    ]);
     expect(rows[0]).toMatchObject({ tankCode: "TK-12", heartLiters: null });
     expect(rows[1]!.rest).toMatchObject({ state: "resting", daysRemaining: 18, restDays: 180, progress: 90 });
     expect(rows[1]).toMatchObject({ heartLiters: 1500, heartAbv: 60 });
@@ -131,6 +139,7 @@ describe("abrir la destilación", () => {
     processStartDate: "2026-09-20",
     inputVolumeLiters: "6.300",
     initialAlcoholPercentage: "",
+    closeTank: false,
     notes: "",
   };
   const ctx = { today: TODAY };

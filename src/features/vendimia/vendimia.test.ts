@@ -174,7 +174,7 @@ describe("dictamen y filtros", () => {
   });
 
   it("filtra por estado y año, del más reciente al más antiguo", () => {
-    expect(harvestYears(harvests)).toEqual([2026, 2025]);
+    expect(harvestYears(harvests)).toEqual([2026, 2025, 2024]);
     const pending = filterHarvests(harvests, { status: "PENDING_INSPECTION" });
     expect(pending.length).toBe(countByStatus(harvests).PENDING_INSPECTION);
     const y2025 = filterHarvests(harvests, { year: 2025 });

@@ -8,6 +8,7 @@ import {
   Button,
   Card,
   CardHeader,
+  Checkbox,
   EmptyState,
   ErrorState,
   Field,
@@ -71,6 +72,7 @@ export function NewDistillationForm() {
     processStartDate: toDateInput(today()),
     inputVolumeLiters: "",
     initialAlcoholPercentage: "",
+    closeTank: false,
     notes: "",
   }));
   const [errors, setErrors] = useState<Partial<Record<DistillationField, string>>>({});
@@ -82,7 +84,8 @@ export function NewDistillationForm() {
   const preselectedInvalid = !!preselected && !!tanks.data && !candidates.some((t) => t.id === preselected);
   const previous = tank ? (productions.data?.items ?? []).filter((p) => p.fermentationTankId === tank.id) : [];
   const lot = useLot(tank?.lotId ?? "", !!tank?.lotId);
-  const tankLiters = tank?.finalVolumeLiters ?? tank?.volumeFilledLiters ?? null;
+  // Lo que queda en el tanque según el servidor; si no lo dice, lo que dejó la fermentación.
+  const tankLiters = tank?.availableLiters ?? tank?.finalVolumeLiters ?? tank?.volumeFilledLiters ?? null;
   // Sin cifra escrita y sin tandas previas, entra todo el vino base del tanque.
   const inputVolume =
     values.inputVolumeLiters.trim() || (tankLiters != null && previous.length === 0 ? String(tankLiters) : "");
@@ -284,6 +287,13 @@ export function NewDistillationForm() {
               />
             </Field>
           </FormSection>
+
+          <Checkbox
+            checked={values.closeTank}
+            onCheckedChange={(c) => set("closeTank", c === true)}
+            label="Es la última destilación de este tanque"
+            description="El tanque queda trasegado aunque le sobre vino base: el resto se cuenta como merma de trasiego. Sin marcarlo, admite otra tanda mientras le quede volumen."
+          />
 
           <Field label="Notas" error={errors.notes}>
             <Textarea value={values.notes} onChange={(e) => set("notes", e.target.value)} rows={2} />

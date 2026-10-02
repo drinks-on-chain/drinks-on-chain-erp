@@ -16,6 +16,9 @@ import {
   toast,
 } from "@drinks-on-chain/ui";
 import { RuleViolationNotice } from "@/components/rule-violation-notice";
+import { VoidedBadge, VoidedText } from "@/components/voided";
+import { CorrectRecordButton } from "@/features/lotes/components/correction-dialog";
+import { isVoided } from "@/lib/erp/voided";
 import { actorText } from "@/features/lotes/lot-timeline";
 import { useCreateMaturityAnalysis } from "@/lib/erp/hooks";
 import { today } from "@/lib/erp/today";
@@ -39,9 +42,20 @@ import { LabReadingCard } from "./lab-reading-card";
  * último análisis), el historial con quién midió y el alta de un análisis nuevo. Solo inserción:
  * uno erróneo se corrige o anula con una corrección, no se edita.
  */
-export function MaturityPanel({ batch, canAnalyze }: { batch: HarvestBatchDetail; canAnalyze: boolean }) {
+export function MaturityPanel({
+  batch,
+  canAnalyze,
+  lotLabel,
+}: {
+  batch: HarvestBatchDetail;
+  canAnalyze: boolean;
+  /** Nombre y referencia del lote del pesaje, para el diálogo de corrección. */
+  lotLabel: string;
+}) {
   const [open, setOpen] = useState(false);
   const analyses = useMemo(() => sortAnalyses(batch.maturityAnalyses), [batch.maturityAnalyses]);
+  // El vigente es el más reciente que no esté anulado: los anulados siguen en el historial.
+  const currentId = analyses.find((a) => !isVoided(a))?.id;
   const none = analyses.length === 0;
 
   const add = canAnalyze ? (
@@ -87,14 +101,31 @@ export function MaturityPanel({ batch, canAnalyze }: { batch: HarvestBatchDetail
                 header: "Medición",
                 cell: (a) => (
                   <span className="flex flex-wrap items-center gap-2 whitespace-nowrap">
-                    {fmtDateTime(a.measuredAt)}
-                    {a.id === analyses[0]!.id && <Badge tone="success">Vigente</Badge>}
+                    <VoidedText voided={isVoided(a)}>{fmtDateTime(a.measuredAt)}</VoidedText>
+                    {a.id === currentId && <Badge tone="success">Vigente</Badge>}
+                    {isVoided(a) && <VoidedBadge />}
+                    {!isVoided(a) && (a.correctedFields?.length ?? 0) > 0 && <Badge tone="info">Corregido</Badge>}
                   </span>
                 ),
               },
-              { id: "brix", header: "Brix", numeric: true, cell: (a) => fmtNumber(a.brixDegrees, 1) },
-              { id: "ph", header: "pH", numeric: true, cell: (a) => fmtNumber(a.ph, 2) },
-              { id: "acidity", header: "Acidez g/L", numeric: true, cell: (a) => fmtNumber(a.acidityGl, 1) },
+              {
+                id: "brix",
+                header: "Brix",
+                numeric: true,
+                cell: (a) => <VoidedText voided={isVoided(a)}>{fmtNumber(a.brixDegrees, 1)}</VoidedText>,
+              },
+              {
+                id: "ph",
+                header: "pH",
+                numeric: true,
+                cell: (a) => <VoidedText voided={isVoided(a)}>{fmtNumber(a.ph, 2)}</VoidedText>,
+              },
+              {
+                id: "acidity",
+                header: "Acidez g/L",
+                numeric: true,
+                cell: (a) => <VoidedText voided={isVoided(a)}>{fmtNumber(a.acidityGl, 1)}</VoidedText>,
+              },
               {
                 id: "by",
                 header: "Registrado por",
@@ -104,6 +135,14 @@ export function MaturityPanel({ batch, canAnalyze }: { batch: HarvestBatchDetail
               },
               { id: "notes", header: "Notas", hideBelow: "lg", cell: (a) => a.notes || "—" },
             ]}
+            rowActions={(a) => (
+              <CorrectRecordButton
+                lotId={batch.lotId}
+                lotLabel={lotLabel}
+                voided={isVoided(a)}
+                record={{ id: a.id, type: "MATURITY_ANALYSIS", label: `Análisis del ${fmtDateTime(a.measuredAt)}` }}
+              />
+            )}
           />
         </>
       )}

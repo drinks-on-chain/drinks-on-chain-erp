@@ -24,6 +24,8 @@ import {
 } from "@drinks-on-chain/ui";
 import { RuleViolationNotice } from "@/components/rule-violation-notice";
 import { StoredFileLink } from "@/components/stored-file-link";
+import { VoidedBadge, VoidedText } from "@/components/voided";
+import { isVoided } from "@/lib/erp/voided";
 import { UploadField } from "@/features/origen/components/upload-field";
 import { toDateInput } from "@/features/vinificacion/form-utils";
 import { errorMessage } from "@/lib/api/errors";
@@ -40,6 +42,7 @@ import {
   LAB_NUMBER_FIELDS,
   checkValueText,
   emptyLab,
+  isCurrentLab,
   labFieldErrors,
   labValueRows,
   limitText,
@@ -65,7 +68,7 @@ export function LotLab({ lot }: Props) {
   const labs = useLotLabAnalyses(lot.id);
   const [open, setOpen] = useState(false);
   const items = useMemo(() => sortLabs(labs.data?.items), [labs.data]);
-  const current = items.find((l) => l.current ?? !l.supersededAt);
+  const current = items.find(isCurrentLab);
   const previous = items.filter((l) => l !== current);
 
   const bottled = lot.links.bottlingBatchId !== null;
@@ -107,7 +110,7 @@ export function LotLab({ lot }: Props) {
         <Card padding="none">
           <CardHeader
             title="Análisis anteriores"
-            description="Sustituidos por un reanálisis. Se conservan: nada se edita ni se borra."
+            description="Sustituidos por un reanálisis o anulados con una corrección. Se conservan: nada se edita ni se borra."
             divided
             className="px-5 pt-5"
           />
@@ -118,8 +121,16 @@ export function LotLab({ lot }: Props) {
             data={previous}
             getRowId={(l) => l.id}
             columns={[
-              { id: "date", header: "Análisis", cell: (l) => fmtDate(l.testPerformedAt) },
-              { id: "lab", header: "Laboratorio", cell: (l) => l.certifiedLaboratoryName },
+              {
+                id: "date",
+                header: "Análisis",
+                cell: (l) => <VoidedText voided={isVoided(l)}>{fmtDate(l.testPerformedAt)}</VoidedText>,
+              },
+              {
+                id: "lab",
+                header: "Laboratorio",
+                cell: (l) => <VoidedText voided={isVoided(l)}>{l.certifiedLaboratoryName}</VoidedText>,
+              },
               {
                 id: "status",
                 header: "Conformidad",
@@ -132,9 +143,19 @@ export function LotLab({ lot }: Props) {
               },
               {
                 id: "superseded",
-                header: "Sustituido",
+                header: "Sustituido o anulado",
                 hideBelow: "md",
-                cell: (l) => (l.supersededAt ? fmtDateTime(l.supersededAt) : "—"),
+                cell: (l) =>
+                  isVoided(l) ? (
+                    <span className="flex flex-wrap items-center gap-2">
+                      <VoidedBadge at={l.voidedAt} />
+                      {l.voidedAt && <span className="text-sm text-fg-muted">{fmtDateTime(l.voidedAt)}</span>}
+                    </span>
+                  ) : l.supersededAt ? (
+                    `Sustituido el ${fmtDateTime(l.supersededAt)}`
+                  ) : (
+                    "—"
+                  ),
               },
               {
                 id: "report",

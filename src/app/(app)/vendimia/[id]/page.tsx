@@ -39,6 +39,7 @@ export default function HarvestDetailPage({ params }: PageProps<"/vendimia/[id]"
   const h = batch.data;
   const lot = useLot(h?.lotId ?? "", !!h?.lotId);
   const tanks = h?.fermentationTanks ?? [];
+  const lotLabel = lot.data ? `${lot.data.name} · ${lot.data.reference}` : (h?.harvestBatchCode ?? "Pesaje");
   // La parcela tal como era al pesar; si el registro no la trae, la actual.
   const parcel = h?.terroirSnapshot ?? h?.terroir ?? null;
 
@@ -120,7 +121,7 @@ export default function HarvestDetailPage({ params }: PageProps<"/vendimia/[id]"
             </Alert>
           )}
 
-          <MaturityPanel batch={h} canAnalyze={can(me.data, "harvest.maturity")} />
+          <MaturityPanel batch={h} canAnalyze={can(me.data, "harvest.maturity")} lotLabel={lotLabel} />
 
           <section aria-labelledby="phyto-title" className="grid grid-cols-1 gap-4">
             <h2 id="phyto-title" className="m-0 font-ui text-lg font-semibold">
@@ -157,7 +158,7 @@ export default function HarvestDetailPage({ params }: PageProps<"/vendimia/[id]"
                 La uva no entra en producción.
               </Alert>
             )}
-            <PhytoHistory decisions={h.phytoDecisions} />
+            <PhytoHistory decisions={h.phytoDecisions} lotId={h.lotId} lotLabel={lotLabel} />
           </section>
 
           <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">

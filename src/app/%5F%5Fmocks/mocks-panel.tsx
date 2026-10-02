@@ -23,7 +23,9 @@ import { fmtDateTime } from "@/lib/format";
 import { useLogin } from "@/lib/auth/hooks";
 import { es } from "@/lib/i18n/es";
 
-const SCENARIO_LABELS: Record<ScenarioName, string> = {
+// Etiquetas de los escenarios que usa el ERP; los demás de `SCENARIOS` (p. ej. los del pasaporte
+// público) se muestran con su nombre.
+const SCENARIO_LABELS: Partial<Record<ScenarioName, string>> = {
   normal: "Normal",
   empty: "Listas vacías",
   error: "Error del servidor (500)",
@@ -135,7 +137,7 @@ export function MocksPanel() {
             <Select
               value={scenario}
               onValueChange={changeScenario}
-              options={SCENARIOS.map((s) => ({ value: s, label: SCENARIO_LABELS[s] }))}
+              options={SCENARIOS.map((s) => ({ value: s, label: SCENARIO_LABELS[s] ?? s }))}
             />
           </Field>
           <Button

@@ -1,8 +1,10 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { expect, test, type Browser, type Page, type Response } from "@playwright/test";
 import { hasMailbox, mailLink } from "./mailpit";
 import { trackErrors } from "./support";
 
-// Integración con el backend real de desarrollo (03 §4 1G; O0-ERP-2). Excluida por defecto: solo
+// Integración con el backend real de desarrollo (03 §4 1G; O0-ERP-2, O1-ERP-2 y O2-ERP-1). Excluida por defecto: solo
 // corre con E2E_REAL_API=1, y el build usa E2E_API_ORIGIN como API_ORIGIN (Next reescribe
 // /api/v1/* al backend). Ver "Prueba contra el backend real" en el README:
 //
@@ -11,17 +13,15 @@ import { trackErrors } from "./support";
 //
 // Personas de la semilla del backend (README del backend, "Datos de demostración"); su
 // contraseña es la de SEED_DEMO_PASSWORD y solo llega por E2E_PASSWORD (nunca en el repo).
-// Solo lecturas y altas inocuas (una parcela `E2E-<fecha>`), con un solo worker para no rozar los
-// límites del backend (login 10/min y renovación 30/min por IP): se navega con los enlaces del
-// shell, sin recargar, salvo donde la recarga es lo que se prueba.
+// Lecturas y altas con el sufijo de la ejecución (`E2E-<fecha>-<azar>`: una parcela, un pesaje y el
+// lote del recorrido de la Ola 2), con un solo worker para no rozar los límites del backend (login
+// 10/min y renovación 30/min por IP): se navega con los enlaces del shell, sin recargar, salvo
+// donde la recarga es lo que se prueba.
 
 const PASSWORD = process.env.E2E_PASSWORD ?? "";
 /** Parcela `E2E-…` que da de alta la dueña de Cinti Viejo: el operario pesa sobre ella. */
 let e2eParcel: string | null = null;
 const needsPassword = () => test.skip(!PASSWORD, "Falta E2E_PASSWORD (contraseña de las personas de demostración).");
-
-/** Un embotellado sin certificado de laboratorio responde 404: es lo esperado. */
-const NO_LAB = /^404 \/api\/v1\/lab-analyses\/batch\//;
 
 const shellUser = (page: Page) => page.getByRole("button", { name: /Menú de usuario/ });
 const orgSelector = (page: Page) => page.getByRole("combobox", { name: "Organización activa" });
@@ -73,7 +73,7 @@ test("dueña de Cinti Viejo: sesión por cookie, módulos, alta de parcela, 422 
   needsPassword();
   test.setTimeout(240_000);
   // El 422 del perfil es el que provoca la prueba de errores por campo.
-  const errors = trackErrors(page, [NO_LAB, /^422 \/api\/v1\/users\/me$/]);
+  const errors = trackErrors(page, [/^422 \/api\/v1\/users\/me$/]);
 
   await test.step("login a través de la reescritura: cookie doc_rt de primera parte", async () => {
     await login(page, "admin@cintiviejo.test");
@@ -109,11 +109,30 @@ test("dueña de Cinti Viejo: sesión por cookie, módulos, alta de parcela, 422 
     await openModule(page, "Envasado y QR", "Envasado y QR");
     await page.getByRole("link", { name: "CVJ-2026-SINGANI-001", exact: true }).click();
     await expect(page.getByRole("heading", { level: 1, name: "CVJ-2026-SINGANI-001" })).toBeVisible();
-    // Línea de tiempo desde el grafo del backend (forma de la cadena, normalizada en el ERP).
-    await expect(page.getByText("Destilación · Alambique de cobre Charentais AL-01")).toBeVisible();
-    await expect(page.getByText(/^Parcela · Parcela 2 · Cañón Viejo/)).toBeVisible();
-    // El certificado llega en `details.labAnalysis` del embotellado: hecho, no "Pendiente".
-    await expect(page.getByText(/^Certificado de laboratorio · /)).toBeVisible();
+    await settled(page);
+    // Desde la Ola 2 el laboratorio, el expediente y el grafo son del lote: la ficha del embotellado
+    // lleva a ellos y muestra su balance y sus códigos.
+    await expect(page.getByText("Códigos de botella", { exact: true })).toBeVisible();
+    await page.getByRole("link", { name: "Trazabilidad", exact: true }).click();
+    await expect(page.getByRole("tab", { name: "Trazabilidad" })).toHaveAttribute("aria-selected", "true");
+    await settled(page);
+    await expect(page.locator('[data-stage="TERROIR"]')).toContainText("Parcela 2 · Cañón Viejo");
+    await expect(page.locator('[data-stage="DISTILLATION"]')).toContainText("Alambique de cobre Charentais AL-01");
+    for (const tab of [
+      "Balance",
+      "Códigos",
+      "Laboratorio",
+      "Expediente",
+      "Línea de tiempo",
+      "Correcciones",
+      "Archivos",
+    ]) {
+      await page.getByRole("tab", { name: tab }).click();
+      await settled(page);
+      await expect(page.getByText("No se pudo cargar"), `pestaña ${tab} de la ficha del lote`).toHaveCount(0);
+      await expect(page.getByText(/datos inesperados/), `pestaña ${tab}: contrato`).toHaveCount(0);
+    }
+    await openModule(page, "Reportes", "Reportes de producción");
     await openModule(page, "Cuenta Stellar", "Cuenta Stellar");
     await expect(page.getByRole("link", { name: /Ver en stellar.expert/ })).toBeVisible();
     await openModule(page, "Ajustes", "Ajustes de la bodega");
@@ -252,9 +271,8 @@ test("operario de Cinti Viejo: lee parcelas y pesa; no crea parcelas ni ve crian
       await expect(page.getByRole("combobox", { name: "Terroir de origen" })).toContainText(e2eParcel!);
       await page.getByLabel("Peso bruto").fill("120");
       await page.getByLabel("Tara").fill("20");
-      await page.getByLabel("Grados Brix").fill("22,5");
-      await page.getByLabel("pH").fill("3,5");
-      await page.getByLabel("Acidez total").fill("6");
+      // El operario pesa sin análisis: el de madurez lo registran enología o agronomía (Ola 2 §3.3).
+      await expect(page.getByLabel("Grados Brix")).toHaveCount(0);
       const [created] = await Promise.all([
         page.waitForResponse((r) => r.url().endsWith("/api/v1/harvest-batches") && r.request().method() === "POST"),
         page.getByRole("button", { name: "Registrar ingreso" }).click(),
@@ -283,12 +301,637 @@ test("contabilidad de Cinti Viejo: membresía bloqueada por la plataforma, sin a
   expect(errors).toEqual([]);
 });
 
+// ---------- Ola 2 · ERP confiable (O2-ERP-1 contra la Etapa 2 del backend) ----------
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Fecha `AAAA-MM-DD` de hace `days` días (UTC): el proceso se declara en el pasado para que el reposo ya esté cumplido. */
+const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+
+const ruleNotice = (page: Page) => page.getByTestId("rule-violation-notice");
+
+/** Respuesta al alta de una corrección del lote. */
+const isCorrection = (r: Response) =>
+  /\/api\/v1\/lots\/[\w-]+\/corrections$/.test(r.url()) && r.request().method() === "POST";
+
+async function signOut(page: Page) {
+  await shellUser(page).click();
+  await page.getByRole("menuitem", { name: "Cerrar sesión" }).click();
+  await expect(page).toHaveURL(/\/login$/, { timeout: 20_000 });
+}
+
+async function switchTo(page: Page, email: string) {
+  await signOut(page);
+  await login(page, email);
+  await expect(page.getByText("Tareas pendientes", { exact: true })).toBeVisible({ timeout: 20_000 });
+  await settled(page);
+}
+
+const side = (page: Page, name: string) =>
+  page.getByRole("navigation", { name: "Navegación principal" }).getByRole("link", { name, exact: true }).click();
+
+/**
+ * Añade campos al cuerpo de la siguiente escritura a `path`, como quien manipula la petición desde
+ * las herramientas del navegador: la interfaz no ofrece esos campos.
+ */
+async function tamperNextPost(page: Page, path: string, extra: Record<string, unknown>) {
+  await page.evaluate(
+    ({ path, extra }) => {
+      const original = window.fetch;
+      window.fetch = (input, init) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        if (init?.method === "POST" && new URL(url, location.href).pathname === path && typeof init.body === "string") {
+          window.fetch = original;
+          init = { ...init, body: JSON.stringify({ ...JSON.parse(init.body), ...extra }) };
+        }
+        return original(input, init);
+      };
+    },
+    { path, extra },
+  );
+}
+
+test("Ola 2: el panel de la bodega carga con datos reales (Altos y Cinti Viejo)", async ({ page }) => {
+  needsPassword();
+  test.setTimeout(120_000);
+  const errors = trackErrors(page);
+  for (const email of ["admin@altos.test", "admin@cintiviejo.test"]) {
+    const [dashboard] = await Promise.all([
+      page.waitForResponse((r) => r.url().endsWith("/api/v1/traceability/dashboard")),
+      login(page, email),
+    ]);
+    expect(dashboard.status()).toBe(200);
+    // Formas reales que el ERP admite aunque los mocks pidan un instante ISO: se anota la del backend.
+    const data = (await dashboard.json()).data as {
+      pendingPhyto: { intakeDate: string }[];
+      fermentationAlerts: { lastReadingAt: string | null }[];
+    };
+    const shape = (v: string | null | undefined) =>
+      v == null
+        ? "null"
+        : /^\d{4}-\d{2}-\d{2}$/.test(v)
+          ? "AAAA-MM-DD"
+          : /^\d{4}-\d{2}-\d{2}T/.test(v)
+            ? "instante ISO"
+            : "otro";
+    console.log(
+      `[panel] ${email}: pendingPhyto=${data.pendingPhyto.length} intakeDate=${shape(data.pendingPhyto[0]?.intakeDate)} · fermentationAlerts=${data.fermentationAlerts.length} lastReadingAt=${shape(data.fermentationAlerts[0]?.lastReadingAt)}`,
+    );
+    await expect(page.getByText("Tareas pendientes", { exact: true })).toBeVisible({ timeout: 20_000 });
+    await settled(page);
+    await expect(page.getByText("No se pudo cargar"), `panel de ${email}`).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Resumen" })).toContainText("Lotes en proceso");
+    await expect(page.getByRole("list", { name: "Lotes por etapa" })).toBeVisible();
+    await signOut(page);
+  }
+  expect(errors).toEqual([]);
+});
+
+test("Ola 2: Altos (vino): módulos, fichas y pestañas del lote cumplen el contrato", async ({ page }) => {
+  needsPassword();
+  test.setTimeout(240_000);
+  const errors = trackErrors(page);
+  await login(page, "admin@altos.test");
+  await expect(page.getByText("Tareas pendientes", { exact: true })).toBeVisible({ timeout: 20_000 });
+
+  /** La pantalla abierta cargó sin ErrorState ni respuesta fuera de contrato. */
+  const healthy = async (what: string) => {
+    await settled(page);
+    await expect(page.getByText("No se pudo cargar"), what).toHaveCount(0);
+    await expect(page.getByText(/datos inesperados/), `${what}: contrato`).toHaveCount(0);
+  };
+
+  await openModule(page, "Vendimia y laboratorio", "Vendimia y laboratorio");
+  await page
+    .getByRole("link", { name: /^HARV-/ })
+    .first()
+    .click();
+  await healthy("ficha del pesaje");
+
+  await openModule(page, "Vinificación", "Mapa de tanques");
+  await page.getByTestId("tank-card").first().click();
+  await healthy("ficha del tanque");
+
+  await openModule(page, "Crianza", "Barricas y crianza");
+  await page.getByRole("table").getByRole("link").first().click();
+  await healthy("ficha de la crianza");
+
+  await openModule(page, "Destilación y reposo", "Destilación y reposo");
+  await openModule(page, "Envasado y QR", "Envasado y QR");
+  await page.getByRole("link", { name: "Nuevo embotellado" }).click();
+  await healthy("lotes por embotellar");
+  await openModule(page, "Reportes", "Reportes de producción");
+
+  // Un lote de vino embotellado: todas sus pestañas.
+  await openModule(page, "Lotes", "Lotes");
+  await page.getByRole("combobox", { name: "Filtrar por etapa" }).click();
+  await page.getByRole("option", { name: "Embotellado", exact: true }).click();
+  await page.getByRole("link", { name: "Ver" }).first().click();
+  await healthy("ficha del lote");
+  for (const tab of [
+    "Balance",
+    "Códigos",
+    "Laboratorio",
+    "Expediente",
+    "Línea de tiempo",
+    "Trazabilidad",
+    "Correcciones",
+    "Archivos",
+  ]) {
+    await page.getByRole("tab", { name: tab }).click();
+    await healthy(`pestaña ${tab}`);
+  }
+  expect(errors).toEqual([]);
+});
+
+test("Ola 2: recorrido de §18 por la interfaz, del lote nuevo al expediente cerrado, con intentos de elusión", async ({
+  page,
+}) => {
+  needsPassword();
+  test.setTimeout(900_000);
+  const stamp = `${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")}-${Math.random().toString(36).slice(2, 6)}`;
+  const LOT = `E2E Singani ${stamp}`;
+  // Rechazos que la prueba provoca a propósito (cada uno con su aviso en pantalla).
+  const errors = trackErrors(page, [
+    /^422 \/api\/v1\/harvest-batches$/,
+    /^422 \/api\/v1\/fermentation-tanks$/,
+    /^422 \/api\/v1\/production-batches\/[\w-]+\/close$/,
+    /^422 \/api\/v1\/lots\/[\w-]+\/dossier\/close$/,
+    /^409 \/api\/v1\/lots\/[\w-]+\/corrections$/,
+  ]);
+  let harvestCode = "";
+  let lotCode = "";
+
+  await test.step("la enóloga crea el lote: instantánea de reglas a la vista", async () => {
+    await login(page, "enologa@cintiviejo.test");
+    await expect(page.getByText("Tareas pendientes", { exact: true })).toBeVisible({ timeout: 20_000 });
+    await side(page, "Lotes");
+    await page.getByRole("link", { name: "Nuevo lote" }).click();
+    await expect(page.getByRole("heading", { name: "Nuevo lote" })).toBeVisible();
+    await page.getByLabel("Nombre del lote").fill(LOT);
+    await page.getByRole("combobox", { name: "Tipo de producto" }).click();
+    await page.getByRole("option", { name: "Singani" }).click();
+    await page.getByLabel("Botellas estimadas").fill("3.000");
+    await page.getByLabel("Formato previsto").fill("75");
+    await page.getByLabel("Grado previsto de la botella").fill("40");
+    const [created] = await Promise.all([
+      page.waitForResponse((r) => r.url().endsWith("/api/v1/lots") && r.request().method() === "POST"),
+      page.getByRole("button", { name: "Crear lote" }).click(),
+    ]);
+    expect(created.status()).toBe(201);
+    await expect(page.getByRole("heading", { name: LOT })).toBeVisible({ timeout: 20_000 });
+    const rules = page.getByLabel("Instantánea de reglas del lote");
+    await expect(rules).toContainText("1.600 m s. n. m.");
+    await expect(rules).toContainText("Moscatel de Alejandría");
+    await expect(rules).toContainText("180 días");
+    await expect(rules).toContainText("5 %");
+    // Los límites de laboratorio se leen por su nombre, no por la clave de la instantánea.
+    await expect(rules).not.toContainText("acidezVolatil");
+  });
+
+  await test.step("el operario pesa la uva; colar el dictamen en el alta se rechaza (TRC_PHYTO_IN_CREATE)", async () => {
+    await switchTo(page, "operario@cintiviejo.test");
+    await side(page, "Vendimia y laboratorio");
+    await page.getByRole("link", { name: "Registrar ingreso" }).click();
+    await page.getByRole("combobox", { name: "Lote" }).click();
+    await page.getByRole("option", { name: new RegExp(escapeRe(LOT)) }).click();
+    await page.getByRole("combobox", { name: "Terroir de origen" }).click();
+    await page.getByRole("option", { name: /Parcela 2 · Cañón Viejo/ }).click();
+    await page.getByLabel("Fecha y hora de ingreso").fill(`${daysAgo(200)}T08:00`);
+    await page.getByLabel("Peso bruto").fill("18.550");
+    await page.getByLabel("Tara").fill("150");
+
+    await tamperNextPost(page, "/api/v1/harvest-batches", { phytosanitaryStatus: "APPROVED" });
+    await page.getByRole("button", { name: "Registrar ingreso" }).click();
+    await expect(ruleNotice(page)).toContainText("TRC_PHYTO_IN_CREATE", { timeout: 20_000 });
+
+    const [created] = await Promise.all([
+      page.waitForResponse((r) => r.url().endsWith("/api/v1/harvest-batches") && r.request().method() === "POST"),
+      page.getByRole("button", { name: "Registrar ingreso" }).click(),
+    ]);
+    expect(created.status()).toBe(201);
+    const heading = page.getByRole("heading", { level: 1, name: /^HARV-/ });
+    await expect(heading).toBeVisible({ timeout: 20_000 });
+    harvestCode = (await heading.textContent())!.trim();
+    await expect(page.getByText("18.400 kg").first()).toBeVisible();
+    await expect(page.getByText("Pendiente de inspección").first()).toBeVisible();
+  });
+
+  await test.step("la enóloga registra el análisis; un tanque con uva sin dictamen se rechaza (TRC_PHYTO_NOT_APPROVED)", async () => {
+    await switchTo(page, "enologa@cintiviejo.test");
+    await side(page, "Vendimia y laboratorio");
+    await page.getByRole("link", { name: harvestCode, exact: true }).first().click();
+    await page.getByRole("button", { name: "Registrar análisis" }).click();
+    const maturity = page.getByRole("dialog", { name: "Registrar análisis de madurez" });
+    await maturity.getByLabel("Grados Brix").fill("23,4");
+    await maturity.getByLabel("pH").fill("3,4");
+    await maturity.getByLabel("Acidez total").fill("5,9");
+    await maturity.getByLabel("Fecha y hora de la medición").fill(`${daysAgo(200)}T10:00`);
+    await maturity.getByRole("button", { name: "Guardar análisis" }).click();
+    await expect(page.getByText("Análisis registrado", { exact: true })).toBeVisible({ timeout: 20_000 });
+
+    await side(page, "Vinificación");
+    await page.getByRole("link", { name: "Llenar tanque" }).click();
+    await page.getByRole("checkbox", { name: harvestCode }).click();
+    await page.getByLabel("Capacidad").fill("15000");
+    await page.getByLabel("Volumen llenado").fill("12.100");
+    await page.getByLabel("Fecha de inicio").fill(daysAgo(199));
+    await page.getByRole("button", { name: "Llenar tanque" }).first().click();
+    await expect(ruleNotice(page)).toContainText("TRC_PHYTO_NOT_APPROVED", { timeout: 20_000 });
+  });
+
+  await test.step("el agrónomo aprueba el dictamen", async () => {
+    await switchTo(page, "agronomo@cintiviejo.test");
+    await side(page, "Vendimia y laboratorio");
+    await page.getByRole("link", { name: harvestCode, exact: true }).first().click();
+    await page.getByRole("button", { name: "Aprobar lote" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Sí, aprobar" }).click();
+    await expect(page.getByText("Lote aprobado").first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("list", { name: "Historial de dictámenes" })).toContainText("Agronomía");
+  });
+
+  await test.step("tanque de 12.100 L, lectura y fermentación completada con destino singani", async () => {
+    await switchTo(page, "enologa@cintiviejo.test");
+    await side(page, "Vendimia y laboratorio");
+    await page.getByRole("link", { name: harvestCode, exact: true }).first().click();
+
+    // Corrección compensatoria de un sub-registro: el pH del análisis, con el valor anterior a la vista.
+    const analyses = page.getByRole("table", { name: /Historial de análisis/ });
+    await analyses
+      .getByRole("row")
+      .nth(1)
+      .getByRole("button", { name: /^Corregir/ })
+      .click();
+    const fix = page.getByRole("dialog", { name: "Corregir análisis de madurez" });
+    await fix.getByLabel("pH").fill("3,5");
+    await fix.getByLabel("Motivo").fill(`Prueba E2E ${stamp}: pH mal transcrito`);
+    const [corrected] = await Promise.all([
+      page.waitForResponse(isCorrection),
+      fix.getByRole("button", { name: "Registrar corrección" }).click(),
+    ]);
+    expect(corrected.status()).toBe(201);
+    await expect(analyses.getByRole("row").nth(1)).toContainText("Corregido", { timeout: 20_000 });
+    await expect(analyses.getByRole("row").nth(1)).toContainText("3,50");
+
+    await page.getByRole("link", { name: "Llenar tanque" }).first().click();
+    await expect(page.getByRole("checkbox", { name: harvestCode })).toBeChecked({ timeout: 20_000 });
+    await page.getByLabel("Capacidad").fill("15000");
+    await page.getByLabel("Volumen llenado").fill("12.100");
+    await page.getByLabel("Fecha de inicio").fill(daysAgo(199));
+    const [created] = await Promise.all([
+      page.waitForResponse((r) => r.url().endsWith("/api/v1/fermentation-tanks") && r.request().method() === "POST"),
+      page.getByRole("button", { name: "Llenar tanque" }).first().click(),
+    ]);
+    expect(created.status()).toBe(201);
+    await expect(page.getByRole("heading", { level: 1, name: /^TK-/ })).toBeVisible({ timeout: 20_000 });
+    await settled(page);
+
+    await page.getByRole("button", { name: "Añadir registro diario" }).first().click();
+    const log = page.getByRole("dialog", { name: "Añadir registro diario" });
+    await log.getByLabel("Temperatura").fill("22,4");
+    await log.getByLabel("Densidad").fill("1,012");
+    await log.getByLabel("Fecha y hora").fill(`${daysAgo(197)}T09:00`);
+    await log.getByRole("button", { name: "Guardar lectura" }).click();
+    await expect(log).toBeHidden({ timeout: 20_000 });
+
+    // Una lectura errónea se anula: sigue en la bitácora, marcada, y no cuenta.
+    await page.getByRole("button", { name: "Añadir registro diario" }).first().click();
+    await log.getByLabel("Temperatura").fill("41");
+    await log.getByLabel("Fecha y hora").fill(`${daysAgo(196)}T09:00`);
+    await log.getByRole("button", { name: "Guardar lectura" }).click();
+    await expect(log).toBeHidden({ timeout: 20_000 });
+    const wrong = page
+      .getByRole("table", { name: /^Bitácora de TK-/ })
+      .getByRole("row")
+      .nth(1);
+    await expect(wrong).toContainText("41,0");
+    await wrong.getByRole("button", { name: /^Corregir/ }).click();
+    const voidLog = page.getByRole("dialog", { name: "Corregir lectura de fermentación" });
+    await voidLog.getByText("Anular el registro", { exact: true }).click();
+    await voidLog.getByLabel("Motivo").fill(`Prueba E2E ${stamp}: lectura de otro tanque`);
+    const [voided] = await Promise.all([
+      page.waitForResponse(isCorrection),
+      voidLog.getByRole("button", { name: "Anular registro" }).click(),
+    ]);
+    expect(voided.status()).toBe(201);
+    await expect(wrong).toContainText("Anulada", { timeout: 20_000 });
+    await expect(page.getByText(/la más reciente primero · 1 anulada$/)).toBeVisible();
+
+    await page.getByRole("button", { name: "Completar fermentación" }).click();
+    const decision = page.getByRole("dialog", { name: /Completar la fermentación de TK-/ });
+    await decision.getByLabel("Fin de la fermentación").fill(daysAgo(195));
+    await decision.getByRole("button", { name: /A destilación/ }).click();
+    await decision.getByRole("checkbox").click();
+    await decision.getByRole("button", { name: "Confirmar destino y completar" }).click();
+    await expect(page.getByText("Destino: Destilación (singani)", { exact: true })).toBeVisible({ timeout: 20_000 });
+  });
+
+  await test.step("destilación: cortes mayores que la entrada se rechazan (TRC_MASS_BALANCE_EXCEEDED); cerrada, el reposo ya está cumplido", async () => {
+    await page.getByRole("link", { name: "Pasar a destilación" }).click();
+    await expect(page.getByRole("heading", { name: "Registrar destilación" })).toBeVisible();
+    await page.getByLabel("Alambique").fill(`Alambique E2E ${stamp}`);
+    await page.getByLabel("Volumen de entrada").fill("12.100");
+    await page.getByLabel("Inicio").fill(daysAgo(192));
+    await page.getByRole("button", { name: "Abrir destilación" }).first().click();
+    const close = page.getByRole("form", { name: "Cerrar destilación" });
+    await expect(close).toBeVisible({ timeout: 20_000 });
+    await close.getByLabel("Cabezas").fill("120");
+    await close.getByRole("textbox", { name: "Corazón", exact: true }).fill("90.000");
+    await close.getByLabel("Colas").fill("210");
+    await close.getByLabel("Grado del corazón").fill("60");
+    await close.getByLabel("Fin de la destilación").fill(daysAgo(190));
+    await close.getByRole("button", { name: "Cerrar destilación" }).click();
+    await expect(close.getByTestId("rule-violation-notice")).toContainText("TRC_MASS_BALANCE_EXCEEDED", {
+      timeout: 20_000,
+    });
+
+    await close.getByRole("textbox", { name: "Corazón", exact: true }).fill("1.500");
+    await close.getByRole("button", { name: "Cerrar destilación" }).click();
+    await expect(page.getByText("Destilación cerrada", { exact: true })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText("Candado liberado")).toBeVisible({ timeout: 20_000 });
+  });
+
+  await test.step("vista previa: más botellas y más alcohol de los que hay; después, embotellado válido", async () => {
+    await page.getByRole("link", { name: "Pasar a embotellado" }).click();
+    await expect(page.getByRole("heading", { name: `Embotellar ${LOT}` })).toBeVisible({ timeout: 20_000 });
+    const preview = page.getByLabel("Vista previa del servidor");
+    await page.getByLabel("Botellas llenadas").fill("3.100");
+    await page.getByLabel("Grado alcohólico final").fill("45");
+    await page.getByLabel("Adición de agua").fill("750");
+    const notice = preview.getByTestId("rule-violation-notice");
+    await expect(notice).toContainText("TRC_BOTTLING_EXCEEDS_VOLUME", { timeout: 20_000 });
+    await expect(notice).toContainText("TRC_ALCOHOL_BALANCE_EXCEEDED");
+    await expect(page.getByRole("button", { name: "Embotellar y generar códigos" })).toBeDisabled();
+
+    await page.getByLabel("Grado alcohólico final").fill("40");
+    await page.getByLabel("Botellas llenadas").fill("2.950");
+    await expect(preview.getByText("Balance válido")).toBeVisible({ timeout: 20_000 });
+    await expect(preview.locator('[data-meter="volume"]')).toContainText("2.212,5 L de 2.250 L");
+    await expect(preview.locator('[data-meter="loss"]')).toContainText("1,67 %");
+    await expect(preview.locator('[data-meter="alcohol"]')).toContainText("885 L embotellados de 900 L");
+    const [bottled] = await Promise.all([
+      page.waitForResponse(
+        (r) => /\/api\/v1\/lots\/[\w-]+\/bottling$/.test(r.url()) && r.request().method() === "POST",
+      ),
+      (async () => {
+        await page.getByRole("button", { name: "Embotellar y generar códigos" }).click();
+        await page.getByRole("alertdialog").getByRole("button", { name: "Sí, embotellar" }).click();
+      })(),
+    ]);
+    expect(bottled.status()).toBe(201);
+    expect(bottled.request().headers()["idempotency-key"], "el embotellado viaja con Idempotency-Key").toMatch(
+      /^[0-9a-f-]{36}$/,
+    );
+    await expect(page).toHaveURL(/\?pestana=codigos$/, { timeout: 20_000 });
+    lotCode = (await page
+      .getByText(/^CVJ-\d{4}-SINGANI-\d{3}$/)
+      .first()
+      .textContent())!.trim();
+    await expect(page.getByText(`2.950 códigos activos en ${lotCode}`)).toBeVisible({ timeout: 20_000 });
+  });
+
+  await test.step("códigos: tabla, CSV (Content-Disposition y X-Export-Rows) y ZIP para la imprenta", async () => {
+    const table = page.getByRole("table", { name: `Códigos de botella de ${lotCode}` });
+    await expect(table.getByRole("row")).toHaveCount(21, { timeout: 20_000 });
+    const [csvResponse, download] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes("/bottle-codes/export?")),
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: "Descargar CSV" }).click(),
+    ]);
+    expect(csvResponse.status()).toBe(200);
+    const headers = csvResponse.headers();
+    expect(headers["content-type"]).toMatch(/^text\/csv/);
+    expect(headers["content-disposition"]).toMatch(
+      new RegExp(`attachment; filename="codigos-${lotCode}-1-2950\\.csv"`),
+    );
+    expect(headers["x-export-rows"]).toBe("2950");
+    expect(download.suggestedFilename()).toBe(`codigos-${lotCode}-1-2950.csv`);
+    const csv = (await readFile((await download.path())!, "utf8"))
+      .replace(/^\uFEFF/, "")
+      .trimEnd()
+      .split(/\r?\n/);
+    expect(csv).toHaveLength(2951);
+
+    await page.getByLabel("Desde la serie", { exact: true }).fill("1");
+    await page.getByLabel("Hasta la serie", { exact: true }).fill("50");
+    await page.getByRole("button", { name: "Generar ZIP con los QR" }).click();
+    // El worker genera el ZIP: la pantalla consulta su estado cada 2 s.
+    await expect(page.getByText("Listo para descargar")).toBeVisible({ timeout: 90_000 });
+    const href = await page.getByRole("link", { name: "Descargar ZIP" }).getAttribute("href");
+    expect(href, "URL firmada del ZIP").toBeTruthy();
+    // La descarga del ZIP depende de un endpoint público del almacenamiento: se anota lo que responde.
+    const zip = await page.request.get(href!, { failOnStatusCode: false }).then(
+      (r) => `${r.status()} ${r.headers()["content-type"] ?? ""}`,
+      (e: Error) => `sin respuesta: ${e.message.split("\n")[0]}`,
+    );
+    test.info().annotations.push({
+      type: "zip",
+      description: `${new URL(href!).origin}${new URL(href!).pathname.replace(/[\w-]{20,}/g, "…")} → ${zip}`,
+    });
+    console.log(`[zip] ${new URL(href!).host} → ${zip}`);
+  });
+
+  await test.step("un código dañado se anula con sustituto; adjunto privado; reporte con CSV", async () => {
+    const table = page.getByRole("table", { name: `Códigos de botella de ${lotCode}` });
+    const first = table.getByRole("row").nth(1);
+    await first.getByRole("button", { name: /^Anular/ }).click();
+    const voidDialog = page.getByRole("alertdialog", { name: /^¿Anular el código / });
+    await voidDialog.getByRole("checkbox", { name: "Emitir un código de sustitución" }).click();
+    await voidDialog.getByRole("textbox").fill(`Prueba E2E ${stamp}: etiqueta dañada`);
+    const [voidedCode] = await Promise.all([
+      page.waitForResponse((r) => /\/api\/v1\/bottle-codes\/[^/]+\/void$/.test(r.url())),
+      voidDialog.getByRole("button", { name: "Sí, anular" }).click(),
+    ]);
+    expect(voidedCode.status()).toBeLessThan(300);
+    await expect(page.getByText("Código anulado", { exact: true })).toBeVisible({ timeout: 20_000 });
+    await page.getByRole("combobox", { name: "Filtrar por estado" }).click();
+    await page.getByRole("option", { name: "Anulados" }).click();
+    await expect(table.getByRole("row")).toHaveCount(2, { timeout: 20_000 });
+    await expect(table).toContainText("Sustituido por");
+
+    await page.getByRole("tab", { name: "Archivos" }).click();
+    await page.getByRole("button", { name: "Adjuntar archivo" }).first().click();
+    const attach = page.getByRole("dialog", { name: "Adjuntar archivo" });
+    await attach.getByLabel("Título").fill(`Foto E2E ${stamp}`);
+    await attach.getByLabel("Archivo", { exact: true }).setInputFiles({
+      name: `foto-${stamp}.pdf`,
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.4\n%E2E adjunto\n"),
+    });
+    await expect(attach.getByRole("button", { name: "Quitar" })).toBeVisible({ timeout: 30_000 });
+    const [attached] = await Promise.all([
+      page.waitForResponse(
+        (r) => /\/api\/v1\/lots\/[\w-]+\/attachments$/.test(r.url()) && r.request().method() === "POST",
+      ),
+      attach.getByRole("button", { name: "Adjuntar" }).click(),
+    ]);
+    expect(attached.status()).toBe(201);
+    const files = page.getByRole("table", { name: `Archivos de ${LOT}` });
+    await expect(files.getByRole("row", { name: new RegExp(`Foto E2E ${escapeRe(stamp)}`) })).toContainText("Privado", {
+      timeout: 20_000,
+    });
+
+    await side(page, "Reportes");
+    await expect(page.getByRole("heading", { level: 1, name: "Reportes de producción" })).toBeVisible();
+    await settled(page);
+    await expect(page.getByRole("row", { name: new RegExp(escapeRe(LOT)) })).toContainText("2.950 bot.", {
+      timeout: 20_000,
+    });
+    const [reportCsv, reportFile] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes("/reports/production") && r.url().includes("format=csv")),
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: "Descargar CSV" }).click(),
+    ]);
+    expect(reportCsv.headers()["content-type"]).toMatch(/^text\/csv/);
+    expect(reportCsv.headers()["content-disposition"]).toMatch(/^attachment; filename=".+\.csv"/);
+    console.log(
+      `[reporte] content-disposition=${reportCsv.headers()["content-disposition"]} x-export-rows=${reportCsv.headers()["x-export-rows"] ?? "(sin cabecera)"}`,
+    );
+    const report = (await readFile((await reportFile.path())!, "utf8")).replace(/^\uFEFF/, "").split(/\r?\n/);
+    expect(report[0]).toContain("lotId");
+    expect(report.some((line) => line.includes(lotCode))).toBe(true);
+
+    // De vuelta en la ficha del lote.
+    await side(page, "Lotes");
+    await page.getByRole("searchbox", { name: "Buscar lote" }).fill(stamp);
+    await page.getByRole("link", { name: LOT, exact: true }).click();
+    await expect(page.getByRole("heading", { name: LOT })).toBeVisible({ timeout: 20_000 });
+  });
+
+  await test.step("lote ya embotellado: la corrección que incumple el balance se registra con una incidencia, y otra la resuelve", async () => {
+    await page.getByRole("tab", { name: "Correcciones" }).click();
+    const correct = async (abv: string, reason: string) => {
+      await page.getByRole("button", { name: "Registrar corrección" }).click();
+      const dialog = page.getByRole("dialog", { name: "Registrar corrección" });
+      await dialog.getByRole("combobox", { name: "Registro que se corrige" }).click();
+      await page.getByRole("option", { name: /^Destilación/ }).click();
+      await dialog.getByLabel("Grado del corazón").fill(abv);
+      await dialog.getByLabel("Motivo").fill(`Prueba E2E ${stamp}: ${reason}`);
+      const [response] = await Promise.all([
+        page.waitForResponse(isCorrection),
+        dialog.getByRole("button", { name: "Registrar corrección" }).click(),
+      ]);
+      return response;
+    };
+    // Con el corazón al 30 %, las botellas ya llenadas llevarían más alcohol del que había.
+    const breaking = await correct("30", "grado del corazón mal medido");
+    expect(breaking.status(), "la corrección se registra aunque incumpla una regla del embotellado").toBe(201);
+    await expect(page.getByText("Corrección registrada con una incidencia", { exact: true })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByText("Una corrección dejó una incidencia abierta")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("region", { name: "Incidencias de cumplimiento" })).toContainText(
+      "Surgió de una corrección",
+    );
+
+    const fixing = await correct("60", "se restituye el grado medido");
+    expect(fixing.status()).toBe(201);
+    await expect(page.getByText("Una corrección dejó una incidencia abierta")).toHaveCount(0, { timeout: 20_000 });
+    await expect(page.getByRole("region", { name: "Incidencias de cumplimiento" })).toHaveCount(0);
+  });
+
+  await test.step("sin laboratorio el expediente no cierra (TRC_DOSSIER_NOT_READY)", async () => {
+    await page.getByRole("tab", { name: "Expediente" }).click();
+    const requirements = page.getByRole("list", { name: "Requisitos del expediente" });
+    await expect(requirements.locator('[data-requirement="BOTTLED"]')).toHaveAttribute("data-met", "true", {
+      timeout: 20_000,
+    });
+    await expect(requirements.locator('[data-requirement="LAB_CONFORMING"]')).toHaveAttribute("data-met", "false");
+    await page.getByRole("button", { name: "Cerrar el expediente" }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Sí, cerrar el expediente" }).click();
+    await expect(ruleNotice(page)).toContainText("TRC_DOSSIER_NOT_READY", { timeout: 20_000 });
+  });
+
+  await test.step("laboratorio: la conformidad la calcula el servidor (metanol en mg/100 mL a.a., cobre y grado)", async () => {
+    await page.getByRole("tab", { name: "Laboratorio" }).click();
+    await page.getByRole("button", { name: "Registrar análisis" }).click();
+    const lab = page.getByRole("dialog", { name: "Registrar análisis de laboratorio" });
+    await lab.getByRole("textbox", { name: "Laboratorio", exact: true }).fill(`Laboratorio E2E ${stamp}`);
+    await lab.getByLabel("Código de acreditación").fill("IBMETRO-LE-042");
+    await lab.getByLabel("Grado alcohólico real").fill("40,1");
+    await lab.getByRole("textbox", { name: "Acidez total", exact: true }).fill("0,3");
+    await lab.getByLabel("Acidez volátil").fill("0,1");
+    await lab.getByLabel("Metanol (alcohol anhidro)").fill("85");
+    await lab.getByLabel("Cobre").fill("2,1");
+    await lab.getByLabel("Informe firmado del laboratorio").setInputFiles({
+      name: `informe-${stamp}.pdf`,
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.4\n%E2E\n"),
+    });
+    await expect(lab.getByRole("button", { name: "Quitar" })).toBeVisible({ timeout: 30_000 });
+    await lab.getByRole("button", { name: "Guardar análisis" }).click();
+    await expect(lab).toBeHidden({ timeout: 20_000 });
+    await expect(page.getByTestId("lab-conformity")).toContainText("Conforme", { timeout: 20_000 });
+    const checks = page.getByRole("table", { name: "Comprobaciones de la conformidad" });
+    await expect(checks.getByRole("row", { name: /Metanol/ })).toContainText("Cumple");
+    await expect(checks.getByRole("row", { name: /Cobre/ })).toContainText("Cumple");
+  });
+
+  await test.step("cierre del expediente con huella, JSON canónico y corrección rechazada después (TRC_DOSSIER_CLOSED)", async () => {
+    await page.getByRole("tab", { name: "Expediente" }).click();
+    await expect(page.getByText("5 de 5 requisitos cumplidos")).toBeVisible({ timeout: 20_000 });
+    const [closed] = await Promise.all([
+      page.waitForResponse((r) => r.url().endsWith("/dossier/close")),
+      (async () => {
+        await page.getByRole("button", { name: "Cerrar el expediente" }).click();
+        await page.getByRole("alertdialog").getByRole("button", { name: "Sí, cerrar el expediente" }).click();
+      })(),
+    ]);
+    expect(closed.status()).toBeLessThan(300);
+    await expect(page.getByText("Huella (SHA-256)")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/Raíz Merkle de los 2\.950 códigos de botella/)).toBeVisible();
+    const hash = (await page
+      .getByTitle(/^[0-9a-f]{64}$/)
+      .first()
+      .textContent())!.trim();
+    const [canonicalResponse, json] = await Promise.all([
+      page.waitForResponse((r) => r.url().endsWith("/dossier/canonical")),
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: "Descargar JSON canónico" }).click(),
+    ]);
+    expect(canonicalResponse.headers()["content-type"]).toMatch(/^application\/json/);
+    const bytes = await readFile((await json.path())!);
+    expect(createHash("sha256").update(bytes).digest("hex"), "la huella es el SHA-256 de los bytes canónicos").toBe(
+      hash,
+    );
+
+    await page.getByRole("tab", { name: "Correcciones" }).click();
+    await page.getByRole("button", { name: "Registrar corrección" }).click();
+    const correction = page.getByRole("dialog", { name: "Registrar corrección" });
+    await correction.getByRole("combobox", { name: "Registro que se corrige" }).click();
+    await page.getByRole("option", { name: new RegExp(`Pesaje · ${escapeRe(harvestCode)}`) }).click();
+    await correction.getByLabel("Peso bruto").fill("18.600");
+    await correction.getByLabel("Motivo").fill(`Prueba E2E ${stamp}: corrección tras el cierre`);
+    await correction.getByRole("button", { name: "Registrar corrección" }).click();
+    await expect(correction.getByTestId("rule-violation-notice")).toContainText("TRC_DOSSIER_CLOSED", {
+      timeout: 20_000,
+    });
+    await correction.getByRole("button", { name: "Cancelar" }).click();
+  });
+
+  await test.step("línea de tiempo, grafo y lista con el expediente cerrado", async () => {
+    await page.getByRole("tab", { name: "Línea de tiempo" }).click();
+    await expect(page.getByRole("list", { name: "Línea de tiempo del lote" })).toContainText("Expediente cerrado", {
+      timeout: 20_000,
+    });
+    await page.getByRole("tab", { name: "Trazabilidad" }).click();
+    const graph = page.getByRole("list", { name: `Trazabilidad de ${LOT}` });
+    await expect(graph.locator('[data-stage="HARVEST_BATCH"]')).toContainText("18.400 kg", { timeout: 20_000 });
+    await expect(graph.locator('[data-stage="BOTTLING"]')).toContainText("2.950 botellas");
+    await side(page, "Lotes");
+    await page.getByRole("searchbox", { name: "Buscar lote" }).fill(stamp);
+    await expect(page.getByRole("row", { name: new RegExp(escapeRe(LOT)) })).toContainText("Expediente cerrado", {
+      timeout: 20_000,
+    });
+  });
+
+  expect(errors, "respuestas o errores inesperados").toEqual([]);
+});
+
 // ---------- Ola 1 · cuenta, invitaciones y equipo (O1-ERP-1 contra O1-BE-1) ----------
 
 const nav = (page: Page, name: string) =>
   page.getByRole("navigation", { name: "Navegación principal" }).getByRole("link", { name, exact: true }).click();
-
-const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** Contexto nuevo (otra persona en otro navegador) con su página. */
 async function actor(browser: Browser) {

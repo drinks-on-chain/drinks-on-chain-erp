@@ -15,8 +15,16 @@ describe("configuración efectiva", () => {
     expect(formatSettingValue("trazabilidad.singani.variedadesExigidas", ["Moscatel de Alejandría"])).toBe(
       "Moscatel de Alejandría",
     );
-    expect(formatSettingValue("trazabilidad.laboratorio.limites", { cobre: { max: 6, unidad: "mg/l" } })).toBe(
-      "cobre: máx. 6 mg/l",
+    // Los límites de laboratorio se leen por el nombre del parámetro, no por su clave.
+    expect(
+      formatSettingValue("trazabilidad.laboratorio.limites", {
+        cobre: { max: 6, unidad: "mg/l" },
+        acidezVolatil: { max: 1.2, unidad: "g/l" },
+        grado: { min: 38, max: 46, unidad: "% vol" },
+        otroParametro: { max: 3, unidad: "mg/l" },
+      }),
+    ).toBe(
+      "Cobre: máx. 6 mg/l · Acidez volátil: máx. 1,20 g/l · Grado alcohólico: mín. 38 y máx. 46 % vol · otroParametro: máx. 3 mg/l",
     );
   });
 

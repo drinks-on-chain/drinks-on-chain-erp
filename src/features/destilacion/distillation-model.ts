@@ -165,6 +165,8 @@ export type DistillationValues = {
   processStartDate: string;
   inputVolumeLiters: string;
   initialAlcoholPercentage: string;
+  /** Última destilación del tanque: lo que quede en él pasa a merma de trasiego. */
+  closeTank: boolean;
   notes: string;
 };
 export type DistillationField = keyof DistillationValues;
@@ -199,6 +201,7 @@ export function toOpenDistillationDto(v: DistillationValues, ctx: { today: Date 
     processStartDate: v.processStartDate,
     inputVolumeLiters: input!,
     initialAlcoholPercentage: abv,
+    closeTank: v.closeTank ? true : null,
     notes: v.notes.trim() || null,
   });
   const parsed = CreateDistillationBatchSchema.safeParse(dto);

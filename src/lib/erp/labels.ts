@@ -170,3 +170,18 @@ export const LOT_EVENT: Record<LotEventType, string> = {
   LOT_REJECTED: "Lote rechazado",
   LOT_DISCARDED: "Lote descartado",
 };
+
+/** Parámetros de los límites de laboratorio de la instantánea de reglas (`rules.lab.limits`). */
+export const LAB_PARAMETER: Record<string, string> = {
+  metanol: "Metanol",
+  cobre: "Cobre",
+  acidezVolatil: "Acidez volátil",
+  acidezTotal: "Acidez total",
+  grado: "Grado alcohólico",
+  so2Libre: "SO₂ libre",
+  so2Total: "SO₂ total",
+  azucaresReductores: "Azúcares reductores",
+};
+
+/** Nombre de un parámetro de laboratorio (`acidezVolatil` → "Acidez volátil"); los desconocidos, tal cual. */
+export const labParameterLabel = (parameter: string): string => LAB_PARAMETER[parameter] ?? parameter;

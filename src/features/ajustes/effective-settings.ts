@@ -1,4 +1,5 @@
 import type { EffectiveSetting } from "@drinks-on-chain/mocks";
+import { labParameterLabel } from "@/lib/erp/labels";
 import { fmtNumber } from "@/lib/format";
 
 // Configuración efectiva de la bodega (contrato de la Ola 1 §6, `GET /v1/organizations/current/settings`):
@@ -67,11 +68,19 @@ export function formatSettingValue(key: string, value: unknown): string {
   if (typeof value === "object") {
     return Object.entries(value as Record<string, unknown>)
       .map(([k, v]) => {
-        if (v && typeof v === "object" && "max" in v) {
-          const { max, unidad } = v as { max: unknown; unidad?: unknown };
-          return `${k}: máx. ${scalar(max)}${typeof unidad === "string" ? ` ${unidad}` : ""}`;
+        const name = labParameterLabel(k);
+        if (v && typeof v === "object" && ("max" in v || "min" in v)) {
+          const { min, max, unidad } = v as { min?: unknown; max?: unknown; unidad?: unknown };
+          const unit = typeof unidad === "string" ? ` ${unidad}` : "";
+          const range = [
+            min !== undefined && min !== null ? `mín. ${scalar(min)}` : null,
+            max !== undefined && max !== null ? `máx. ${scalar(max)}` : null,
+          ]
+            .filter(Boolean)
+            .join(" y ");
+          return `${name}: ${range}${unit}`;
         }
-        return `${k}: ${scalar(v)}`;
+        return `${name}: ${scalar(v)}`;
       })
       .join(" · ");
   }

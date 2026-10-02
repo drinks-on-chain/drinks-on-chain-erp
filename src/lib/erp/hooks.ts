@@ -327,6 +327,15 @@ export const useVoidBottleCode = () =>
   useErpMutation((v: { code: string; body: Parameters<typeof erpApi.voidBottleCode>[1] }) =>
     erpApi.voidBottleCode(v.code, v.body),
   );
+/**
+ * Lote recién leído del servidor (sin caché), para comparar su estado antes y después de una
+ * escritura: p. ej. las incidencias que abre una corrección en un lote ya embotellado.
+ */
+export function useFreshLot() {
+  const client = useQueryClient();
+  return (lotId: string) =>
+    client.fetchQuery({ queryKey: erpKeys.lot(lotId), queryFn: () => erpApi.lot(lotId), staleTime: 0 });
+}
 /** Análisis de laboratorio del lote: uno nuevo sustituye al vigente (reanálisis). */
 export const useCreateLotLabAnalysis = () =>
   useErpMutation((v: { lotId: string; body: Parameters<typeof erpApi.createLotLabAnalysis>[1] }) =>

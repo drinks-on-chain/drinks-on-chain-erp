@@ -27,7 +27,7 @@ import { errorMessage } from "@/lib/api/errors";
 import { isRuleError } from "@/lib/api/rule-violations";
 import { useMe } from "@/lib/auth/hooks";
 import { useAttachments, useChangeAttachmentVisibility, useCreateAttachment } from "@/lib/erp/hooks";
-import { can } from "@/lib/erp/permissions";
+import { can, erpRole } from "@/lib/erp/permissions";
 import { fmtDateTime, shortHash } from "@/lib/format";
 import { useReturnFocus } from "@/lib/use-return-focus";
 import {
@@ -45,6 +45,8 @@ import { actorText } from "../lot-timeline";
 
 type Props = { lot: Pick<Lot, "id" | "name" | "dossierStatus"> };
 
+const OWN_ONLY_ROLES: readonly string[] = ["AGRONOMIST", "OPERATOR"];
+
 /**
  * Archivos del lote (contrato de la Ola 2 §11.5): informes, certificados, etiqueta y fotos, con su
  * huella y quién los adjuntó. Privados por defecto; los enlaces son URL firmadas de 15 minutos.
@@ -55,6 +57,8 @@ export function LotAttachments({ lot }: Props) {
   const [open, setOpen] = useState(false);
   const canAdd = can(me.data, "attachment.create") && lot.dossierStatus !== "CLOSED";
   const canPublish = can(me.data, "attachment.visibility");
+  // Agronomía y operación adjuntan, pero el servidor solo les lista los archivos que subieron.
+  const ownOnly = OWN_ONLY_ROLES.includes(erpRole(me.data) ?? "");
   const add = canAdd ? (
     <Button variant="secondary" iconStart={<Paperclip aria-hidden size={16} />} onClick={() => setOpen(true)}>
       Adjuntar archivo
@@ -65,7 +69,11 @@ export function LotAttachments({ lot }: Props) {
     <Card padding="none">
       <CardHeader
         title="Archivos del lote"
-        description="Privados salvo la etiqueta. Los informes del dictamen y del laboratorio aparecen aquí también."
+        description={
+          ownOnly
+            ? "Ves solo los archivos que adjuntaste tú: el resto lo consultan la dirección, enología y contabilidad."
+            : "Privados salvo la etiqueta. Los informes del dictamen y del laboratorio aparecen aquí también."
+        }
         action={add}
         divided
         className="px-5 pt-5"
@@ -124,7 +132,9 @@ export function LotAttachments({ lot }: Props) {
               cell: (a) => (
                 <span className="grid gap-0.5 text-sm">
                   <span>{fmtDateTime(a.createdAt)}</span>
-                  <span className="text-xs text-fg-muted">{actorText(a.createdBy)}</span>
+                  <span className="text-xs text-fg-muted">
+                    {a.createdBy ? actorText(a.createdBy) : "Autor no registrado"}
+                  </span>
                 </span>
               ),
             },

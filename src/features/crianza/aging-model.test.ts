@@ -51,13 +51,13 @@ describe("tabla de barricas", () => {
     expect(rows.slice(0, 2).map((r) => r.containerCode)).toEqual(["BAR-FR-2024-01", "BAR-US-2024-07"]);
     expect(rows[0]!.lotName).toBe("Cuartel 1 · La Angostura · Tannat");
     expect(rows[0]!.lock.daysRemaining).toBe(39);
-    // Las cerradas (embotellada y descartada), al final.
+    // Las cerradas (embotelladas y descartada), al final.
     expect(
       rows
         .slice(2)
         .map((r) => r.status)
         .sort(),
-    ).toEqual(["BOTTLED", "DISCARDED"]);
+    ).toEqual(["BOTTLED", "BOTTLED", "DISCARDED"]);
   });
 
   it("solo ofrece tanques con la fermentación completada, destino vino y sin crianza previa", () => {

@@ -165,6 +165,19 @@ test("axe con el análisis de laboratorio, la corrección y el archivo abiertos"
   await audit(page, { dialog: true });
 });
 
+test("axe con la corrección de una lectura del tanque abierta", async ({ page }) => {
+  await login(page, "admin@altos.test");
+  await page.goto(`/vinificacion/${ALTOS_FERMENTING_TANK}`);
+  await settled(page);
+  await page
+    .getByRole("table", { name: /^Bitácora de / })
+    .getByRole("button", { name: /^Corregir/ })
+    .first()
+    .click();
+  await expect(page.getByRole("dialog", { name: "Corregir lectura de fermentación" })).toBeVisible();
+  await audit(page, { dialog: true });
+});
+
 test("axe en el panel del operario", async ({ page }) => {
   await login(page, "operario@cintiviejo.test");
   await expect(page.getByRole("list", { name: "Accesos directos" })).toBeVisible();

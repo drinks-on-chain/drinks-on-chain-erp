@@ -185,11 +185,11 @@ test("recorrido H2: del lote nuevo al expediente cerrado, con las reglas a la vi
   const requirements = page.getByRole("list", { name: "Requisitos del expediente" });
   await expect(requirements.locator('[data-requirement="BOTTLED"]')).toHaveAttribute("data-met", "true");
   await expect(requirements.locator('[data-requirement="LAB_CONFORMING"]')).toHaveAttribute("data-met", "false");
-  await expect(requirements).toContainText("Falta registrar el análisis de laboratorio");
+  await expect(requirements).toContainText("Falta el análisis de laboratorio del lote");
   await page.getByRole("button", { name: "Cerrar el expediente" }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Sí, cerrar el expediente" }).click();
   await expect(notice(page)).toContainText("TRC_DOSSIER_NOT_READY");
-  await expect(notice(page)).toContainText("Falta registrar el análisis de laboratorio");
+  await expect(notice(page)).toContainText("Falta el análisis de laboratorio del lote");
 
   // Laboratorio sin cobre: la conformidad la calcula el servidor y queda incompleta (nunca conforme por omisión).
   await page.getByRole("tab", { name: "Laboratorio" }).click();
