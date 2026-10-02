@@ -135,6 +135,8 @@ function LotBottlingForm({ lot, crumbs }: { lot: Lot; crumbs: { label: string; h
   const [errors, setErrors] = useState<BottlingErrors>({});
   const [uploading, setUploading] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  // Al registrar, la vista previa deja de pedirse: con el lote ya embotellado respondería 409.
+  const [submitted, setSubmitted] = useState(false);
 
   const sources = useMemo(
     () => lotBottlingSources(lot.id, agings.data?.items ?? [], productions.data?.items ?? []),
@@ -149,7 +151,7 @@ function LotBottlingForm({ lot, crumbs }: { lot: Lot; crumbs: { label: string; h
   // y las reglas que daría por incumplidas. No escribe nada.
   const draft = useMemo(() => toLotBottlingDto(values), [values]);
   const previewBody = useDebounced<CreateLotBottlingDto | null>(draft.ok ? draft.dto : null, 400);
-  const preview = useBottlingPreview(lot.id, previewBody);
+  const preview = useBottlingPreview(lot.id, submitted ? null : previewBody);
   const settled = draft.ok && preview.data && !preview.isFetching && previewBody !== null;
   const violations = useMemo(() => parseRuleViolations(preview.data?.violations), [preview.data]);
   const violated = violations.map((v) => v.code ?? "");
@@ -180,6 +182,7 @@ function LotBottlingForm({ lot, crumbs }: { lot: Lot; crumbs: { label: string; h
   async function submit() {
     const result = toLotBottlingDto(values);
     if (!result.ok) return;
+    setSubmitted(true);
     try {
       const bottling = await create.mutateAsync({ lotId: lot.id, body: result.dto });
       toast({
@@ -189,6 +192,7 @@ function LotBottlingForm({ lot, crumbs }: { lot: Lot; crumbs: { label: string; h
       });
       router.push(`/lotes/${lot.id}?pestana=codigos`);
     } catch (err) {
+      setSubmitted(false);
       setErrors(bottlingFieldErrors(err));
     }
   }

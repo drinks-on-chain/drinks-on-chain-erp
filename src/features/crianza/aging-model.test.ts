@@ -85,11 +85,11 @@ describe("validación del alta", () => {
     startDate: "2026-09-25",
     notes: "",
   };
-  const ctx = { candidateIds: new Set(["t1"]), today: TODAY };
+  const ctx = { today: TODAY };
   it("acepta un alta correcta y rechaza meses decimales, recipientes o volumen mal escritos", () => {
     expect(validateAging(base, ctx)).toEqual({});
     const e = validateAging(
-      { ...base, plannedMonths: "1,5", volumeLiters: "", containerCount: "0", fermentationTankId: "t9" },
+      { ...base, plannedMonths: "1,5", volumeLiters: "", containerCount: "0", fermentationTankId: "" },
       ctx,
     );
     expect(Object.keys(e).sort()).toEqual(["containerCount", "fermentationTankId", "plannedMonths", "volumeLiters"]);

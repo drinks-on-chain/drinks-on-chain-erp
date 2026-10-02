@@ -141,18 +141,14 @@ export type AgingValues = {
 export type AgingField = keyof AgingValues;
 
 /**
- * Validación de forma del alta de crianza (`CreateWineAgingBatchDto`). El mínimo de meses de la
- * instantánea del lote y el volumen disponible del tanque los comprueba el servidor
- * (`TRC_AGING_BELOW_MINIMUM`, `TRC_VOLUME_EXCEEDS_AVAILABLE`).
+ * Validación de forma del alta de crianza (`CreateWineAgingBatchDto`). El estado y el destino del
+ * tanque, el mínimo de meses de la instantánea del lote y el volumen disponible los comprueba el
+ * servidor (`TRC_TANK_NOT_COMPLETED`, `TRC_DESTINATION_MISMATCH`, `TRC_AGING_BELOW_MINIMUM`,
+ * `TRC_VOLUME_EXCEEDS_AVAILABLE`).
  */
-export function validateAging(
-  v: AgingValues,
-  ctx: { candidateIds: ReadonlySet<string>; today: Date },
-): FieldErrors<AgingField> {
+export function validateAging(v: AgingValues, ctx: { today: Date }): FieldErrors<AgingField> {
   const e: FieldErrors<AgingField> = {};
   if (!v.fermentationTankId) e.fermentationTankId = "Elige el tanque de vino que pasa a crianza.";
-  else if (!ctx.candidateIds.has(v.fermentationTankId))
-    e.fermentationTankId = "Este tanque no tiene destino crianza o ya inició su crianza.";
   if (!v.containerType.trim()) e.containerType = "Indica el tipo de recipiente.";
 
   if (v.barrelUseCycle.trim()) {

@@ -173,17 +173,13 @@ type OpenResult = { ok: true; dto: CreateDistillationBatchDto } | { ok: false; e
 
 /**
  * `POST /v1/production-batches/distillation`: abre la destilación con el vino base que entra. La
- * D.O. del lote y el volumen disponible del tanque los comprueba el servidor
- * (`TRC_DO_NOT_ELIGIBLE`, `TRC_VOLUME_EXCEEDS_AVAILABLE`); `isDoEligible` no se envía.
+ * D.O. del lote, el estado y el destino del tanque y su volumen disponible los comprueba el
+ * servidor (`TRC_DO_NOT_ELIGIBLE`, `TRC_TANK_NOT_COMPLETED`, `TRC_DESTINATION_MISMATCH`,
+ * `TRC_VOLUME_EXCEEDS_AVAILABLE`); `isDoEligible` no se envía.
  */
-export function toOpenDistillationDto(
-  v: DistillationValues,
-  ctx: { candidateIds: ReadonlySet<string>; today: Date },
-): OpenResult {
+export function toOpenDistillationDto(v: DistillationValues, ctx: { today: Date }): OpenResult {
   const e: FieldErrors<DistillationField> = {};
   if (!v.fermentationTankId) e.fermentationTankId = "Elige el tanque de vino base.";
-  else if (!ctx.candidateIds.has(v.fermentationTankId))
-    e.fermentationTankId = "Ese tanque no tiene la fermentación completada con destino destilación.";
   if (!v.equipmentIdentifier.trim()) e.equipmentIdentifier = "Indica el alambique.";
   if (!v.processStartDate) e.processStartDate = "Indica la fecha de inicio.";
   else if (isAfter(v.processStartDate, ctx.today)) e.processStartDate = "La fecha no puede ser futura.";

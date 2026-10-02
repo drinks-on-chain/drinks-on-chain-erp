@@ -110,15 +110,15 @@ export function NewAgingForm() {
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    const found = validateAging(
-      { ...values, volumeLiters },
-      { candidateIds: new Set(candidates.map((t) => t.id)), today: today() },
-    );
+    // Mientras las listas se actualizan se confía en el tanque del enlace; si no admite crianza,
+    // lo rechaza el servidor con su regla.
+    const fermentationTankId = tank || tanks.isFetching || agings.isFetching ? values.fermentationTankId : "";
+    const found = validateAging({ ...values, fermentationTankId, volumeLiters }, { today: today() });
     setErrors(found);
     if (hasErrors(found)) return;
     createAging.mutate(
       {
-        fermentationTankId: values.fermentationTankId,
+        fermentationTankId,
         containerType: values.containerType.trim(),
         containerMaterial: values.containerMaterial.trim() || null,
         containerCode: values.containerCode.trim() || null,

@@ -133,7 +133,7 @@ describe("abrir la destilación", () => {
     initialAlcoholPercentage: "",
     notes: "",
   };
-  const ctx = { candidateIds: new Set(["t1"]), today: TODAY };
+  const ctx = { today: TODAY };
 
   it("envía solo lo que entra al alambique, sin D.O. ni cortes", () => {
     const r = toOpenDistillationDto(base, ctx);
@@ -152,7 +152,7 @@ describe("abrir la destilación", () => {
     const r = toOpenDistillationDto(
       {
         ...base,
-        fermentationTankId: "t9",
+        fermentationTankId: "",
         equipmentIdentifier: "",
         processStartDate: "2026-09-26",
         inputVolumeLiters: "0",

@@ -95,9 +95,12 @@ export function NewDistillationForm() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     createDistillation.reset();
+    // Mientras la lista de tanques se actualiza se confía en el tanque del enlace; si no es de
+    // destilación, lo rechaza el servidor con su regla.
+    const fermentationTankId = tank || tanks.isFetching ? values.fermentationTankId : "";
     const result = toOpenDistillationDto(
-      { ...values, inputVolumeLiters: inputVolume },
-      { candidateIds: new Set(candidates.map((t) => t.id)), today: today() },
+      { ...values, fermentationTankId, inputVolumeLiters: inputVolume },
+      { today: today() },
     );
     if (!result.ok) {
       setErrors(result.errors);

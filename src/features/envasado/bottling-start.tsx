@@ -164,7 +164,7 @@ function LotPicker({ notice }: { notice?: string }) {
                     <span className="text-xs text-fg-muted">{lockStatusText(l.nextLock)}</span>
                   </span>
                 ) : (
-                  <span className="text-fg-muted">Sin candado</span>
+                  <span className="text-fg-muted">Sin candado pendiente</span>
                 ),
             },
           ]}
