@@ -140,3 +140,11 @@ Contrato: `plan/contratos/o2-erp-confiable.md` del plan maestro (§2–§14, §1
 - [x] Archivos del lote: lista con huella y autor, alta por tipo (privados salvo la etiqueta) y cambio de visibilidad con confirmación · 2026-10-02
 - [x] Descartar el lote con motivo; retirados `useLotViews`/`deriveLotViews`, el panel calculado en el cliente, el certificado por embotellado y el grafo legado (`/v1/traceability/dag`) · 2026-10-02
 - [x] Pruebas: unitarias de laboratorio, correcciones, expediente, grafo, archivos, panel y reportes; e2e `recorrido-h2.spec.ts` (recorrido §18 completo con enóloga, operario, agrónomo: del lote nuevo al expediente cerrado, con `TRC_DOSSIER_NOT_READY` y `TRC_DOSSIER_CLOSED` explicados) y axe de las pantallas y diálogos nuevos · 2026-10-02
+
+### Fase 5 · Mocks 0.5.0-rc.2 y backend real
+
+- [x] `@drinks-on-chain/mocks` 0.5.0-rc.2: registros anulados marcados (`voided`, `voidedAt`) a la vista, tachados y fuera de la última lectura, el análisis vigente y las gráficas; exportaciones con `format` y rango; autores anulables; CSV `codigos-{lote}-{desde}-{hasta}.csv`; mensajes nuevos del expediente; adjuntos propios para agronomía y operación · 2026-10-02
+- [x] Correcciones de análisis de madurez, dictámenes, lecturas y tratamientos desde la ficha del pesaje y del tanque (`CorrectRecordButton`); una corrección que incumple una regla de un embotellado ya hecho se registra y se explica como incidencia abierta · 2026-10-02
+- [x] Los límites de laboratorio de la instantánea de reglas se leen por el nombre del parámetro (`acidezVolatil` → «Acidez volátil») · 2026-10-02
+- [x] Destilación: parte del volumen disponible del tanque (`availableLiters`) y puede cerrarlo (`closeTank`) · 2026-10-02
+- [x] Backend real (Etapa 2 completa): `e2e/backend-real.spec.ts` recorre §18 por la interfaz hasta el expediente cerrado, con siete avisos de elusión; el panel admite `pendingPhyto[].intakeDate` como fecha de calendario (`src/lib/erp/schemas.ts`); los errores de contrato dejan en consola el campo que no cumple · 2026-10-02

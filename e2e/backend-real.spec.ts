@@ -798,6 +798,38 @@ test("Ola 2: recorrido de §18 por la interfaz, del lote nuevo al expediente cer
     await expect(page.getByRole("heading", { name: LOT })).toBeVisible({ timeout: 20_000 });
   });
 
+  await test.step("lote ya embotellado: la corrección que incumple el balance se registra con una incidencia, y otra la resuelve", async () => {
+    await page.getByRole("tab", { name: "Correcciones" }).click();
+    const correct = async (abv: string, reason: string) => {
+      await page.getByRole("button", { name: "Registrar corrección" }).click();
+      const dialog = page.getByRole("dialog", { name: "Registrar corrección" });
+      await dialog.getByRole("combobox", { name: "Registro que se corrige" }).click();
+      await page.getByRole("option", { name: /^Destilación/ }).click();
+      await dialog.getByLabel("Grado del corazón").fill(abv);
+      await dialog.getByLabel("Motivo").fill(`Prueba E2E ${stamp}: ${reason}`);
+      const [response] = await Promise.all([
+        page.waitForResponse(isCorrection),
+        dialog.getByRole("button", { name: "Registrar corrección" }).click(),
+      ]);
+      return response;
+    };
+    // Con el corazón al 30 %, las botellas ya llenadas llevarían más alcohol del que había.
+    const breaking = await correct("30", "grado del corazón mal medido");
+    expect(breaking.status(), "la corrección se registra aunque incumpla una regla del embotellado").toBe(201);
+    await expect(page.getByText("Corrección registrada con una incidencia", { exact: true })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByText("Una corrección dejó una incidencia abierta")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("region", { name: "Incidencias de cumplimiento" })).toContainText(
+      "Surgió de una corrección",
+    );
+
+    const fixing = await correct("60", "se restituye el grado medido");
+    expect(fixing.status()).toBe(201);
+    await expect(page.getByText("Una corrección dejó una incidencia abierta")).toHaveCount(0, { timeout: 20_000 });
+    await expect(page.getByRole("region", { name: "Incidencias de cumplimiento" })).toHaveCount(0);
+  });
+
   await test.step("sin laboratorio el expediente no cierra (TRC_DOSSIER_NOT_READY)", async () => {
     await page.getByRole("tab", { name: "Expediente" }).click();
     const requirements = page.getByRole("list", { name: "Requisitos del expediente" });

@@ -69,7 +69,11 @@ Recorre: login a través de la reescritura (cookie `doc_rt` de primera parte, `H
 
 En GitHub hay un job manual (`E2E contra el backend real`, `workflow_dispatch`) que lee el secreto `E2E_PASSWORD` y, si existen, los de la llave restringida del buzón (`DEV_MAILPIT_SSH_KEY`, `DEV_SSH_KNOWN_HOSTS`, `DEV_SSH_HOST`, `DEV_SSH_USER`); no sube artefactos. Con el backend real, Playwright no escribe la instantánea de la página en `error-context.md` (contendría los campos de contraseña).
 
-**Estado (27-09-2026)**: en verde sin parches contra el backend de desarrollo (`eace713`, Etapa 1 completa): las 7 pruebas, incluido el recorrido de la Ola 1 y el 429.
+**Ola 2** (O2-ERP-1, contra la Etapa 2 del backend): el panel de Altos y de Cinti Viejo con datos reales; los módulos, las fichas y las pestañas del lote de Altos (vino) sin respuestas fuera de contrato; y el recorrido de §18 del contrato por la interfaz con las personas de Cinti Viejo y datos `E2E … <fecha>-<azar>`: la enóloga crea el lote, el operario pesa, la enóloga analiza, el agrónomo dictamina, tanque de 12.100 L con una lectura anulada, destilación cerrada con fechas pasadas (reposo cumplido), vista previa y embotellado de 2.950 botellas, códigos (CSV con `Content-Disposition` y `X-Export-Rows`, ZIP), anulación de un código con sustituto, adjunto, reporte con CSV, corrección tras embotellar que abre una incidencia y otra que la resuelve, laboratorio conforme y cierre del expediente (la huella es el SHA-256 de los bytes canónicos descargados). Intentos de elusión con su aviso: `TRC_PHYTO_IN_CREATE`, `TRC_PHYTO_NOT_APPROVED`, `TRC_MASS_BALANCE_EXCEEDED`, `TRC_BOTTLING_EXCEEDS_VOLUME`, `TRC_ALCOHOL_BALANCE_EXCEEDED`, `TRC_DOSSIER_NOT_READY` y `TRC_DOSSIER_CLOSED`. Cada ejecución deja un lote `E2E Singani …` con el expediente cerrado.
+
+**Estado (02-10-2026)**: en verde contra el backend de desarrollo con la Etapa 2 completa (9 pruebas; el 429 solo con `E2E_REAL_429=1`). Pendiente fuera del ERP: el `downloadUrl` del ZIP de códigos apunta al host interno del almacenamiento (`minio:9000`) y no se puede descargar desde el navegador.
+
+**Estado anterior (27-09-2026)**: en verde sin parches contra el backend de desarrollo (`eace713`, Etapa 1 completa): las 7 pruebas, incluido el recorrido de la Ola 1 y el 429.
 
 Publicado en Vercel (con datos de prueba): https://drinks-on-chain-erp.vercel.app · panel de usuarios de demo en `/__mocks`.
 
