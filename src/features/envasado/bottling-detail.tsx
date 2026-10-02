@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Check } from "lucide-react";
 import type { BottlingBatchResponse } from "@drinks-on-chain/mocks";
 import {
   Button,
@@ -20,39 +19,14 @@ import { ScreenTitle } from "@/components/screen-title";
 import { ApiError, errorMessage } from "@/lib/api/errors";
 import { useBottling, useTraceabilityDag } from "@/lib/erp/hooks";
 import { PRODUCT_TYPE } from "@/lib/erp/labels";
-import { env } from "@/lib/env";
 import { fmtDate, fmtDateTime, fmtNumber } from "@/lib/format";
 import { ExternalLink, HashText, explorerTxUrl } from "@/features/cuenta/stellar";
+import { BottlingBalanceMeters } from "@/features/lotes/components/lot-balance-chart";
 import { AnchorBadge } from "./anchor-badge";
 import { LabCertificateCard } from "./lab-certificate-card";
-import { QrExportCard } from "./qr-export-card";
-import { marketplaceOrigin } from "./qr-codes";
 import { dagSteps } from "./traceability";
 
 const abv = (n: number) => `${fmtNumber(n, Number.isInteger(n) ? 0 : 1)} % vol`;
-
-/** Sello de éxito tras cerrar la producción (6.2 de la maqueta). */
-function SealHeader({ b }: { b: BottlingBatchResponse }) {
-  const origin = marketplaceOrigin(env.urlApp, b.qrBatchUrl);
-  return (
-    <section
-      aria-label="Producción cerrada"
-      className="border-border bg-bg-raised grid justify-items-center gap-2 rounded-lg border px-6 py-8 text-center"
-    >
-      <span className="border-success text-success grid size-18 place-items-center rounded-full border-2" aria-hidden>
-        <Check size={34} strokeWidth={1.75} />
-      </span>
-      <h1 className="font-display text-3xl">
-        {PRODUCT_TYPE[b.productType]} {b.bottlingDate.slice(0, 4)} · sellado
-      </h1>
-      <p className="text-fg-muted text-sm">
-        Lote <span className="font-mono font-medium">{b.internationalLotCode}</span> ·{" "}
-        {fmtNumber(b.totalBottlesPackaged)} códigos QR generados · apuntan a{" "}
-        <code className="font-mono text-xs">{origin ? `${origin}/b/{código}` : "app./b/{código}"}</code>
-      </p>
-    </section>
-  );
-}
 
 function TraceabilityCard({ b }: { b: BottlingBatchResponse }) {
   const dag = useTraceabilityDag(b.id);
@@ -98,7 +72,7 @@ function TraceabilityCard({ b }: { b: BottlingBatchResponse }) {
   );
 }
 
-export function BottlingDetail({ id, justCreated }: { id: string; justCreated: boolean }) {
+export function BottlingDetail({ id }: { id: string }) {
   const bottling = useBottling(id);
   const b = bottling.data;
   const crumbs = [{ label: "Envasado y QR", href: "/envasado" }, { label: b?.internationalLotCode ?? "Embotellado" }];
@@ -153,14 +127,10 @@ export function BottlingDetail({ id, justCreated }: { id: string; justCreated: b
   return (
     <div className="grid grid-cols-1 gap-6">
       <PageChrome breadcrumbs={crumbs} />
-      {justCreated ? (
-        <SealHeader b={b} />
-      ) : (
-        <header className="flex flex-wrap items-center gap-3">
-          <h1 className="font-mono text-2xl font-medium">{b.internationalLotCode}</h1>
-          <AnchorBadge anchored={b.isAnchoredOnChain} />
-        </header>
-      )}
+      <header className="flex flex-wrap items-center gap-3">
+        <h1 className="font-mono text-2xl font-medium">{b.internationalLotCode}</h1>
+        <AnchorBadge anchored={b.isAnchoredOnChain} />
+      </header>
 
       <div className="grid items-start gap-6 lg:grid-cols-2">
         <div className="grid grid-cols-1 gap-6">
@@ -170,6 +140,18 @@ export function BottlingDetail({ id, justCreated }: { id: string; justCreated: b
               items={[
                 { term: "Código de lote", value: <span className="font-mono">{b.internationalLotCode}</span> },
                 { term: "Producto", value: PRODUCT_TYPE[b.productType] },
+                ...(b.lotId
+                  ? [
+                      {
+                        term: "Lote",
+                        value: (
+                          <Link href={`/lotes/${b.lotId}`} className="hover:underline">
+                            Ver la ficha del lote
+                          </Link>
+                        ),
+                      },
+                    ]
+                  : []),
                 {
                   term: "Origen",
                   value: source ? (
@@ -186,6 +168,16 @@ export function BottlingDetail({ id, justCreated }: { id: string; justCreated: b
                 { term: "Grado final", value: abv(b.finalAlcoholAbv) },
                 ...(b.waterDilutionLiters != null
                   ? [{ term: "Agua añadida", value: `${fmtNumber(b.waterDilutionLiters)} L` }]
+                  : []),
+                ...(b.leftover
+                  ? [
+                      {
+                        term: "Remanente",
+                        value: `${fmtNumber(b.leftover.liters, 1)} L · ${
+                          b.leftover.disposition === "RETAINED" ? "se conserva" : "se desecha"
+                        }${b.leftover.notes ? ` · ${b.leftover.notes}` : ""}`,
+                      },
+                    ]
                   : []),
                 { term: "Botella", value: b.bottleType ?? "—" },
                 {
@@ -214,7 +206,9 @@ export function BottlingDetail({ id, justCreated }: { id: string; justCreated: b
                   value: b.blockchainDataHash ? (
                     <HashText value={b.blockchainDataHash} full label="Copiar huella" />
                   ) : (
-                    "—"
+                    <span className="text-fg-muted">
+                      Desde la Ola 2 la huella que se ancla es la del expediente del lote, al cerrarlo.
+                    </span>
                   ),
                 },
                 {
@@ -237,7 +231,44 @@ export function BottlingDetail({ id, justCreated }: { id: string; justCreated: b
         </div>
 
         <div className="grid grid-cols-1 gap-6">
-          <QrExportCard lotCode={b.internationalLotCode} qrBatchUrl={b.qrBatchUrl} bottles={b.totalBottlesPackaged} />
+          {b.balance && (
+            <Card className="grid grid-cols-1 gap-4">
+              <CardHeader
+                title="Balance del embotellado"
+                description="Litros, merma y alcohol puro, tal como los comprobó el servidor al registrar."
+              />
+              <BottlingBalanceMeters balance={b.balance} />
+            </Card>
+          )}
+          <Card className="grid grid-cols-1 gap-4">
+            <CardHeader
+              title="Códigos de botella"
+              description="Un código por botella, con su número de serie. Se listan y exportan desde la ficha del lote."
+            />
+            {b.bottleCodes ? (
+              <KeyValueList
+                items={[
+                  { term: "Códigos activos", value: fmtNumber(b.bottleCodes.active) },
+                  { term: "Anulados", value: fmtNumber(b.bottleCodes.voided) },
+                  ...(b.bottleCodes.firstSerial != null && b.bottleCodes.lastSerial != null
+                    ? [
+                        {
+                          term: "Series",
+                          value: `${fmtNumber(b.bottleCodes.firstSerial)} a ${fmtNumber(b.bottleCodes.lastSerial)}`,
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+            ) : (
+              <p className="m-0 text-sm text-fg-muted">{fmtNumber(b.totalBottlesPackaged)} botellas embotelladas.</p>
+            )}
+            {b.lotId && (
+              <Button asChild variant="secondary" className="justify-self-start">
+                <Link href={`/lotes/${b.lotId}?pestana=codigos`}>Ver y exportar los códigos</Link>
+              </Button>
+            )}
+          </Card>
           <TraceabilityCard b={b} />
         </div>
       </div>

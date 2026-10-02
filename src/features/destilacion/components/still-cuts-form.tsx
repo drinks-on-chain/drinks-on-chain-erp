@@ -3,12 +3,13 @@
 import { Field, Input, cn } from "@drinks-on-chain/ui";
 import { parseDecimal, fmtNumber } from "@/lib/format";
 
-export type CutsField = "headDiscardLiters" | "heartYieldLiters" | "tailDiscardLiters" | "initialAlcoholPercentage";
+export type CutsField = "headsLiters" | "heartLiters" | "tailsLiters" | "heartAbvPercent" | "vinasseLiters";
 export type CutsValues = Record<CutsField, string>;
 
 /**
- * Cortes del alambique (05 §3.3 StillCutsForm, 01-erp.html §07): cabeza, corazón (el campo
- * clave, en oro), cola y grado inicial. Muestra cuánto suman los cortes frente a la entrada.
+ * Cortes del alambique (05 §3.3 StillCutsForm, 01-erp.html §07): cabezas, corazón (el campo clave,
+ * en oro), colas y grado del corazón. Muestra cuánto suman los cortes frente a la entrada; que no
+ * la superen (balance de masa) lo comprueba el servidor al cerrar.
  */
 export function StillCutsForm({
   values,
@@ -20,28 +21,27 @@ export function StillCutsForm({
   values: CutsValues;
   errors?: Partial<Record<CutsField, string>>;
   onChange: (field: CutsField, value: string) => void;
-  /** Litros de vino base que entran al alambique (para el total de cortes). */
+  /** Litros de vino base que entraron al alambique (para el total de cortes). */
   inputVolumeLiters: number | null;
   disabled?: boolean;
 }) {
-  const head = parseDecimal(values.headDiscardLiters) ?? 0;
-  const heart = parseDecimal(values.heartYieldLiters) ?? 0;
-  const tail = parseDecimal(values.tailDiscardLiters) ?? 0;
-  const total = head + heart + tail;
-  const over = inputVolumeLiters !== null && inputVolumeLiters > 0 && total > inputVolumeLiters;
+  const sum = (["headsLiters", "heartLiters", "tailsLiters", "vinasseLiters"] as const).reduce(
+    (total, f) => total + (parseDecimal(values[f]) ?? 0),
+    0,
+  );
 
-  const cut = (field: CutsField, label: string, help: string, key = false) => (
+  const cut = (field: CutsField, label: string, help: string, { key = false, required = true } = {}) => (
     <Field
       label={label}
       help={help}
       error={errors[field]}
-      required={key}
+      required={required}
       className={cn(key && "rounded-md bg-accent-soft p-3")}
     >
       <Input
         size="lg"
         numeric
-        suffix={field === "initialAlcoholPercentage" ? "% vol" : "L"}
+        suffix={field === "heartAbvPercent" ? "% vol" : "L"}
         value={values[field]}
         disabled={disabled}
         onChange={(e) => onChange(field, e.target.value)}
@@ -53,16 +53,17 @@ export function StillCutsForm({
   return (
     <div className="grid grid-cols-1 gap-3">
       <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {cut("headDiscardLiters", "Cabeza", "Descarte inicial.")}
-        {cut("heartYieldLiters", "Corazón", "Rendimiento: el singani del lote.", true)}
-        {cut("tailDiscardLiters", "Cola", "Descarte final.")}
-        {cut("initialAlcoholPercentage", "Grado inicial", "Del destilado al salir.")}
+        {cut("headsLiters", "Cabezas", "Descarte inicial.")}
+        {cut("heartLiters", "Corazón", "Rendimiento: el singani del lote.", { key: true })}
+        {cut("tailsLiters", "Colas", "Descarte final.")}
+        {cut("heartAbvPercent", "Grado del corazón", "Decide el alcohol puro del lote.")}
       </div>
-      <p className={cn("m-0 text-sm tabular-nums", over ? "text-danger-text" : "text-fg-muted")} aria-live="polite">
-        Cortes: {fmtNumber(total)} L
-        {inputVolumeLiters !== null && inputVolumeLiters > 0
-          ? ` de ${fmtNumber(inputVolumeLiters)} L de entrada${over ? " · superan la entrada" : ""}`
-          : ""}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {cut("vinasseLiters", "Vinaza", "Opcional. Residuo del alambique.", { required: false })}
+      </div>
+      <p className="m-0 text-sm text-fg-muted tabular-nums" aria-live="polite">
+        Cortes: {fmtNumber(sum)} L
+        {inputVolumeLiters !== null && inputVolumeLiters > 0 ? ` de ${fmtNumber(inputVolumeLiters)} L de entrada` : ""}
       </p>
     </div>
   );

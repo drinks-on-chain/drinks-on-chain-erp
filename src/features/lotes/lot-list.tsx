@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Plus, Search } from "lucide-react";
 import type { LotSummary } from "@drinks-on-chain/mocks";
 import { Badge, Button, DataTable, EmptyState, ErrorState, Input, Pill, PillGroup, Select } from "@drinks-on-chain/ui";
@@ -12,6 +12,7 @@ import { useLots } from "@/lib/erp/hooks";
 import { LOT_LAB_STATUS, LOT_PRODUCT, LOT_STAGE_CODE } from "@/lib/erp/labels";
 import { can } from "@/lib/erp/permissions";
 import { fmtNumber } from "@/lib/format";
+import { useDebounced } from "@/lib/use-debounced";
 import { LotStageBadge } from "./components/lot-stage-badge";
 import {
   EMPTY_LOT_FILTERS,
@@ -35,16 +36,6 @@ const STAGE_OPTIONS = [
   { value: "ALL", label: "Todas las etapas" },
   ...FILTER_STAGES.map((s) => ({ value: s, label: LOT_STAGE_CODE[s].label })),
 ];
-
-/** Texto de búsqueda que se envía al servidor medio segundo después de dejar de escribir. */
-function useDebounced(value: string, ms = 350) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const id = setTimeout(() => setDebounced(value), ms);
-    return () => clearTimeout(id);
-  }, [value, ms]);
-  return debounced;
-}
 
 /** Lista de lotes (`GET /v1/lots`): filtra y pagina el servidor; etapa, candado e incidencias los calcula él. */
 export function LotList() {

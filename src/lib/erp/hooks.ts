@@ -12,6 +12,7 @@ import { can } from "./permissions";
 import {
   erpApi,
   type AuditQuery,
+  type BottleCodeQuery,
   type HarvestQuery,
   type LotQuery,
   type ProductionQuery,
@@ -39,6 +40,41 @@ export const useLotTimeline = (id: string, enabled = true) =>
   useQuery({ queryKey: erpKeys.lotTimeline(id), queryFn: ({ signal }) => erpApi.lotTimeline(id, signal), enabled });
 export const useLotGraph = (id: string, enabled = true) =>
   useQuery({ queryKey: erpKeys.lotGraph(id), queryFn: ({ signal }) => erpApi.lotGraph(id, signal), enabled });
+
+export const useLotBalance = (id: string, enabled = true) =>
+  useQuery({ queryKey: erpKeys.lotBalance(id), queryFn: ({ signal }) => erpApi.lotBalance(id, signal), enabled });
+
+/**
+ * Vista previa del embotellado (`POST …/bottling/preview`): no escribe nada, así que se trata como
+ * una lectura. Devuelve el balance y las reglas que el servidor daría por incumplidas; la vista
+ * anterior sigue visible mientras llega la nueva.
+ */
+export const useBottlingPreview = (lotId: string, body: Parameters<typeof erpApi.bottlingPreview>[1] | null) =>
+  useQuery({
+    queryKey: erpKeys.bottlingPreview(lotId, body ?? {}),
+    queryFn: ({ signal }) => erpApi.bottlingPreview(lotId, body!, signal),
+    enabled: body !== null,
+    placeholderData: keepPreviousData,
+    retry: false,
+  });
+
+/** Códigos de botella del lote, paginados en el servidor (solo dirección y enología). */
+export const useBottleCodes = (lotId: string, q: BottleCodeQuery, enabled = true) =>
+  useQuery({
+    queryKey: erpKeys.bottleCodes(lotId, q),
+    queryFn: ({ signal }) => erpApi.bottleCodes(lotId, q, signal),
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+
+/** Estado de una exportación ZIP: se consulta cada 2 s mientras el worker la genera. */
+export const useBottleCodeExport = (lotId: string, exportId: string | null) =>
+  useQuery({
+    queryKey: erpKeys.bottleCodeExport(lotId, exportId ?? ""),
+    queryFn: ({ signal }) => erpApi.bottleCodeExport(lotId, exportId!, signal),
+    enabled: !!exportId,
+    refetchInterval: (query) => (query.state.data?.status === "PENDING" || !query.state.data ? 2_000 : false),
+  });
 
 /**
  * Enlaces antiguos `/lotes/{harvestBatchId}` (contrato §16.3): el id era el del pesaje. Devuelve
@@ -114,8 +150,6 @@ export const useProductions = (q: ProductionQuery = {}, enabled = true) =>
   useQuery({ queryKey: erpKeys.productions(q), queryFn: ({ signal }) => erpApi.productions(q, signal), enabled });
 export const useProduction = (id: string) =>
   useQuery({ queryKey: erpKeys.production(id), queryFn: ({ signal }) => erpApi.production(id, signal) });
-export const useRestStatus = (id: string) =>
-  useQuery({ queryKey: erpKeys.restStatus(id), queryFn: ({ signal }) => erpApi.restStatus(id, signal) });
 
 export const useBottlings = () =>
   useQuery({ queryKey: erpKeys.bottlings(), queryFn: ({ signal }) => erpApi.bottlings({}, signal) });
@@ -307,8 +341,37 @@ export const useAddTreatment = () =>
     erpApi.addTreatment(v.id, v.body),
   );
 export const useCreateAging = () => useErpMutation(erpApi.createAging);
+export const useDiscardAging = () =>
+  useErpMutation((v: { id: string; body: Parameters<typeof erpApi.discardAging>[1] }) =>
+    erpApi.discardAging(v.id, v.body),
+  );
 export const useCreateDistillation = () => useErpMutation(erpApi.createDistillation);
-export const useCreateBottling = () => useErpMutation(erpApi.createBottling);
+/** Cierre de la destilación con sus cortes: empieza el reposo. */
+export const useCloseDistillation = () =>
+  useErpMutation((v: { id: string; body: Parameters<typeof erpApi.closeDistillation>[1] }) =>
+    erpApi.closeDistillation(v.id, v.body),
+  );
+export const useDiscardProduction = () =>
+  useErpMutation((v: { id: string; reason: string }) => erpApi.discardProduction(v.id, { reason: v.reason }));
+/** Embotellado del lote (una sola vez), con `Idempotency-Key`. */
+export const useCreateLotBottling = () =>
+  useIdempotentErpMutation(
+    (v: { lotId: string; body: Parameters<typeof erpApi.createLotBottling>[1] }) => v,
+    (v, key) => erpApi.createLotBottling(v.lotId, v.body, key),
+  );
+/** CSV de los códigos de botella (queda en la bitácora con su rango). */
+export const useBottleCodesCsv = () =>
+  useErpMutation((v: { lotId: string; range?: Parameters<typeof erpApi.bottleCodesCsv>[1] }) =>
+    erpApi.bottleCodesCsv(v.lotId, v.range),
+  );
+export const useCreateBottleCodeExport = () =>
+  useErpMutation((v: { lotId: string; body: Parameters<typeof erpApi.createBottleCodeExport>[1] }) =>
+    erpApi.createBottleCodeExport(v.lotId, v.body),
+  );
+export const useVoidBottleCode = () =>
+  useErpMutation((v: { code: string; body: Parameters<typeof erpApi.voidBottleCode>[1] }) =>
+    erpApi.voidBottleCode(v.code, v.body),
+  );
 export const useCreateLabAnalysis = () => useErpMutation(erpApi.createLabAnalysis);
 export const useUpdateWinery = () => useErpMutation(erpApi.updateWinery);
 

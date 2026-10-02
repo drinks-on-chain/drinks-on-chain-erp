@@ -48,6 +48,8 @@ const ADMIN_ROUTES = [
   "/lotes/nuevo",
   `/lotes/${CINTI.lot}`,
   `/lotes/${CINTI.lot}?pestana=linea-de-tiempo`,
+  `/lotes/${CINTI.lot}?pestana=balance`,
+  `/lotes/${CINTI.lot}/embotellar`,
   "/origen",
   `/origen/${CINTI.terroir}`,
   "/origen/nuevo",
@@ -93,6 +95,37 @@ test.describe("administración de Cinti Viejo", () => {
     await expect(page.getByRole("dialog", { name: "Invitar al equipo" })).toBeVisible();
     await audit(page, { dialog: true });
   });
+});
+
+test("axe en los códigos de botella de un lote embotellado y con la anulación abierta", async ({ page }) => {
+  await login(page, "admin@cintiviejo.test");
+  await page.goto("/lotes");
+  await settled(page);
+  await page
+    .getByRole("row", { name: /CVJ-L2025-001/ })
+    .getByRole("link", { name: "Ver" })
+    .click();
+  await page.getByRole("tab", { name: "Códigos" }).click();
+  await expect(page.getByRole("table", { name: /Códigos de botella de/ }).getByRole("row")).toHaveCount(21);
+  await audit(page);
+  await page
+    .getByRole("button", { name: /^Anular/ })
+    .first()
+    .click();
+  await expect(page.getByRole("alertdialog")).toBeVisible();
+  await settled(page);
+  await expect(page.getByRole("alertdialog")).toHaveAccessibleName(/Anular el código/);
+  expect(await axe(page)).toEqual([]);
+});
+
+test("axe con la vista previa del embotellado calculada", async ({ page }) => {
+  await login(page, "admin@cintiviejo.test");
+  await page.goto(`/lotes/${CINTI.lot}/embotellar`);
+  await settled(page);
+  await page.getByLabel("Botellas llenadas").fill("2.950");
+  await page.getByLabel("Grado alcohólico final").fill("40");
+  await expect(page.getByTestId("rule-violation-notice").first()).toBeVisible();
+  await audit(page);
 });
 
 test("axe con el modal de dictamen fitosanitario abierto", async ({ page }) => {

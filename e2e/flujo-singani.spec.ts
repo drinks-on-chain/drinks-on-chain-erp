@@ -1,12 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { trackErrors } from "./support";
 
-// Un embotellado recién creado aún no tiene certificado de laboratorio: 404 esperado.
-const NO_LAB = /^404 \/api\/v1\/lab-analyses\/batch\//;
-
 // Flujo de ejemplo del documento maestro ("Singani Gran Reserva 2026"): un lote nuevo recorre
-// origen → vendimia → tanque → destilación y queda en el reposo de 180 días, con su lote del
-// servidor en la lista. El recorrido completo hasta el expediente llega con la fase 3 de O2-ERP-1.
+// origen → vendimia → tanque → destilación (abrir y cerrar con cortes) y queda en el reposo de 180
+// días, con su lote del servidor en la lista y el embotellado bloqueado por el candado.
 // Los mocks viven en la memoria de la página: tras crear datos se navega solo con clics.
 
 async function login(page: Page, email: string) {
@@ -26,7 +23,7 @@ const nav = (page: Page, name: string) => page.getByRole("link", { name, exact: 
 
 test("Singani Gran Reserva 2026: de la parcela al reposo de 180 días", async ({ page }) => {
   test.setTimeout(120_000);
-  const errors = trackErrors(page, [NO_LAB]);
+  const errors = trackErrors(page);
   await page.goto("/login");
 
   // 1. El agrónomo registra la parcela D.O. y el ingreso de uva, y lo aprueba.
@@ -89,19 +86,27 @@ test("Singani Gran Reserva 2026: de la parcela al reposo de 180 días", async ({
   await decision.getByRole("button", { name: "Confirmar destino y completar" }).click();
   await expect(page.getByText("Destino: Destilación (singani)", { exact: true })).toBeVisible();
 
-  // 3. Destilación con cortes: el corazón es el singani del lote.
+  // 3. La destilación se abre con el vino base que entra al alambique…
   await page.getByRole("link", { name: "Pasar a destilación" }).click();
   await expect(page.getByRole("heading", { name: "Registrar destilación" })).toBeVisible();
   await page.getByLabel("Alambique").fill("Alambique de cobre AL-01");
   await page.getByLabel("Volumen de entrada").fill("12.100");
-  await page.getByLabel("Cabeza").fill("120");
-  await page.getByLabel("Corazón").fill("1.500");
-  await page.getByLabel("Cola").fill("210");
-  await page.getByLabel("Grado inicial").fill("60");
-  await page.getByRole("button", { name: "Registrar destilación" }).first().click();
+  await page.getByRole("button", { name: "Abrir destilación" }).first().click();
+  await expect(page.getByText("Destilación abierta", { exact: true }).first()).toBeVisible();
+
+  // …y se cierra con sus cortes: el corazón es el singani del lote y ahí empieza el reposo.
+  const close = page.getByRole("form", { name: "Cerrar destilación" });
+  await close.getByLabel("Cabezas").fill("120");
+  await close.getByRole("textbox", { name: "Corazón", exact: true }).fill("1.500");
+  await close.getByLabel("Colas").fill("210");
+  await close.getByLabel("Grado del corazón").fill("60");
+  await close.getByRole("button", { name: "Cerrar destilación" }).click();
+  await expect(page.getByText("Destilación cerrada", { exact: true })).toBeVisible();
 
   // 4. El reposo normativo inmoviliza el lote 180 días: no se puede embotellar.
-  await expect(page.getByText(/180/).first()).toBeVisible();
+  await expect(page.getByText("Lote inmovilizado por normativa")).toBeVisible();
+  await expect(page.getByTestId("countdown-days")).toHaveText(/^180\s*días$/);
+  await expect(page.getByText("Reposo mínimo de 180 días.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Pasar a embotellado" })).toBeDisabled();
 
   // El lote del servidor (nació al llenar el tanque) está en reposo, con su candado.
@@ -110,7 +115,7 @@ test("Singani Gran Reserva 2026: de la parcela al reposo de 180 días", async ({
   await expect(row).toContainText("Singani Gran Reserva 2026");
   await expect(row).toContainText("Reposo");
   await expect(row).toContainText("Singani");
-  await expect(row).toContainText(/Faltan 1[78]\d días/);
+  await expect(row).toContainText("Faltan 180 días");
   await row.getByRole("link", { name: "Ver" }).click();
   await expect(page.getByRole("list", { name: "Candados del lote" })).toContainText("Reposo mínimo de 180 días");
   await expect(

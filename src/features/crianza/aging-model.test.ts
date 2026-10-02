@@ -60,9 +60,15 @@ describe("tabla de barricas", () => {
     ).toEqual(["BOTTLED", "DISCARDED"]);
   });
 
-  it("solo ofrece tanques de vino sin crianza previa", () => {
-    const candidates = agingCandidates(mine(fx.fermentationTanks), mine(fx.wineAging)).map((t) => t.tankCode);
-    expect(candidates.sort()).toEqual(["TK-04", "TK-10"]);
+  it("solo ofrece tanques con la fermentación completada, destino vino y sin crianza previa", () => {
+    const tank = mine(fx.fermentationTanks)[0]!;
+    const tanks = [
+      { ...tank, id: "a", tankCode: "A", destinationType: "WINE_AGING" as const, status: "COMPLETED" as const },
+      { ...tank, id: "b", tankCode: "B", destinationType: "WINE_AGING" as const, status: "FERMENTING" as const },
+      { ...tank, id: "c", tankCode: "C", destinationType: "SINGANI_DIST" as const, status: "COMPLETED" as const },
+      { ...tank, id: "d", tankCode: "D", destinationType: "WINE_AGING" as const, status: "COMPLETED" as const },
+    ];
+    expect(agingCandidates(tanks, [{ fermentationTankId: "d" }]).map((t) => t.tankCode)).toEqual(["A"]);
   });
 });
 
@@ -73,15 +79,23 @@ describe("validación del alta", () => {
     containerMaterial: "Roble francés",
     containerCode: "BAR-FR-2026-01",
     barrelUseCycle: "1",
+    containerCount: "",
     volumeLiters: "3000",
     plannedMonths: "12",
     startDate: "2026-09-25",
     notes: "",
   };
-  const ctx = { candidateIds: new Set(["t1"]), tankVolume: 8300, today: TODAY };
-  it("acepta un alta correcta y rechaza meses decimales o volumen excesivo", () => {
+  const ctx = { today: TODAY };
+  it("acepta un alta correcta y rechaza meses decimales, recipientes o volumen mal escritos", () => {
     expect(validateAging(base, ctx)).toEqual({});
-    const e = validateAging({ ...base, plannedMonths: "1,5", volumeLiters: "9000", fermentationTankId: "t9" }, ctx);
-    expect(Object.keys(e).sort()).toEqual(["fermentationTankId", "plannedMonths", "volumeLiters"]);
+    const e = validateAging(
+      { ...base, plannedMonths: "1,5", volumeLiters: "", containerCount: "0", fermentationTankId: "" },
+      ctx,
+    );
+    expect(Object.keys(e).sort()).toEqual(["containerCount", "fermentationTankId", "plannedMonths", "volumeLiters"]);
+  });
+
+  it("no comprueba el volumen del tanque ni el mínimo de meses: lo hace el servidor", () => {
+    expect(validateAging({ ...base, volumeLiters: "90.000", plannedMonths: "0" }, ctx)).toEqual({});
   });
 });

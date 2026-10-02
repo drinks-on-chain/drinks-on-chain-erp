@@ -31,7 +31,6 @@ export const erpKeys = {
   aging: (id: string) => ["erp", "wine-aging", "detail", id] as const,
   productions: (params?: object) => ["erp", "production", params ?? {}] as const,
   production: (id: string) => ["erp", "production", "detail", id] as const,
-  restStatus: (id: string) => ["erp", "production", "rest", id] as const,
   bottlings: (params?: object) => ["erp", "bottling", params ?? {}] as const,
   bottling: (id: string) => ["erp", "bottling", "detail", id] as const,
   lab: (bottlingId: string) => ["erp", "lab", bottlingId] as const,

@@ -3,14 +3,11 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Lock } from "lucide-react";
 import {
   Alert,
-  Badge,
   Button,
   Card,
   CardHeader,
-  Checkbox,
   EmptyState,
   ErrorState,
   Field,
@@ -22,40 +19,40 @@ import {
   toast,
 } from "@drinks-on-chain/ui";
 import { PageChrome } from "@/components/page-chrome";
-import { StillCutsForm, type CutsField } from "@/features/destilacion/components/still-cuts-form";
+import { RuleViolationNotice } from "@/components/rule-violation-notice";
 import {
-  SINGANI_REST_DAYS,
+  DISTILLATION_FIELDS,
   distillationCandidates,
-  restUntilPreview,
-  validateDistillation,
+  toOpenDistillationDto,
   type DistillationField,
   type DistillationValues,
 } from "@/features/destilacion/distillation-model";
-import { RuleViolationNotice } from "@/components/rule-violation-notice";
-import { hasErrors, toDateInput } from "@/features/vinificacion/form-utils";
-import { parseDecimal, fmtDate, fmtLiters, fmtNumber } from "@/lib/format";
-import { doEligibility, lotLookup, lotName, terroirOfHarvest } from "@/features/vinificacion/tank-model";
-import { fieldErrorsFrom } from "@/lib/api/field-errors";
+import { DoEvaluationView } from "@/features/lotes/components/do-evaluation";
+import { toDateInput } from "@/features/vinificacion/form-utils";
+import { lotLookup, lotName } from "@/features/vinificacion/tank-model";
 import { errorMessage } from "@/lib/api/errors";
+import { fieldErrorsFrom } from "@/lib/api/field-errors";
 import { useMe } from "@/lib/auth/hooks";
-import { useCreateDistillation, useHarvestBatches, useProductions, useTanks, useTerroirs } from "@/lib/erp/hooks";
-import { TANK_STATUS } from "@/lib/erp/labels";
+import {
+  useCreateDistillation,
+  useHarvestBatches,
+  useLot,
+  useProductions,
+  useTanks,
+  useTerroirs,
+} from "@/lib/erp/hooks";
 import { can } from "@/lib/erp/permissions";
 import { today } from "@/lib/erp/today";
+import { fmtLiters, fmtNumber } from "@/lib/format";
 
 const FORM_ID = "new-distillation-form";
 
-/** Campos del formulario que el backend puede marcar en un 422. */
-const SERVER_FIELDS: readonly DistillationField[] = [
-  "fermentationTankId",
-  "equipmentIdentifier",
-  "inputVolumeLiters",
-  "processStartDate",
-  "processEndDate",
-  "outputVolumeLiters",
-  "wasteVolumeLiters",
-];
-
+/**
+ * Abrir una destilación (contrato de la Ola 2 §5.2): tanque con la fermentación completada y
+ * destino singani, alambique, fecha de inicio y vino base que entra. Los cortes y el grado del
+ * corazón se registran al cerrarla, y ahí empieza el reposo. La D.O. no se declara: la comprueba
+ * el servidor con la uva del lote y sus reglas.
+ */
 export function NewDistillationForm() {
   const router = useRouter();
   const params = useSearchParams();
@@ -65,22 +62,15 @@ export function NewDistillationForm() {
   const harvest = useHarvestBatches();
   const terroirs = useTerroirs();
   const createDistillation = useCreateDistillation();
-  // 422 del backend: cada mensaje junto a su campo (details[].field).
-  const server = fieldErrorsFrom(createDistillation.error, SERVER_FIELDS).fieldErrors;
+  // 409/422 del servidor: cada mensaje junto a su campo (details[].field).
+  const server = fieldErrorsFrom(createDistillation.error, DISTILLATION_FIELDS).fieldErrors;
 
   const [values, setValues] = useState<DistillationValues>(() => ({
     fermentationTankId: params.get("tanque") ?? "",
     equipmentIdentifier: "",
     processStartDate: toDateInput(today()),
-    processEndDate: toDateInput(today()),
     inputVolumeLiters: "",
-    headDiscardLiters: "",
-    heartYieldLiters: "",
-    tailDiscardLiters: "",
     initialAlcoholPercentage: "",
-    outputVolumeLiters: "",
-    wasteVolumeLiters: "",
-    isDoEligible: true,
     notes: "",
   }));
   const [errors, setErrors] = useState<Partial<Record<DistillationField, string>>>({});
@@ -90,73 +80,44 @@ export function NewDistillationForm() {
   const tank = candidates.find((t) => t.id === values.fermentationTankId);
   const preselected = params.get("tanque");
   const preselectedInvalid = !!preselected && !!tanks.data && !candidates.some((t) => t.id === preselected);
-  const terroir = tank ? terroirOfHarvest(lookup, tank.harvestBatchId) : undefined;
-  const eligibility = doEligibility(terroir);
-  const doAllowed = !!tank && eligibility.eligible;
   const previous = tank ? (productions.data?.items ?? []).filter((p) => p.fermentationTankId === tank.id) : [];
-
-  // Valores por defecto que dependen del tanque o de los cortes (se muestran como sugerencia).
-  const head = parseDecimal(values.headDiscardLiters);
-  const heart = parseDecimal(values.heartYieldLiters);
-  const tail = parseDecimal(values.tailDiscardLiters);
-  const defaults = {
-    inputVolumeLiters: tank?.volumeFilledLiters ? String(tank.volumeFilledLiters) : "",
-    outputVolumeLiters: heart !== null ? String(heart) : "",
-    wasteVolumeLiters: head !== null || tail !== null ? String((head ?? 0) + (tail ?? 0)) : "",
-  };
-  const effective = (): DistillationValues => ({
-    ...values,
-    inputVolumeLiters: values.inputVolumeLiters.trim() || defaults.inputVolumeLiters,
-    outputVolumeLiters: values.outputVolumeLiters.trim() || defaults.outputVolumeLiters,
-    wasteVolumeLiters: values.wasteVolumeLiters.trim() || defaults.wasteVolumeLiters,
-    isDoEligible: values.isDoEligible && doAllowed,
-  });
-  const restUntil = restUntilPreview(values.processStartDate, values.processEndDate);
+  const lot = useLot(tank?.lotId ?? "", !!tank?.lotId);
+  const tankLiters = tank?.finalVolumeLiters ?? tank?.volumeFilledLiters ?? null;
+  // Sin cifra escrita y sin tandas previas, entra todo el vino base del tanque.
+  const inputVolume =
+    values.inputVolumeLiters.trim() || (tankLiters != null && previous.length === 0 ? String(tankLiters) : "");
 
   const set = <K extends DistillationField>(k: K, value: DistillationValues[K]) => {
     setValues((v) => ({ ...v, [k]: value }));
     setErrors((x) => ({ ...x, [k]: undefined }));
   };
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
-    const v = effective();
-    const found = validateDistillation(v, {
-      candidateIds: new Set(candidates.map((t) => t.id)),
-      doAllowed,
-      today: today(),
-    });
-    setErrors(found);
-    if (hasErrors(found)) return;
-    createDistillation.mutate(
-      {
-        fermentationTankId: v.fermentationTankId,
-        equipmentIdentifier: v.equipmentIdentifier.trim(),
-        processStartDate: v.processStartDate,
-        processEndDate: v.processEndDate || null,
-        inputVolumeLiters: parseDecimal(v.inputVolumeLiters),
-        outputVolumeLiters: parseDecimal(v.outputVolumeLiters),
-        wasteVolumeLiters: parseDecimal(v.wasteVolumeLiters),
-        initialAlcoholPercentage: parseDecimal(v.initialAlcoholPercentage),
-        isDoEligible: v.isDoEligible,
-        additionalParams: {
-          headDiscardLiters: parseDecimal(v.headDiscardLiters),
-          heartYieldLiters: parseDecimal(v.heartYieldLiters),
-          tailDiscardLiters: parseDecimal(v.tailDiscardLiters),
-        },
-        notes: v.notes.trim() || null,
-      },
-      {
-        onSuccess: (p) => {
-          toast({
-            title: "Destilación registrada",
-            description: p.mandatoryRestUntil ? `En reposo hasta el ${fmtDate(p.mandatoryRestUntil)}.` : undefined,
-            tone: "success",
-          });
-          router.push(`/destilacion/${p.id}`);
-        },
-      },
+    createDistillation.reset();
+    // Mientras la lista de tanques se actualiza se confía en el tanque del enlace; si no es de
+    // destilación, lo rechaza el servidor con su regla.
+    const fermentationTankId = tank || tanks.isFetching ? values.fermentationTankId : "";
+    const result = toOpenDistillationDto(
+      { ...values, fermentationTankId, inputVolumeLiters: inputVolume },
+      { today: today() },
     );
+    if (!result.ok) {
+      setErrors(result.errors);
+      return;
+    }
+    setErrors({});
+    try {
+      const p = await createDistillation.mutateAsync(result.dto);
+      toast({
+        title: "Destilación abierta",
+        description: "Registra los cortes al cerrarla: ahí empieza el reposo.",
+        tone: "success",
+      });
+      router.push(`/destilacion/${p.id}`);
+    } catch {
+      // El aviso del formulario explica el rechazo del servidor.
+    }
   };
 
   const allowed = can(me.data, "distillation.create");
@@ -172,14 +133,17 @@ export function NewDistillationForm() {
         actions={
           ready ? (
             <Button type="submit" form={FORM_ID} loading={createDistillation.isPending}>
-              Registrar destilación
+              Abrir destilación
             </Button>
           ) : null
         }
       />
       <div>
         <h1 className="font-display text-3xl">Registrar destilación</h1>
-        <p className="m-0 text-fg-muted">Cortes del alambique y datos del proceso. Al guardar empieza el reposo.</p>
+        <p className="m-0 text-fg-muted">
+          Abre la destilación con el vino base que entra al alambique. Los cortes se registran al cerrarla, y ahí
+          empieza el reposo.
+        </p>
       </div>
       {body}
     </div>
@@ -198,7 +162,7 @@ export function NewDistillationForm() {
     return shell(
       <EmptyState
         title="Tu rol no puede registrar destilaciones"
-        description="Registrar los cortes del alambique es tarea de enología o de la administración de la bodega."
+        description="Registrar una destilación es tarea de enología o de la dirección de la bodega."
         action={
           <Button asChild variant="secondary">
             <Link href="/destilacion">Volver a destilación</Link>
@@ -210,7 +174,7 @@ export function NewDistillationForm() {
     return shell(
       <EmptyState
         title="No hay tanques para destilar"
-        description="Solo van al alambique los tanques llenados con destino destilación (singani)."
+        description="Van al alambique los tanques con la fermentación completada y destino destilación (singani)."
         action={
           <Button asChild variant="secondary">
             <Link href="/vinificacion">Ir al mapa de tanques</Link>
@@ -223,7 +187,7 @@ export function NewDistillationForm() {
     <>
       {preselectedInvalid && (
         <Alert tone="warning" title="Ese tanque no puede ir al alambique">
-          Su destino no es destilación (singani). Elige otro tanque.
+          No tiene la fermentación completada con destino destilación (singani). Elige otro tanque.
         </Alert>
       )}
 
@@ -234,7 +198,7 @@ export function NewDistillationForm() {
               label="Tanque"
               required
               error={errors.fermentationTankId ?? server.fermentationTankId}
-              help="Tanques con destino destilación."
+              help="Tanques con la fermentación completada y destino destilación."
             >
               <Select
                 size="lg"
@@ -245,14 +209,17 @@ export function NewDistillationForm() {
                 onValueChange={(v) => set("fermentationTankId", v)}
                 options={candidates.map((t) => ({
                   value: t.id,
-                  label: `${t.tankCode} · ${lotName(lookup, t.harvestBatchId)} · ${TANK_STATUS[t.status].label}`,
+                  label: `${t.tankCode} · ${lotName(lookup, t.harvestBatchId)}${
+                    t.finalVolumeLiters != null ? ` · ${fmtLiters(t.finalVolumeLiters)}` : ""
+                  }`,
                 }))}
               />
             </Field>
             {previous.length > 0 && (
               <Alert tone="info">
                 {tank?.tankCode} ya pasó por el alambique{" "}
-                {previous.length === 1 ? "una vez" : `${fmtNumber(previous.length)} veces`}: esta será otra tanda.
+                {previous.length === 1 ? "una vez" : `${fmtNumber(previous.length)} veces`}: esta será otra tanda, con
+                el vino base que quede.
               </Alert>
             )}
           </FormSection>
@@ -274,18 +241,27 @@ export function NewDistillationForm() {
               label="Volumen de entrada"
               required
               error={errors.inputVolumeLiters ?? server.inputVolumeLiters}
-              help="Vino base que entra."
+              help={
+                tankLiters != null
+                  ? `Vino base que entra. El tanque quedó con ${fmtLiters(tankLiters)} al completar la fermentación.`
+                  : "Vino base que entra."
+              }
             >
               <Input
                 size="lg"
                 numeric
                 suffix="L"
                 value={values.inputVolumeLiters}
-                placeholder={defaults.inputVolumeLiters}
+                placeholder={tankLiters != null && previous.length === 0 ? String(tankLiters) : undefined}
                 onChange={(e) => set("inputVolumeLiters", e.target.value)}
               />
             </Field>
-            <Field label="Inicio" required error={errors.processStartDate ?? server.processStartDate}>
+            <Field
+              label="Inicio"
+              required
+              error={errors.processStartDate ?? server.processStartDate}
+              help="No puede ser anterior al fin de la fermentación."
+            >
               <Input
                 size="lg"
                 type="date"
@@ -294,107 +270,47 @@ export function NewDistillationForm() {
               />
             </Field>
             <Field
-              label="Fin"
-              error={errors.processEndDate ?? server.processEndDate}
-              help="El reposo cuenta desde el fin."
-            >
-              <Input
-                size="lg"
-                type="date"
-                value={values.processEndDate}
-                onChange={(e) => set("processEndDate", e.target.value)}
-              />
-            </Field>
-          </FormSection>
-
-          <FormSection title="Cortes del alambique" columns={1}>
-            <StillCutsForm
-              values={values}
-              errors={errors}
-              onChange={(f: CutsField, v) => set(f, v)}
-              inputVolumeLiters={parseDecimal(values.inputVolumeLiters || defaults.inputVolumeLiters)}
-            />
-          </FormSection>
-
-          <FormSection title="Balance" columns={2}>
-            <Field
-              label="Volumen de salida"
-              error={errors.outputVolumeLiters ?? server.outputVolumeLiters}
-              help="Por defecto, el corazón."
+              label="Grado del vino base"
+              error={errors.initialAlcoholPercentage ?? server.initialAlcoholPercentage}
+              help="Opcional."
             >
               <Input
                 size="lg"
                 numeric
-                suffix="L"
-                value={values.outputVolumeLiters}
-                placeholder={defaults.outputVolumeLiters}
-                onChange={(e) => set("outputVolumeLiters", e.target.value)}
-              />
-            </Field>
-            <Field
-              label="Merma"
-              error={errors.wasteVolumeLiters ?? server.wasteVolumeLiters}
-              help="Por defecto, cabeza + cola."
-            >
-              <Input
-                size="lg"
-                numeric
-                suffix="L"
-                value={values.wasteVolumeLiters}
-                placeholder={defaults.wasteVolumeLiters}
-                onChange={(e) => set("wasteVolumeLiters", e.target.value)}
+                inputMode="text"
+                suffix="% vol"
+                value={values.initialAlcoholPercentage}
+                onChange={(e) => set("initialAlcoholPercentage", e.target.value)}
               />
             </Field>
           </FormSection>
 
-          <Field label="Notas">
+          <Field label="Notas" error={errors.notes}>
             <Textarea value={values.notes} onChange={(e) => set("notes", e.target.value)} rows={2} />
           </Field>
-          <RuleViolationNotice error={createDistillation.error} fields={SERVER_FIELDS} />
+          <RuleViolationNotice error={createDistillation.error} fields={DISTILLATION_FIELDS} />
         </Card>
 
         <aside className="grid content-start gap-4">
           <Card className="grid gap-3 p-5">
-            <CardHeader title="Denominación de Origen" />
+            <CardHeader title="Denominación de origen" />
             {!tank ? (
-              <p className="m-0 text-sm text-fg-muted">Elige un tanque para comprobar la aptitud D.O.</p>
-            ) : doAllowed ? (
-              <>
-                <Badge tone="accent" variant="strong">
-                  Parcela apta para Singani D.O.
-                </Badge>
-                <Checkbox
-                  checked={values.isDoEligible}
-                  onCheckedChange={(c) => set("isDoEligible", c === true)}
-                  label="Destilación con D.O. Singani"
-                  description={
-                    terroir ? `${terroir.parcelName} · ${fmtNumber(terroir.altitudeMasl)} m s. n. m.` : undefined
-                  }
-                />
-              </>
+              <p className="m-0 text-sm text-fg-muted">Elige un tanque para ver la D.O. de su lote.</p>
+            ) : lot.data ? (
+              <DoEvaluationView evaluation={lot.data.denomination} />
             ) : (
-              <Alert tone="warning" title="Sin D.O. Singani">
-                {eligibility.reasons.join(" ")}
-              </Alert>
+              <Skeleton shape="block" className="h-16" />
             )}
-          </Card>
-          <Card className="grid gap-3 border-warning bg-warning-soft p-5" aria-live="polite">
-            <CardHeader title="Reposo obligatorio" />
-            <div className="flex items-center gap-3">
-              <Lock aria-hidden size={28} strokeWidth={1.5} className="text-warning" />
-              <span className="font-display text-3xl text-warning-text">
-                {restUntil ? fmtDate(restUntil.toISOString()) : "—"}
-              </span>
-            </div>
-            <p className="m-0 text-sm text-fg-muted">
-              {SINGANI_REST_DAYS} días desde el fin de la destilación. El embotellado queda bloqueado hasta entonces.
+            <p className="m-0 text-xs text-fg-subtle">
+              La calcula el servidor con toda la uva del lote y sus reglas, y la vuelve a comprobar al abrir la
+              destilación. No se declara.
             </p>
-            {tank?.volumeFilledLiters ? (
-              <p className="m-0 text-xs text-fg-subtle">
-                Tanque {tank.tankCode}: {fmtLiters(tank.volumeFilledLiters)} de vino base.
-              </p>
-            ) : null}
           </Card>
+          <Alert tone="info" title="El reposo empieza al cerrar">
+            {lot.data
+              ? `Las reglas de este lote exigen ${fmtNumber(lot.data.rules.singani.minRestDays)} días de reposo desde el cierre de la destilación.`
+              : "El reposo mínimo es el de las reglas del lote y cuenta desde el cierre de la destilación."}
+          </Alert>
         </aside>
       </form>
     </>,

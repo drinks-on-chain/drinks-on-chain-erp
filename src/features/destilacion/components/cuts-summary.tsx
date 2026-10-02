@@ -2,13 +2,26 @@ import { cn } from "@drinks-on-chain/ui";
 import { fmtLiters, fmtNumber } from "@/lib/format";
 import { cutShares, type Cuts } from "../distillation-model";
 
-/** Resumen de los cortes: tres cifras (corazón en oro) y la barra de proporciones. */
-export function CutsSummary({ cuts, inputLiters }: { cuts: Cuts; inputLiters: number | null }) {
+/**
+ * Resumen de los cortes: tres cifras (corazón en oro), la barra de proporciones y, si el servidor
+ * los da, el grado del corazón y su alcohol puro (la base del balance de alcohol del embotellado).
+ */
+export function CutsSummary({
+  cuts,
+  inputLiters,
+  heartAbvPercent = null,
+  pureAlcoholLiters = null,
+}: {
+  cuts: Cuts;
+  inputLiters: number | null;
+  heartAbvPercent?: number | null;
+  pureAlcoholLiters?: number | null;
+}) {
   const shares = cutShares(cuts);
   const items = [
-    { key: "head", label: "Cabeza", liters: cuts.head, share: shares.head, bar: "bg-border-strong" },
+    { key: "head", label: "Cabezas", liters: cuts.head, share: shares.head, bar: "bg-border-strong" },
     { key: "heart", label: "Corazón", liters: cuts.heart, share: shares.heart, bar: "bg-accent" },
-    { key: "tail", label: "Cola", liters: cuts.tail, share: shares.tail, bar: "bg-fg-subtle" },
+    { key: "tail", label: "Colas", liters: cuts.tail, share: shares.tail, bar: "bg-fg-subtle" },
   ] as const;
   const yieldPct = cuts.heart !== null && inputLiters ? (cuts.heart / inputLiters) * 100 : null;
 
@@ -34,7 +47,7 @@ export function CutsSummary({ cuts, inputLiters }: { cuts: Cuts; inputLiters: nu
       <div
         className="flex h-3 overflow-hidden rounded-full bg-bg-deep"
         role="img"
-        aria-label={`Cabeza ${fmtNumber(shares.head, 1)} %, corazón ${fmtNumber(shares.heart, 1)} %, cola ${fmtNumber(shares.tail, 1)} %`}
+        aria-label={`Cabezas ${fmtNumber(shares.head, 1)} %, corazón ${fmtNumber(shares.heart, 1)} %, colas ${fmtNumber(shares.tail, 1)} %`}
       >
         {items.map((i) => (
           <span key={i.key} className={i.bar} style={{ width: `${i.share}%` }} />
@@ -43,6 +56,12 @@ export function CutsSummary({ cuts, inputLiters }: { cuts: Cuts; inputLiters: nu
       {yieldPct !== null && (
         <p className="m-0 text-sm text-fg-muted">
           Rendimiento del corazón: {fmtNumber(yieldPct, 1)} % del vino base ({fmtLiters(inputLiters!)}).
+        </p>
+      )}
+      {heartAbvPercent != null && (
+        <p className="m-0 text-sm text-fg-muted">
+          Corazón al {fmtNumber(heartAbvPercent, 1)} % vol
+          {pureAlcoholLiters != null ? ` · ${fmtLiters(pureAlcoholLiters, 1)} de alcohol puro` : ""}.
         </p>
       )}
     </div>

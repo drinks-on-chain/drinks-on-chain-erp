@@ -29,11 +29,13 @@ import { fmtDate, fmtDaysLeft, parseDecimal } from "@/lib/format";
 // ---------------------------------------------------------------------------
 
 /** Pestañas de la ficha del lote (`?pestana=` en la URL). */
-export const LOT_TABS = ["resumen", "linea-de-tiempo"] as const;
+export const LOT_TABS = ["resumen", "balance", "codigos", "linea-de-tiempo"] as const;
 export type LotTab = (typeof LOT_TABS)[number];
 
 export const LOT_TAB_LABEL: Record<LotTab, string> = {
   resumen: "Resumen",
+  balance: "Balance",
+  codigos: "Códigos",
   "linea-de-tiempo": "Línea de tiempo",
 };
 

@@ -26,7 +26,6 @@ import {
   ProductionBatchResponseSchema,
   ProductionReportSchema,
   TraceDashboardSchema,
-  RestStatusResponseSchema,
   TerroirDetailSchema,
   TerroirResponseSchema,
   WineAgingResponseSchema,
@@ -44,7 +43,6 @@ import {
   type CompleteFermentationTankDto,
   type CreateBatchLabAnalysisDto,
   type CreateBottleCodeExportDto,
-  type CreateBottlingBatchDto,
   type CreateLotAttachmentDto,
   type CreateLotBottlingDto,
   type CreateLotCorrectionDto,
@@ -335,8 +333,6 @@ export const erpApi = {
     list("/v1/production-batches", ProductionBatchResponseSchema, q, s),
   production: (id: string, signal?: AbortSignal) =>
     api(`/v1/production-batches/${id}`, { schema: ProductionBatchResponseSchema, signal }),
-  restStatus: (id: string, signal?: AbortSignal) =>
-    api(`/v1/production-batches/${id}/rest-status`, { schema: RestStatusResponseSchema, signal }),
   createDistillation: (body: Nullable<CreateDistillationBatchDto>) =>
     api("/v1/production-batches/distillation", {
       method: "POST",
@@ -357,12 +353,6 @@ export const erpApi = {
   bottlings: (q: PageQuery = {}, s?: AbortSignal) => list("/v1/bottling", BottlingBatchResponseSchema, q, s),
   bottling: (id: string, signal?: AbortSignal) =>
     api(`/v1/bottling/${id}`, { schema: BottlingBatchResponseSchema, signal }),
-  createBottling: (body: Nullable<CreateBottlingBatchDto>) =>
-    api("/v1/bottling", {
-      method: "POST",
-      body: omitNulls<CreateBottlingBatchDto>(body),
-      schema: BottlingBatchResponseSchema,
-    }),
   labAnalysis: (bottlingId: string, signal?: AbortSignal) =>
     api(`/v1/lab-analyses/batch/${bottlingId}`, { schema: BatchLabAnalysisResponseSchema, signal }),
   createLabAnalysis: (body: Nullable<CreateBatchLabAnalysisDto>) =>
