@@ -1,5 +1,5 @@
 import type { LotGraph, LotGraphNode } from "@drinks-on-chain/mocks";
-import { fmtNumber } from "@/lib/format";
+import { fmtDate, fmtNumber } from "@/lib/format";
 
 // Grafo del lote (contrato de la Ola 2 §11.3, `GET /v1/lots/{id}/graph`): de la parcela al
 // laboratorio, con cantidades y métricas reales. Lo que no se registró llega como `null` y se
@@ -37,7 +37,12 @@ export type GraphMetric = { key: string; label: string; text: string; recorded: 
 /** "23,4 °Bx" o "No registrado". */
 export function metricView(m: LotGraphNode["metrics"][number]): GraphMetric {
   if (m.value === null) return { key: m.key, label: m.label, text: "No registrado", recorded: false };
-  const value = typeof m.value === "number" ? fmtNumber(m.value, Number.isInteger(m.value) ? 0 : 2) : m.value;
+  const value =
+    typeof m.value === "number"
+      ? fmtNumber(m.value, Number.isInteger(m.value) ? 0 : 2)
+      : /^\d{4}-\d{2}-\d{2}(T.*)?$/.test(m.value)
+        ? fmtDate(m.value)
+        : m.value;
   return { key: m.key, label: m.label, text: m.unit ? `${value} ${m.unit}` : value, recorded: true };
 }
 

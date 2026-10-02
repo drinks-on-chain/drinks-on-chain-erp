@@ -62,6 +62,12 @@ const STAGE_ORDER: readonly LotStageCode[] = [
   "DISCARDED",
 ];
 
+/** "Singani Gran Reserva 2026 · CVJ-2026-SINGANI-004" (los lotes migrados se llaman como su código). */
+function lotSubject(lot: { name: string; lotCode: string | null; reference: string }): string {
+  const code = lot.lotCode ?? lot.reference;
+  return lot.name === code ? code : `${lot.name} · ${code}`;
+}
+
 export function dashboardView(d: TraceDashboard): DashboardView {
   const sum = (stages: readonly LotStageCode[]) => stages.reduce((total, s) => total + d.lotsByStage[s], 0);
   const tasks: DashboardTask[] = [];
@@ -121,7 +127,7 @@ export function dashboardView(d: TraceDashboard): DashboardView {
       id: `lab-${lot.id}`,
       kind: "lab",
       title: "Registrar el laboratorio del lote",
-      subject: `${lot.name} · ${lot.lotCode ?? lot.reference}`,
+      subject: lotSubject(lot),
       href: `/lotes/${lot.id}?pestana=laboratorio`,
       due: "Pendiente",
       urgent: false,
@@ -133,7 +139,7 @@ export function dashboardView(d: TraceDashboard): DashboardView {
       id: `close-${lot.id}`,
       kind: "close",
       title: "Cerrar el expediente",
-      subject: `${lot.name} · ${lot.lotCode ?? lot.reference}`,
+      subject: lotSubject(lot),
       href: `/lotes/${lot.id}?pestana=expediente`,
       due: "Listo",
       urgent: false,
