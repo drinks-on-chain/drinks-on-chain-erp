@@ -9,7 +9,7 @@ import { today } from "@/lib/erp/today";
 import { fmtNumber, parseDecimal } from "@/lib/format";
 import { hasErrors, toDateInput } from "../form-utils";
 import { suggestedTotalG, validateTreatment, type TreatmentField, type TreatmentValues } from "../tank-model";
-import { FormErrorAlert } from "./form-error";
+import { RuleViolationNotice } from "@/components/rule-violation-notice";
 import { useReturnFocus } from "@/lib/use-return-focus";
 import { fieldErrorsFrom } from "@/lib/api/field-errors";
 
@@ -187,7 +187,7 @@ export function TreatmentForm({
         <Field label="Notas">
           <Textarea value={values.notes} onChange={set("notes")} rows={2} />
         </Field>
-        <FormErrorAlert error={addTreatment.error} fields={SERVER_FIELDS} />
+        <RuleViolationNotice error={addTreatment.error} fields={SERVER_FIELDS} />
       </form>
     </SlideOver>
   );

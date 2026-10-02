@@ -27,7 +27,7 @@ import {
   type AgingField,
   type AgingValues,
 } from "@/features/crianza/aging-model";
-import { FormErrorAlert } from "@/features/vinificacion/components/form-error";
+import { RuleViolationNotice } from "@/components/rule-violation-notice";
 import { hasErrors, toDateInput } from "@/features/vinificacion/form-utils";
 import { parseDecimal, fmtDate, fmtDaysLeft, fmtLiters } from "@/lib/format";
 import { lotLookup, lotName } from "@/features/vinificacion/tank-model";
@@ -115,7 +115,8 @@ export function NewAgingForm() {
         containerMaterial: values.containerMaterial.trim() || null,
         containerCode: values.containerCode.trim() || null,
         barrelUseCycle: parseDecimal(values.barrelUseCycle),
-        volumeLiters: parseDecimal(values.volumeLiters) ?? tank?.volumeFilledLiters ?? null,
+        // Obligatorio desde la Ola 2: por defecto, lo que quedó en el tanque al completar la fermentación.
+        volumeLiters: parseDecimal(values.volumeLiters) ?? tank?.finalVolumeLiters ?? tank?.volumeFilledLiters ?? 0,
         plannedMonths: months!,
         startDate: values.startDate || null,
         notes: values.notes.trim() || null,
@@ -306,7 +307,7 @@ export function NewAgingForm() {
           <Field label="Notas">
             <Textarea value={values.notes} onChange={(e) => set("notes", e.target.value)} rows={2} />
           </Field>
-          <FormErrorAlert error={createAging.error} fields={SERVER_FIELDS} />
+          <RuleViolationNotice error={createAging.error} fields={SERVER_FIELDS} />
         </Card>
 
         <aside className="grid content-start gap-4">

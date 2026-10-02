@@ -4,7 +4,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Flame, Wine } from "lucide-react";
-import type { DestinationType } from "@drinks-on-chain/mocks";
+import type { BifurcationDestination } from "@drinks-on-chain/mocks";
 import {
   Alert,
   Badge,
@@ -24,7 +24,7 @@ import {
 } from "@drinks-on-chain/ui";
 import { PageChrome } from "@/components/page-chrome";
 import { DecisionModal, type DecisionOption } from "@/features/vinificacion/components/decision-modal";
-import { FormErrorAlert } from "@/features/vinificacion/components/form-error";
+import { RuleViolationNotice } from "@/components/rule-violation-notice";
 import { hasErrors, toDateInput } from "@/features/vinificacion/form-utils";
 import { parseDecimal, fmtDate, fmtKg, fmtNumber } from "@/lib/format";
 import {
@@ -114,7 +114,7 @@ export function NewTankForm() {
     setDeciding(true);
   };
 
-  const confirm = (destinationType: DestinationType) => {
+  const confirm = (destinationType: BifurcationDestination) => {
     const v = formValues();
     createTank.mutate(
       {
@@ -142,7 +142,7 @@ export function NewTankForm() {
     );
   };
 
-  const options: DecisionOption<DestinationType>[] = [
+  const options: DecisionOption<BifurcationDestination>[] = [
     {
       value: "WINE_AGING",
       title: "A crianza",
@@ -386,7 +386,7 @@ export function NewTankForm() {
         confirmLabel="Confirmar destino y llenar"
         onConfirm={confirm}
         confirming={createTank.isPending}
-        error={createTank.error ? <FormErrorAlert error={createTank.error} fields={SERVER_FIELDS} /> : undefined}
+        error={createTank.error ? <RuleViolationNotice error={createTank.error} fields={SERVER_FIELDS} /> : undefined}
       />
     </div>
   );
