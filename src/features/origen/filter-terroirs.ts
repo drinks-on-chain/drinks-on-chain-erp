@@ -1,5 +1,5 @@
 import type { TerroirResponse } from "@drinks-on-chain/mocks";
-import { doEligibility } from "./do-eligibility";
+import { isDoApt } from "./do-eligibility";
 
 // Filtros del directorio de terroirs (búsqueda, cepa y "Apto D.O."), en cliente: la bodega
 // tiene pocas parcelas y las pills se construyen con las cepas que existen.
@@ -34,7 +34,7 @@ export function filterTerroirs(items: readonly TerroirResponse[], f: TerroirFilt
   const q = fold(f.search?.trim() ?? "");
   return items.filter((t) => {
     if (f.variety && t.varietyName !== f.variety) return false;
-    if (f.doOnly && !doEligibility(t).eligible) return false;
+    if (f.doOnly && !isDoApt(t)) return false;
     if (!q) return true;
     return [t.parcelName, t.varietyName, t.cadastreCode ?? "", t.doType ?? "", t.soilType ?? ""].some((v) =>
       fold(v).includes(q),

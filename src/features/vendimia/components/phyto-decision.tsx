@@ -1,46 +1,55 @@
 "use client";
 
 import { useState } from "react";
-import type { HarvestBatchResponse } from "@drinks-on-chain/mocks";
+import type { HarvestBatchDetail } from "@drinks-on-chain/mocks";
 import { Alert, Button, Field, Modal, ModalClose, Textarea, toast } from "@drinks-on-chain/ui";
+import { RuleViolationNotice } from "@/components/rule-violation-notice";
 import { UploadField } from "@/features/origen/components/upload-field";
-import { errorMessage } from "@/lib/api/errors";
-import { useUpdatePhytoStatus } from "@/lib/erp/hooks";
+import { useCreatePhytoDecision } from "@/lib/erp/hooks";
 import { useReturnFocus } from "@/lib/use-return-focus";
 import { outOfRangeCount } from "../lab-targets";
-import { availableDecisions, PHYTO_DECISIONS, type PhytoDecision } from "../phyto";
+import { availableDecisions, PHYTO_DECISIONS, requiresReason, type PhytoDecision } from "../phyto";
 
 /**
- * 3.2 Dictamen: botones masivos (rechazar / cuarentena / aprobar) y confirmación explícita
- * en un modal con informe de inspección opcional (uploads?folder=inspections) y notas.
+ * Dictamen fitosanitario (contrato de la Ola 2 §3.4): botones masivos (rechazar / cuarentena /
+ * aprobar) y confirmación explícita en un modal, con informe de inspección opcional y motivo
+ * (obligatorio al rechazar o poner en cuarentena). Cada dictamen se añade al historial con su
+ * autor; el servidor decide si aún se puede dictaminar.
  */
-export function PhytoDecisionPanel({ batch }: { batch: HarvestBatchResponse }) {
-  const update = useUpdatePhytoStatus();
+export function PhytoDecisionPanel({ batch }: { batch: HarvestBatchDetail }) {
+  const decide = useCreatePhytoDecision();
   const [decision, setDecision] = useState<PhytoDecision | null>(null);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [reportKey, setReportKey] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
+  const [notesError, setNotesError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   useReturnFocus(decision !== null);
 
   const decisions = availableDecisions(batch.phytosanitaryStatus);
   const outOfRange = outOfRangeCount(batch);
   const config = decision ? PHYTO_DECISIONS[decision] : null;
+  const needsReason = decision !== null && requiresReason(decision);
 
   function open(d: PhytoDecision) {
     setDecision(d);
-    setPdfUrl(batch.phytoInspectionPdfUrl ?? null);
-    setNotes(batch.notes ?? "");
-    setError(null);
+    setReportKey(null);
+    setNotes("");
+    setNotesError(null);
+    decide.reset();
   }
 
   async function confirm() {
     if (!decision || !config) return;
-    setError(null);
+    decide.reset();
+    const reason = notes.trim();
+    if (needsReason && !reason) {
+      setNotesError("Indica el motivo: queda en el historial del dictamen.");
+      return;
+    }
     try {
-      await update.mutateAsync({
-        id: batch.id,
-        body: { phytosanitaryStatus: decision, phytoInspectionPdfUrl: pdfUrl, notes: notes.trim() || null },
+      await decide.mutateAsync({
+        harvestBatchId: batch.id,
+        body: { decision, inspectionReportKey: reportKey, notes: reason || null },
       });
       toast({
         title: config.done,
@@ -48,8 +57,8 @@ export function PhytoDecisionPanel({ batch }: { batch: HarvestBatchResponse }) {
         tone: decision === "REJECTED" ? "danger" : "success",
       });
       setDecision(null);
-    } catch (e) {
-      setError(errorMessage(e));
+    } catch {
+      // El aviso del modal explica el rechazo del servidor.
     }
   }
 
@@ -65,18 +74,18 @@ export function PhytoDecisionPanel({ batch }: { batch: HarvestBatchResponse }) {
 
       <Modal
         open={decision !== null}
-        onOpenChange={(o) => !o && !update.isPending && setDecision(null)}
-        dismissible={!update.isPending}
+        onOpenChange={(o) => !o && !decide.isPending && setDecision(null)}
+        dismissible={!decide.isPending}
         title={config ? `${config.title} ${batch.harvestBatchCode}` : ""}
         description={
           decision === "QUARANTINE"
-            ? "El lote queda retenido hasta un nuevo dictamen."
-            : "Esta decisión es definitiva: no se puede deshacer desde el ERP."
+            ? "La uva queda retenida hasta un nuevo dictamen."
+            : "Esta decisión es definitiva: queda en el historial con tu nombre y no se sustituye."
         }
         footer={
           <>
             <ModalClose asChild>
-              <Button variant="secondary" size="lg" disabled={update.isPending}>
+              <Button variant="secondary" size="lg" disabled={decide.isPending}>
                 Cancelar
               </Button>
             </ModalClose>
@@ -84,7 +93,7 @@ export function PhytoDecisionPanel({ batch }: { batch: HarvestBatchResponse }) {
               <Button
                 variant={config.variant === "secondary" ? "primary" : config.variant}
                 size="lg"
-                loading={update.isPending}
+                loading={decide.isPending}
                 disabled={uploading}
                 onClick={confirm}
               >
@@ -103,25 +112,33 @@ export function PhytoDecisionPanel({ batch }: { batch: HarvestBatchResponse }) {
           )}
           {decision === "APPROVED" && (
             <p className="m-0 text-sm text-fg-muted">
-              Al aprobarlo, el lote queda disponible para llenar un tanque de fermentación.
+              Al aprobarla, la uva queda disponible para llenar un tanque de fermentación.
             </p>
           )}
           <UploadField
             label="Informe de inspección"
             folder="inspections"
-            value={pdfUrl}
-            onChange={setPdfUrl}
+            value={reportKey}
+            onChange={setReportKey}
             onBusyChange={setUploading}
             help="Opcional. PDF o imagen, hasta 15 MB."
           />
-          <Field label="Notas" help="Opcional. Se guardan en el lote.">
-            <Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          <Field
+            label={needsReason ? "Motivo" : "Notas"}
+            required={needsReason}
+            error={notesError ?? undefined}
+            help={needsReason ? "Obligatorio. Queda en el historial del dictamen." : "Opcional. Quedan en el dictamen."}
+          >
+            <Textarea
+              rows={3}
+              value={notes}
+              onChange={(e) => {
+                setNotes(e.target.value);
+                setNotesError(null);
+              }}
+            />
           </Field>
-          {error && (
-            <Alert tone="danger" title="No se pudo guardar el dictamen">
-              {error}
-            </Alert>
-          )}
+          <RuleViolationNotice error={decide.error} title="No se pudo guardar el dictamen" />
         </div>
       </Modal>
     </>

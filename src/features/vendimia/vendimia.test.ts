@@ -3,7 +3,16 @@ import { describe, expect, it } from "vitest";
 import { erpFixtures } from "@drinks-on-chain/mocks/fixtures";
 import type { HarvestBatchResponse } from "@drinks-on-chain/mocks";
 import { LAB_TARGETS, outOfRangeCount, readingState, targetText } from "./lab-targets";
-import { availableDecisions, canDecidePhyto, countByStatus, filterHarvests, harvestYears } from "./phyto";
+import { emptyMaturity, maturityFieldErrors, sortAnalyses, toMaturityDto } from "./maturity";
+import {
+  availableDecisions,
+  canDecidePhyto,
+  countByStatus,
+  filterHarvests,
+  harvestYears,
+  requiresReason,
+  sortDecisions,
+} from "./phyto";
 import {
   emptyWeighIn,
   emptyWeighInLot,
@@ -35,6 +44,10 @@ describe("objetivos de laboratorio", () => {
   it("cuenta lecturas fuera de objetivo", () => {
     expect(outOfRangeCount({ brixDegrees: 23.4, initialPh: 3.4, initialAcidityGl: 5.9 })).toBe(0);
     expect(outOfRangeCount({ brixDegrees: 21.2, initialPh: 3.8, initialAcidityGl: 5.9 })).toBe(2);
+  });
+
+  it("un pesaje sin análisis no tiene lecturas fuera de objetivo", () => {
+    expect(outOfRangeCount({ brixDegrees: null, initialPh: null, initialAcidityGl: null })).toBe(0);
   });
 });
 
@@ -169,5 +182,75 @@ describe("dictamen y filtros", () => {
     const all = filterHarvests(harvests, {});
     expect(all).toHaveLength(harvests.length);
     expect(all[0]!.intakeDate >= all.at(-1)!.intakeDate).toBe(true);
+  });
+});
+
+describe("análisis de madurez (aparte del pesaje)", () => {
+  const filled = { ...emptyMaturity(NOW), brixDegrees: "23,4", ph: "3,40", acidityGl: "5,9" };
+
+  it("construye el cuerpo con la fecha de medición en ISO", () => {
+    expect(emptyMaturity(NOW).measuredAt).toBe("2026-09-25T12:00");
+    expect(toMaturityDto({ ...filled, notes: " Muestra de la tolva 2 " }, NOW)).toEqual({
+      ok: true,
+      dto: {
+        brixDegrees: 23.4,
+        ph: 3.4,
+        acidityGl: 5.9,
+        measuredAt: "2026-09-25T12:00:00.000Z",
+        notes: "Muestra de la tolva 2",
+      },
+    });
+  });
+
+  it("exige las tres lecturas en rango y una medición no futura", () => {
+    const r = toMaturityDto({ ...emptyMaturity(NOW), ph: "6", measuredAt: "2026-09-26T08:00" }, NOW);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(Object.keys(r.errors).sort()).toEqual(["acidityGl", "brixDegrees", "measuredAt", "ph"]);
+    expect(r.errors.ph).toMatch(/2 a 5/);
+  });
+
+  it("el análisis vigente es el de la medición más reciente", () => {
+    const analysis = (id: string, measuredAt: string) => ({
+      id,
+      harvestBatchId: "h",
+      brixDegrees: 23,
+      ph: 3.4,
+      acidityGl: 6,
+      measuredAt,
+      recordedAt: "2026-09-25T12:00:00Z",
+      recordedBy: null,
+      notes: null,
+      source: "ERP" as const,
+    });
+    const sorted = sortAnalyses([analysis("a", "2026-09-01T08:00:00Z"), analysis("b", "2026-09-10T08:00:00Z")]);
+    expect(sorted.map((a) => a.id)).toEqual(["b", "a"]);
+    expect(sortAnalyses(undefined)).toEqual([]);
+  });
+
+  it("lleva los details del 422 a los campos", () => {
+    const error = new ApiError({
+      status: 422,
+      code: "TRC_DATE_IN_FUTURE",
+      message: "La fecha no puede ser futura",
+      details: [{ field: "measuredAt", message: "Fecha futura", code: "TRC_DATE_IN_FUTURE" }],
+    });
+    expect(maturityFieldErrors(error)).toEqual({ measuredAt: "Fecha futura" });
+  });
+});
+
+describe("historial de dictámenes", () => {
+  it("rechazar y poner en cuarentena exigen motivo; aprobar no", () => {
+    expect(requiresReason("REJECTED")).toBe(true);
+    expect(requiresReason("QUARANTINE")).toBe(true);
+    expect(requiresReason("APPROVED")).toBe(false);
+  });
+
+  it("ordena del más reciente al más antiguo: el primero es el vigente", () => {
+    const decisions = erpFixtures.phytoDecisions;
+    const sorted = sortDecisions(decisions);
+    expect(sorted).toHaveLength(decisions.length);
+    expect(sorted[0]!.decidedAt >= sorted.at(-1)!.decidedAt).toBe(true);
+    expect(sortDecisions(undefined)).toEqual([]);
   });
 });

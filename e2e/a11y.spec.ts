@@ -112,3 +112,21 @@ test("axe con la bitácora del tanque abierta", async ({ page }) => {
   await expect(page.getByRole("dialog", { name: "Añadir registro diario" })).toBeVisible();
   await audit(page, { dialog: true });
 });
+
+test("axe con el análisis de madurez abierto", async ({ page }) => {
+  await login(page, "enologa@cintiviejo.test");
+  await page.goto(`/vendimia/${CINTI.harvestPending}`);
+  await settled(page);
+  await page.getByRole("button", { name: "Registrar análisis" }).click();
+  await expect(page.getByRole("dialog", { name: "Registrar análisis de madurez" })).toBeVisible();
+  await audit(page, { dialog: true });
+});
+
+test("axe con la bifurcación al completar la fermentación abierta", async ({ page }) => {
+  await login(page, "admin@altos.test");
+  await page.goto(`/vinificacion/${ALTOS_FERMENTING_TANK}`);
+  await settled(page);
+  await page.getByRole("button", { name: "Completar fermentación" }).click();
+  await expect(page.getByRole("dialog", { name: /Completar la fermentación/ })).toBeVisible();
+  await audit(page, { dialog: true });
+});

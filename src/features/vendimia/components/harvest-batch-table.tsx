@@ -3,13 +3,16 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import type { HarvestBatchResponse } from "@drinks-on-chain/mocks";
-import { DataTable, cn, type DataTableColumn } from "@drinks-on-chain/ui";
+import { DataTable, Tag, cn, type DataTableColumn } from "@drinks-on-chain/ui";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import { harvestReadings, readingState } from "../lab-targets";
 import { PhytoBadge } from "./phyto-badge";
 
-/** Brix · pH · acidez en una celda; las lecturas fuera de objetivo en ámbar. */
+/** Brix · pH · acidez en una celda; las lecturas fuera de objetivo en ámbar. Sin análisis, lo dice. */
 export function LabSummary({ batch }: { batch: HarvestBatchResponse }) {
+  if (batch.brixDegrees == null && batch.initialPh == null && batch.initialAcidityGl == null) {
+    return <span className="text-fg-muted">Sin análisis</span>;
+  }
   return (
     <span className="inline-flex gap-1.5 whitespace-nowrap tabular-nums">
       {harvestReadings(batch).map(({ target, value }, i) => {
@@ -41,13 +44,23 @@ export type HarvestBatchTableProps = {
   loading?: boolean;
   /** Nombre de la parcela por id; si se omite, no se muestra la columna (ficha del terroir). */
   parcelNames?: Map<string, string>;
+  /** Nombre del lote por id; si se omite, no se muestra la columna. */
+  lotNames?: Map<string, string>;
   empty: ReactNode;
   rowActions?: (h: HarvestBatchResponse) => ReactNode;
   caption?: string;
 };
 
 /** Tabla de lotes de vendimia: código, parcela, fecha, neto, laboratorio y estado. */
-export function HarvestBatchTable({ data, loading, parcelNames, empty, rowActions, caption }: HarvestBatchTableProps) {
+export function HarvestBatchTable({
+  data,
+  loading,
+  parcelNames,
+  lotNames,
+  empty,
+  rowActions,
+  caption,
+}: HarvestBatchTableProps) {
   const columns: DataTableColumn<HarvestBatchResponse>[] = [
     {
       id: "code",
@@ -69,6 +82,23 @@ export function HarvestBatchTable({ data, loading, parcelNames, empty, rowAction
             sortable: true,
             hideBelow: "lg",
             cell: (h: HarvestBatchResponse) => parcelNames.get(h.terroirId) ?? "—",
+          } satisfies DataTableColumn<HarvestBatchResponse>,
+        ]
+      : []),
+    ...(lotNames
+      ? [
+          {
+            id: "lot",
+            header: "Lote",
+            hideBelow: "lg",
+            cell: (h: HarvestBatchResponse) =>
+              h.lotId ? (
+                <Link href={`/lotes/${h.lotId}`} className="hover:underline">
+                  {lotNames.get(h.lotId) ?? "Ver lote"}
+                </Link>
+              ) : (
+                <Tag>Sin lote</Tag>
+              ),
           } satisfies DataTableColumn<HarvestBatchResponse>,
         ]
       : []),

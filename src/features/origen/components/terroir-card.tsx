@@ -26,7 +26,7 @@ export function TerroirCard({ terroir: t }: { terroir: TerroirResponse }) {
         ]}
       />
       <div className="flex flex-wrap items-center gap-2">
-        <DoBadge {...t} />
+        <DoBadge terroir={t} />
         {!t.isActive && <Tag>Inactiva</Tag>}
       </div>
     </Card>

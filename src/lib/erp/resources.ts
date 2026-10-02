@@ -69,7 +69,6 @@ import {
   type CreateInvitationDto,
   type CreateTerroirDto,
   type CreateWineAgingBatchDto,
-  type UpdatePhytoStatusDto,
   type UpdateTerroirDto,
   type UpdateMemberRoleDto,
   type UpdateWineryDto,
@@ -286,8 +285,6 @@ export const erpApi = {
       body: omitNulls<CreatePhytoDecisionDto>(body),
       schema: HarvestBatchDetailSchema,
     }),
-  updatePhytoStatus: (id: string, body: UpdatePhytoStatusDto) =>
-    api(`/v1/harvest-batches/${id}/phyto-status`, { method: "PATCH", body, schema: HarvestBatchResponseSchema }),
 
   // Vinificación
   tanks: (q: TankQuery = {}, s?: AbortSignal) => list("/v1/fermentation-tanks", FermentationTankResponseSchema, q, s),
