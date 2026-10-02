@@ -8,8 +8,8 @@ import { Badge, Button, DataTable, EmptyState, ErrorState, Skeleton, type SortSt
 import { PageChrome } from "@/components/page-chrome";
 import { errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
-import { useBottlings, useLabAnalysesOf } from "@/lib/erp/hooks";
-import { PRODUCT_TYPE } from "@/lib/erp/labels";
+import { useBottlings, useLots } from "@/lib/erp/hooks";
+import { LOT_LAB_STATUS, PRODUCT_TYPE } from "@/lib/erp/labels";
 import { can } from "@/lib/erp/permissions";
 import { fmtDate, fmtNumber } from "@/lib/format";
 import { AnchorBadge } from "./anchor-badge";
@@ -24,8 +24,9 @@ export function BottlingList() {
   const [offset, setOffset] = useState(0);
   const sorted = useMemo(() => sortBottlings(bottlings.data?.items ?? [], sort), [bottlings.data, sort]);
   const items = bottlingPage(sorted, offset);
-  // Un certificado por embotellado (sin endpoint de lista): solo los de la página visible.
-  const labs = useLabAnalysesOf(items.map((b) => b.id));
+  // El laboratorio es del lote: su estado (calculado por el servidor) viene en la lista de lotes.
+  const lots = useLots({ stage: ["BOTTLED", "CERTIFIED", "ANCHORED"], limit: 100, offset: 0 }, !!me.data);
+  const labByLot = useMemo(() => new Map((lots.data?.items ?? []).map((l) => [l.id, l.labStatus])), [lots.data]);
   const canCreate = can(me.data, "bottling.create");
 
   const newAction = canCreate ? (
@@ -106,17 +107,15 @@ export function BottlingList() {
             { id: "chain", header: "Cadena", cell: (b) => <AnchorBadge anchored={b.isAnchoredOnChain} /> },
             {
               id: "lab",
-              header: "Certificado",
+              header: "Laboratorio",
               hideBelow: "md",
               cell: (b) => {
-                const q = labs.get(b.id);
-                if (!q || q.isPending) return <Skeleton className="h-5 w-16" />;
-                if (q.isError) return <span className="text-fg-subtle">—</span>;
-                return q.data ? (
-                  <Badge tone="success">Sí</Badge>
-                ) : (
-                  <Badge tone="neutral" dot={false}>
-                    Sin certificado
+                if (lots.isPending) return <Skeleton className="h-5 w-16" />;
+                const status = b.lotId ? labByLot.get(b.lotId) : undefined;
+                if (!status) return <span className="text-fg-subtle">—</span>;
+                return (
+                  <Badge tone={LOT_LAB_STATUS[status].tone} dot={status !== "NOT_RECORDED"}>
+                    {LOT_LAB_STATUS[status].label}
                   </Badge>
                 );
               },

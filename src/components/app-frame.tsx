@@ -4,6 +4,7 @@ import { useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  ChartColumn,
   Cylinder,
   FlaskConical,
   Grape,
@@ -47,6 +48,7 @@ function navigationFor(me: MeResponse | undefined): NavGroup[] {
       show("aging.read") && { label: "Crianza", href: "/crianza", icon: icon(Wine) },
       show("distillation.read") && { label: "Destilación y reposo", href: "/destilacion", icon: icon(FlaskConical) },
       show("bottling.read") && { label: "Envasado y QR", href: "/envasado", icon: icon(QrCode) },
+      show("reports.read") && { label: "Reportes", href: "/reportes", icon: icon(ChartColumn) },
     ] as (NavItem | false)[]
   ).filter((item): item is NavItem => Boolean(item));
   const winery = (

@@ -41,7 +41,6 @@ import {
   type CleanFermentationTankDto,
   type CloseDistillationDto,
   type CompleteFermentationTankDto,
-  type CreateBatchLabAnalysisDto,
   type CreateBottleCodeExportDto,
   type CreateLotAttachmentDto,
   type CreateLotBottlingDto,
@@ -74,7 +73,6 @@ import {
 import { api, apiFile } from "@/lib/api/client";
 import { pageSchema, type Page } from "@/lib/api/envelope";
 import { fetchAllPages, MAX_PAGE_SIZE } from "@/lib/api/pagination";
-import { DagResponseSchema } from "./dag";
 import { omitNulls, type Nullable } from "./omit-nulls";
 
 // Acceso a los endpoints del ERP (09 §3). Una función por operación; las pantallas usan
@@ -353,16 +351,6 @@ export const erpApi = {
   bottlings: (q: PageQuery = {}, s?: AbortSignal) => list("/v1/bottling", BottlingBatchResponseSchema, q, s),
   bottling: (id: string, signal?: AbortSignal) =>
     api(`/v1/bottling/${id}`, { schema: BottlingBatchResponseSchema, signal }),
-  labAnalysis: (bottlingId: string, signal?: AbortSignal) =>
-    api(`/v1/lab-analyses/batch/${bottlingId}`, { schema: BatchLabAnalysisResponseSchema, signal }),
-  createLabAnalysis: (body: Nullable<CreateBatchLabAnalysisDto>) =>
-    api("/v1/lab-analyses", {
-      method: "POST",
-      body: omitNulls<CreateBatchLabAnalysisDto>(body),
-      schema: BatchLabAnalysisResponseSchema,
-    }),
-  dag: (bottlingId: string, signal?: AbortSignal) =>
-    api(`/v1/traceability/dag/${bottlingId}`, { schema: DagResponseSchema, signal }),
 
   // Bodega
   winery: (signal?: AbortSignal) => api("/v1/wineries/my", { schema: WineryResponseSchema, signal }),

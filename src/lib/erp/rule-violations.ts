@@ -64,6 +64,10 @@ const VALUE_LABELS: Record<string, string> = {
   ANCHORED: "Anclado",
   DISCARDED: "Descartado",
   NOT_REQUIRED: "Sin reposo",
+  ACTIVE: "Activa",
+  CONFORMING: "Conforme",
+  NON_CONFORMING: "No conforme",
+  INCOMPLETE: "Incompleto",
 };
 
 const isDay = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}(T.*)?$/.test(v);
