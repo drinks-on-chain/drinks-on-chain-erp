@@ -239,6 +239,8 @@ export function NewDistillationForm() {
               <Select
                 size="lg"
                 placeholder="Elige el tanque"
+                // Con `key`: el tanque de la URL puede llegar después de la primera carga de la lista.
+                key={tank ? "elegido" : "sin-elegir"}
                 value={tank ? values.fermentationTankId : undefined}
                 onValueChange={(v) => set("fermentationTankId", v)}
                 options={candidates.map((t) => ({

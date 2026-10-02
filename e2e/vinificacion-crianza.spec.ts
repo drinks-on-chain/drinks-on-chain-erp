@@ -134,7 +134,7 @@ test("enóloga de Altos: llenar un tanque exige uva aprobada y la bifurcación s
   await page.getByRole("button", { name: "Llenar tanque" }).first().click();
 
   await expect(page.getByRole("heading", { name: "TK-17" })).toBeVisible();
-  await expect(page.getByText("Se decide al completar la fermentación")).toBeVisible();
+  await expect(page.getByText("Se decide al completar la fermentación", { exact: true })).toBeVisible();
   // Mientras fermenta no hay paso siguiente: antes hay que completar la fermentación.
   await expect(page.getByRole("link", { name: "Pasar a destilación" })).toHaveCount(0);
 
