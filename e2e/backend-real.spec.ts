@@ -994,7 +994,10 @@ async function stubTurnstile(page: Page) {
     route.fulfill({
       contentType: "application/javascript",
       body: `window.turnstile = {
-        render(el, opts) { setTimeout(() => opts.callback("XXXX.DUMMY.TOKEN.XXXX"), 50); return "e2e"; },
+        render(el, opts) {
+          setTimeout(() => { opts.callback("XXXX.DUMMY.TOKEN.XXXX"); window.__e2eTurnstileToken = true; }, 50);
+          return "e2e";
+        },
         remove() {}, reset() {}, getResponse() { return "XXXX.DUMMY.TOKEN.XXXX"; },
       };`,
     }),
@@ -1132,6 +1135,13 @@ test("Ola 1: invitación con cuenta nueva, cuenta de la persona, equipo, configu
     await persona.page.getByLabel("Correo electrónico").fill(email);
     const send = persona.page.getByRole("button", { name: "Enviar enlace" });
     await expect(send).toBeEnabled({ timeout: 20_000 });
+    // El botón no espera al token: en un corredor rápido el clic llegaba antes que el widget y el
+    // formulario pedía completar la verificación sin enviar nada.
+    await persona.page.waitForFunction(
+      () => (window as unknown as { __e2eTurnstileToken?: boolean }).__e2eTurnstileToken === true,
+      undefined,
+      { timeout: 20_000 },
+    );
     const [forgot] = await Promise.all([
       persona.page.waitForResponse((r) => r.url().endsWith("/api/v1/auth/forgot-password")),
       send.click(),
