@@ -33,19 +33,8 @@ import { LotLocks } from "./components/lot-locks";
 import { LotRecords } from "./components/lot-records";
 import { LotStageBadge } from "./components/lot-stage-badge";
 import { RulesList } from "./components/rules-list";
-import { nextStep, snapshotItems, stageView } from "./lot-model";
+import { LOT_TABS, LOT_TAB_LABEL, isLotTab, nextStep, snapshotItems, stageView, type LotTab } from "./lot-model";
 import { LotTimeline, actorText } from "./lot-timeline";
-
-export const LOT_TABS = ["resumen", "linea-de-tiempo"] as const;
-export type LotTab = (typeof LOT_TABS)[number];
-
-const TAB_LABEL: Record<LotTab, string> = {
-  resumen: "Resumen",
-  "linea-de-tiempo": "Línea de tiempo",
-};
-
-export const isLotTab = (value: unknown): value is LotTab =>
-  typeof value === "string" && (LOT_TABS as readonly string[]).includes(value);
 
 const CRUMBS = [{ label: "Lotes", href: "/lotes" }];
 
@@ -186,7 +175,7 @@ function LotSheet({ lot, initialTab }: { lot: Lot; initialTab?: LotTab }) {
         <TabsList aria-label="Secciones del lote">
           {LOT_TABS.map((t) => (
             <TabsTrigger key={t} value={t}>
-              {TAB_LABEL[t]}
+              {LOT_TAB_LABEL[t]}
             </TabsTrigger>
           ))}
         </TabsList>

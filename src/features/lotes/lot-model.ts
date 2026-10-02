@@ -25,6 +25,22 @@ import { fmtDate, fmtDaysLeft, parseDecimal } from "@/lib/format";
 // y la proyección los calcula el servidor; aquí solo se muestran.
 
 // ---------------------------------------------------------------------------
+// Secciones de la ficha
+// ---------------------------------------------------------------------------
+
+/** Pestañas de la ficha del lote (`?pestana=` en la URL). */
+export const LOT_TABS = ["resumen", "linea-de-tiempo"] as const;
+export type LotTab = (typeof LOT_TABS)[number];
+
+export const LOT_TAB_LABEL: Record<LotTab, string> = {
+  resumen: "Resumen",
+  "linea-de-tiempo": "Línea de tiempo",
+};
+
+export const isLotTab = (value: unknown): value is LotTab =>
+  typeof value === "string" && (LOT_TABS as readonly string[]).includes(value);
+
+// ---------------------------------------------------------------------------
 // Etapa
 // ---------------------------------------------------------------------------
 

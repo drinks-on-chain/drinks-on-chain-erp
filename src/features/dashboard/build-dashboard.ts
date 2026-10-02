@@ -21,6 +21,8 @@ export type DashboardTask = {
 
 export type DashboardLock = {
   harvestBatchId: string;
+  /** Lote del servidor al que pertenece el pesaje (ficha en `/lotes/{lotId}`). */
+  lotId: string | null;
   title: string;
   kind: "crianza" | "reposo";
   unlockAt: string | null;
@@ -154,6 +156,7 @@ export function buildDashboard(input: {
     const released = l.lock.released || daysRemaining === 0;
     locks.push({
       harvestBatchId: l.harvestBatchId,
+      lotId: harvestById.get(l.harvestBatchId)?.lotId ?? null,
       title: `${l.terroir.parcelName} · ${l.terroir.varietyName}`,
       kind: l.lock.kind,
       unlockAt,
