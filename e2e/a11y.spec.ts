@@ -5,6 +5,8 @@ import { axe, login, settled, trackErrors } from "./support";
 // Ids reales de los fixtures (node_modules/@drinks-on-chain/mocks/fixtures/erp), filtrados por bodega.
 
 const CINTI = {
+  /** Lote «Moscatel de Alejandría 2026» (en reposo). */
+  lot: "4af50d09-875b-5d1d-b026-62d60ae13b35",
   terroir: "e26c2890-b4e4-5973-aec2-0f092355ad3b",
   harvestPending: "93bd36a1-673b-52ed-adec-539d805cd018",
   harvestApproved: "2a643ce2-9f17-5017-9d6a-b4eb661d4648",
@@ -43,7 +45,9 @@ test.describe("sin sesión", () => {
 const ADMIN_ROUTES = [
   "/",
   "/lotes",
-  `/lotes/${CINTI.harvestApproved}`,
+  "/lotes/nuevo",
+  `/lotes/${CINTI.lot}`,
+  `/lotes/${CINTI.lot}?pestana=linea-de-tiempo`,
   "/origen",
   `/origen/${CINTI.terroir}`,
   "/origen/nuevo",

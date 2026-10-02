@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { axe, login, settled, trackErrors } from "./support";
+import { axe, login, settled, trackErrors, setDataScenario } from "./support";
 
 // Ola 2 · O2-ERP-1, fase 1: el lote del servidor (lista, ficha, alta) contra los mocks 0.5.
 // La trazabilidad de los mocks vive en la memoria de la página: tras crear datos se navega con clics.
@@ -132,7 +132,7 @@ test("Nuevo lote en origen: instantánea de reglas a la vista y D.O. comprobada 
 
 test("las incidencias de migración se ven en la lista y en la ficha", async ({ page }) => {
   const errors = trackErrors(page);
-  await page.goto("/login?mock=lote-con-incidencia");
+  await setDataScenario(page, "lote-con-incidencia");
   await login(page, "enologa@cintiviejo.test");
   await nav(page, "Lotes");
   await page.getByRole("button", { name: "Con incidencias" }).click();

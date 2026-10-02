@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Plus, Search } from "lucide-react";
 import type { LotSummary } from "@drinks-on-chain/mocks";
-import { Badge, Button, DataTable, EmptyState, Input, Pill, PillGroup, Select } from "@drinks-on-chain/ui";
+import { Badge, Button, DataTable, EmptyState, ErrorState, Input, Pill, PillGroup, Select } from "@drinks-on-chain/ui";
 import { PageChrome } from "@/components/page-chrome";
 import { errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
@@ -112,154 +112,157 @@ export function LotList() {
         </div>
       </div>
 
-      <DataTable<LotSummary>
-        caption="Lotes de la bodega"
-        captionHidden
-        data={lots.data?.items ?? []}
-        loading={lots.isPending}
-        error={lots.isError ? { description: errorMessage(lots.error), onRetry: () => void lots.refetch() } : undefined}
-        getRowId={(l) => l.id}
-        manualSorting
-        pagination={{
-          total: lots.data?.total ?? 0,
-          limit: PAGE_SIZE,
-          offset,
-          onOffsetChange: setOffset,
-        }}
-        columns={[
-          {
-            id: "lot",
-            header: "Lote",
-            cell: (l) => (
-              <span className="grid gap-0.5">
-                <Link href={`/lotes/${l.id}`} className="font-medium hover:underline">
-                  {l.name}
-                </Link>
-                <span className="font-mono text-xs text-fg-muted">{l.reference}</span>
-              </span>
-            ),
-          },
-          {
-            id: "type",
-            header: "Tipo",
-            hideBelow: "lg",
-            cell: (l) =>
-              l.productType ? LOT_PRODUCT[l.productType] : <span className="text-fg-muted">Por decidir</span>,
-          },
-          {
-            id: "stage",
-            header: "Etapa",
-            cell: (l) => {
-              const detail = stageView(l).detail;
-              return (
-                <span className="grid justify-items-start gap-1">
-                  <LotStageBadge lot={l} />
-                  {detail && <span className="text-xs text-fg-muted">{detail}</span>}
+      {lots.isError ? (
+        <ErrorState description={errorMessage(lots.error)} onRetry={() => lots.refetch()} retrying={lots.isFetching} />
+      ) : (
+        <DataTable<LotSummary>
+          caption="Lotes de la bodega"
+          captionHidden
+          data={lots.data?.items ?? []}
+          loading={lots.isPending}
+          getRowId={(l) => l.id}
+          manualSorting
+          pagination={{
+            total: lots.data?.total ?? 0,
+            limit: PAGE_SIZE,
+            offset,
+            onOffsetChange: setOffset,
+          }}
+          columns={[
+            {
+              id: "lot",
+              header: "Lote",
+              cell: (l) => (
+                <span className="grid gap-0.5">
+                  <Link href={`/lotes/${l.id}`} className="font-medium hover:underline">
+                    {l.name}
+                  </Link>
+                  <span className="font-mono text-xs text-fg-muted">{l.reference}</span>
                 </span>
-              );
+              ),
             },
-          },
-          {
-            id: "lock",
-            header: "Candado",
-            cell: (l) =>
-              !l.nextLock ? (
-                <span className="text-fg-muted">—</span>
-              ) : (
-                <Badge tone={l.nextLock.released ? "success" : "warning"}>{lockBadgeText(l.nextLock)}</Badge>
-              ),
-          },
-          {
-            id: "bottles",
-            header: "Botellas",
-            numeric: true,
-            hideBelow: "lg",
-            cell: (l) =>
-              l.bottles != null ? (
-                fmtNumber(l.bottles)
-              ) : l.projectedBottles != null ? (
-                <span className="text-fg-muted" title="Proyección calculada por el servidor">
-                  ≈ {fmtNumber(l.projectedBottles)}
-                </span>
-              ) : l.estimatedBottles != null ? (
-                <span className="text-fg-muted" title="Estimación declarada por la bodega">
-                  est. {fmtNumber(l.estimatedBottles)}
-                </span>
-              ) : (
-                <span className="text-fg-muted">—</span>
-              ),
-          },
-          {
-            id: "lab",
-            header: "Laboratorio",
-            hideBelow: "xl",
-            cell: (l) =>
-              l.labStatus === "NOT_RECORDED" ? (
-                <span className="text-fg-muted">—</span>
-              ) : (
-                <Badge tone={LOT_LAB_STATUS[l.labStatus].tone}>{LOT_LAB_STATUS[l.labStatus].label}</Badge>
-              ),
-          },
-          {
-            id: "code",
-            header: "Código de lote",
-            hideBelow: "md",
-            cell: (l) =>
-              l.lotCode ? (
-                <span className="font-mono text-sm whitespace-nowrap">{l.lotCode}</span>
-              ) : (
-                <span className="text-fg-muted">—</span>
-              ),
-          },
-          {
-            id: "issues",
-            header: "Incidencias",
-            hideBelow: "md",
-            cell: (l) =>
-              l.complianceIssuesOpen > 0 ? (
-                <Badge tone="danger">
-                  {l.complianceIssuesOpen} {l.complianceIssuesOpen === 1 ? "abierta" : "abiertas"}
-                </Badge>
-              ) : (
-                <span className="text-fg-muted">—</span>
-              ),
-          },
-        ]}
-        rowActions={(l) => (
-          <Button asChild size="sm" variant="tertiary">
-            <Link href={`/lotes/${l.id}`} aria-label={`Ver ${l.name} (${l.reference})`}>
-              Ver
-            </Link>
-          </Button>
-        )}
-        empty={
-          filtered ? (
-            <EmptyState
-              bare
-              title="Ningún lote coincide"
-              description="Prueba con otra etapa, otro tipo o borra la búsqueda."
-              action={
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setFilters(EMPTY_LOT_FILTERS);
-                    setOffset(0);
-                  }}
-                >
-                  Quitar filtros
-                </Button>
-              }
-            />
-          ) : (
-            <EmptyState
-              bare
-              title="Aún no hay lotes"
-              description="Crea el lote en origen, o déjalo nacer al registrar un pesaje o al llenar un tanque."
-              action={create}
-            />
-          )
-        }
-      />
+            {
+              id: "type",
+              header: "Tipo",
+              hideBelow: "lg",
+              cell: (l) =>
+                l.productType ? LOT_PRODUCT[l.productType] : <span className="text-fg-muted">Por decidir</span>,
+            },
+            {
+              id: "stage",
+              header: "Etapa",
+              cell: (l) => {
+                const detail = stageView(l).detail;
+                return (
+                  <span className="grid justify-items-start gap-1">
+                    <LotStageBadge lot={l} />
+                    {detail && <span className="text-xs text-fg-muted">{detail}</span>}
+                  </span>
+                );
+              },
+            },
+            {
+              id: "lock",
+              header: "Candado",
+              cell: (l) =>
+                !l.nextLock ? (
+                  <span className="text-fg-muted">—</span>
+                ) : (
+                  <Badge tone={l.nextLock.released ? "success" : "warning"}>{lockBadgeText(l.nextLock)}</Badge>
+                ),
+            },
+            {
+              id: "bottles",
+              header: "Botellas",
+              numeric: true,
+              hideBelow: "lg",
+              cell: (l) =>
+                l.bottles != null ? (
+                  fmtNumber(l.bottles)
+                ) : l.projectedBottles != null ? (
+                  <span className="text-fg-muted" title="Proyección calculada por el servidor">
+                    ≈ {fmtNumber(l.projectedBottles)}
+                  </span>
+                ) : l.estimatedBottles != null ? (
+                  <span className="text-fg-muted" title="Estimación declarada por la bodega">
+                    est. {fmtNumber(l.estimatedBottles)}
+                  </span>
+                ) : (
+                  <span className="text-fg-muted">—</span>
+                ),
+            },
+            {
+              id: "lab",
+              header: "Laboratorio",
+              hideBelow: "xl",
+              cell: (l) =>
+                l.labStatus === "NOT_RECORDED" ? (
+                  <span className="text-fg-muted">—</span>
+                ) : (
+                  <Badge tone={LOT_LAB_STATUS[l.labStatus].tone}>{LOT_LAB_STATUS[l.labStatus].label}</Badge>
+                ),
+            },
+            {
+              id: "code",
+              header: "Código de lote",
+              hideBelow: "md",
+              cell: (l) =>
+                l.lotCode ? (
+                  <span className="font-mono text-sm whitespace-nowrap">{l.lotCode}</span>
+                ) : (
+                  <span className="text-fg-muted">—</span>
+                ),
+            },
+            {
+              id: "issues",
+              header: "Incidencias",
+              hideBelow: "md",
+              cell: (l) =>
+                l.complianceIssuesOpen > 0 ? (
+                  <Badge tone="danger">
+                    {l.complianceIssuesOpen} {l.complianceIssuesOpen === 1 ? "abierta" : "abiertas"}
+                  </Badge>
+                ) : (
+                  <span className="text-fg-muted">—</span>
+                ),
+            },
+          ]}
+          rowActions={(l) => (
+            <Button asChild size="sm" variant="tertiary">
+              <Link href={`/lotes/${l.id}`} aria-label={`Ver ${l.name} (${l.reference})`}>
+                Ver
+              </Link>
+            </Button>
+          )}
+          empty={
+            filtered ? (
+              <EmptyState
+                bare
+                title="Ningún lote coincide"
+                description="Prueba con otra etapa, otro tipo o borra la búsqueda."
+                action={
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setFilters(EMPTY_LOT_FILTERS);
+                      setOffset(0);
+                    }}
+                  >
+                    Quitar filtros
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                bare
+                title="Aún no hay lotes"
+                description="Crea el lote en origen, o déjalo nacer al registrar un pesaje o al llenar un tanque."
+                action={create}
+              />
+            )
+          }
+        />
+      )}
     </div>
   );
 }

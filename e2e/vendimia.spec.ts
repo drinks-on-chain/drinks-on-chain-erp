@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { trackErrors } from "./support";
 
-// Flujo de origen a dictamen: terroir nuevo → pesaje con laboratorio → aprobación.
+// Flujo de origen a dictamen: terroir nuevo → pesaje (análisis opcional) → aprobación.
 // Tras crear datos se navega con clics: los mocks viven en la memoria de la página.
 test("el agrónomo registra un terroir, pesa uva de esa parcela y aprueba el lote", async ({ page }) => {
   const errors = trackErrors(page);
@@ -30,11 +30,11 @@ test("el agrónomo registra un terroir, pesa uva de esa parcela y aprueba el lot
   await page.getByLabel("Peso bruto").fill("12.600");
   await page.getByLabel("Tara").fill("200");
   await expect(page.locator("output")).toContainText("12.400");
-  // Brix, pH y acidez son obligatorios en el mismo alta.
-  await page.getByRole("button", { name: "Registrar ingreso" }).click();
-  await expect(page.getByText("Obligatorio: mide los grados Brix.")).toBeVisible();
-
+  // El análisis es opcional, pero si se registra va completo: Brix, pH y acidez.
   await page.getByLabel("Grados Brix").fill("23,8");
+  await page.getByRole("button", { name: "Registrar ingreso" }).click();
+  await expect(page.getByText("Falta el pH: el análisis se registra completo.")).toBeVisible();
+
   await page.getByLabel("pH").fill("3,9");
   await expect(page.getByText("Sobre el objetivo")).toBeVisible();
   await page.getByLabel("pH").fill("3,45");

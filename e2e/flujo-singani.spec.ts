@@ -4,10 +4,9 @@ import { trackErrors } from "./support";
 // Un embotellado recién creado aún no tiene certificado de laboratorio: 404 esperado.
 const NO_LAB = /^404 \/api\/v1\/lab-analyses\/batch\//;
 
-// Flujo de ejemplo del documento maestro ("Singani Gran Reserva 2026"), de origen a QR (03 §4, 1G).
-// Parte 1: un lote nuevo recorre origen → vendimia → tanque → destilación y queda en el reposo
-// de 180 días. Parte 2: como el reposo no puede cumplirse en una prueba, se embotella la
-// destilación de la misma bodega que ya lo cumplió y se exportan sus QR.
+// Flujo de ejemplo del documento maestro ("Singani Gran Reserva 2026"): un lote nuevo recorre
+// origen → vendimia → tanque → destilación y queda en el reposo de 180 días, con su lote del
+// servidor en la lista. El recorrido completo hasta el expediente llega con la fase 3 de O2-ERP-1.
 // Los mocks viven en la memoria de la página: tras crear datos se navega solo con clics.
 
 async function login(page: Page, email: string) {
@@ -25,7 +24,7 @@ async function logout(page: Page) {
 
 const nav = (page: Page, name: string) => page.getByRole("link", { name, exact: true }).first().click();
 
-test("Singani Gran Reserva 2026: de la parcela al reposo y del reposo cumplido al QR", async ({ page }) => {
+test("Singani Gran Reserva 2026: de la parcela al reposo de 180 días", async ({ page }) => {
   test.setTimeout(120_000);
   const errors = trackErrors(page, [NO_LAB]);
   await page.goto("/login");
@@ -47,6 +46,10 @@ test("Singani Gran Reserva 2026: de la parcela al reposo y del reposo cumplido a
   await page.getByRole("link", { name: "Registrar pesaje" }).first().click();
   await page.getByLabel("Peso bruto").fill("18.550");
   await page.getByLabel("Tara").fill("150");
+  // El pesaje crea el lote: nace con su instantánea de reglas.
+  await page.getByRole("combobox", { name: "Lote" }).click();
+  await expect(page.getByRole("option", { name: "Nuevo lote…" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
   await page.getByLabel("Grados Brix").fill("23,4");
   await page.getByLabel("pH").fill("3,4");
   await page.getByLabel("Acidez total").fill("5,9");
@@ -92,29 +95,16 @@ test("Singani Gran Reserva 2026: de la parcela al reposo y del reposo cumplido a
   await expect(page.getByText(/180/).first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Pasar a embotellado" })).toBeDisabled();
 
-  // El lote aparece en la vista derivada con su etapa y candado.
+  // El lote del servidor (nació al llenar el tanque con uva sin lote) está en reposo, con su candado.
   await nav(page, "Lotes");
-  await expect(page.getByRole("row", { name: new RegExp(harvestCode) })).toContainText("Reposo");
-
-  // 5. Del reposo cumplido al QR: embotellar la destilación ya liberada de la bodega.
-  await nav(page, "Envasado y QR");
-  await page.getByRole("link", { name: "Nuevo embotellado" }).click();
-  await page.getByRole("combobox", { name: "Fuente" }).click();
-  await page.getByRole("option", { name: /HARV-2025-MOLINO-03/ }).click();
-  await page.getByRole("button", { name: "Usar esta cifra" }).click();
-  await page.getByLabel(/Botellas llenadas/).fill("950");
-  await page.getByRole("button", { name: "Cerrar producción y generar identidad" }).click();
-  await page
-    .getByRole("dialog", { name: "¿Cerrar la producción?" })
-    .getByRole("button", { name: "Sí, cerrar y sellar" })
-    .click();
-  await expect(page.getByRole("heading", { name: /sellado$/ })).toBeVisible();
-  await expect(page.getByText(/^CVJ-2026-SINGANI-\d{3}$/).first()).toBeVisible();
-
-  const [download] = await Promise.all([
-    page.waitForEvent("download"),
-    page.getByRole("button", { name: "Descargar CSV" }).click(),
-  ]);
-  expect(download.suggestedFilename()).toMatch(/^qr-CVJ-2026-SINGANI-\d{3}\.csv$/);
+  const row = page.getByRole("row", { name: /CVJ-L2026-006/ });
+  await expect(row).toContainText("Reposo");
+  await expect(row).toContainText("Singani");
+  await expect(row).toContainText(/Faltan 1[78]\d días/);
+  await row.getByRole("link", { name: "Ver" }).click();
+  await expect(page.getByRole("list", { name: "Candados del lote" })).toContainText("Reposo mínimo de 180 días");
+  await expect(
+    page.getByRole("list", { name: "Registros del lote" }).getByRole("link", { name: harvestCode }),
+  ).toBeVisible();
   expect(errors).toEqual([]);
 });
