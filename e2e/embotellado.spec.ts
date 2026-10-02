@@ -101,7 +101,7 @@ test("Cinti Viejo: embotella el singani con el reposo cumplido, exporta sus cód
     page.waitForEvent("download"),
     page.getByRole("button", { name: "Descargar CSV" }).click(),
   ]);
-  expect(csvDownload.suggestedFilename()).toBe(`codigos-${lotCode}.csv`);
+  expect(csvDownload.suggestedFilename()).toBe(`codigos-${lotCode}-1-2950.csv`);
   const csv = (await readFile((await csvDownload.path())!, "utf8")).replace(/^﻿/, "").trimEnd().split(/\r?\n/);
   expect(csv).toHaveLength(2951);
   expect(csv[0]).toContain("serial");

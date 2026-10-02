@@ -81,7 +81,7 @@ test("enóloga de Altos: la crianza en barrica muestra su cuenta regresiva", asy
 
   await page.goto("/crianza");
   await expect(page.getByRole("heading", { name: "Barricas y crianza" })).toBeVisible();
-  const row = page.getByRole("row").filter({ hasText: "Cuartel 1 · La Angostura · Tannat" });
+  const row = page.getByRole("row").filter({ hasText: "BAR-FR-2024-01" });
   await expect(row).toContainText("39 d");
   await row.getByRole("link", { name: "Cuartel 1 · La Angostura · Tannat" }).click();
 
@@ -106,7 +106,7 @@ test("enóloga de Altos: llenar un tanque exige uva aprobada y la bifurcación s
 
   // Uva pendiente de dictamen: el servidor la rechaza y el aviso explica la regla del lote.
   await page.getByRole("checkbox", { name: "HARV-2026-SAUCES-12" }).click();
-  await expect(page.getByLabel("Código del tanque")).toHaveValue("TK-17");
+  await expect(page.getByLabel("Código del tanque")).toHaveValue("TK-33");
   await page.getByLabel("Volumen llenado").fill("4.000");
   await page.getByRole("button", { name: "Llenar tanque" }).first().click();
   const notice = page.getByTestId("rule-violation-notice");
@@ -133,13 +133,13 @@ test("enóloga de Altos: llenar un tanque exige uva aprobada y la bifurcación s
   await page.getByLabel("Volumen llenado").fill("6.500");
   await page.getByRole("button", { name: "Llenar tanque" }).first().click();
 
-  await expect(page.getByRole("heading", { name: "TK-17" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "TK-33" })).toBeVisible();
   await expect(page.getByText("Se decide al completar la fermentación", { exact: true })).toBeVisible();
   // Mientras fermenta no hay paso siguiente: antes hay que completar la fermentación.
   await expect(page.getByRole("link", { name: "Pasar a destilación" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Completar fermentación" }).click();
-  const modal = page.getByRole("dialog", { name: "Completar la fermentación de TK-17" });
+  const modal = page.getByRole("dialog", { name: "Completar la fermentación de TK-33" });
   await expect(modal).toBeVisible();
   const confirm = modal.getByRole("button", { name: "Confirmar destino y completar" });
   await expect(confirm).toBeDisabled();

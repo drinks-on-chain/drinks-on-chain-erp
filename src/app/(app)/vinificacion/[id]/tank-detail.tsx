@@ -302,7 +302,9 @@ export function TankDetail({ id }: { id: string }) {
         <CardHeader
           title="Bitácora"
           description={`${fmtNumber(activeLogs.length)} ${activeLogs.length === 1 ? "lectura" : "lecturas"}, la más reciente primero${
-            logs.length > activeLogs.length ? ` · ${fmtNumber(logs.length - activeLogs.length)} anuladas` : ""
+            logs.length > activeLogs.length
+              ? ` · ${fmtNumber(logs.length - activeLogs.length)} ${logs.length - activeLogs.length === 1 ? "anulada" : "anuladas"}`
+              : ""
           }`}
           divided
           className="px-5 pt-5"
