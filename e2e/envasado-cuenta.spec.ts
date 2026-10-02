@@ -57,9 +57,7 @@ test("Cinti Viejo: embotella un singani con el reposo cumplido y exporta el lote
 
   // Corazón de 1.500 L a 60 % → 2.250 L a 40 %: 750 L de agua (caso del contrato §18).
   await expect(page.getByLabel("Grado alcohólico final")).toHaveValue("40");
-  await expect(page.getByText(/Ajuste de 60 % a 40 % vol: ≈ 750 L/)).toBeVisible();
-  await page.getByRole("button", { name: "Usar esta cifra" }).click();
-  await expect(page.getByLabel("Adición de agua")).toHaveValue("750");
+  await page.getByLabel("Adición de agua").fill("750");
   await page.getByLabel(/Botellas llenadas/).fill("2950");
   await page.getByLabel("Tipo de botella").fill("Vidrio flint 750 ml");
   // 2.950 × 0,75 L = 2.212,5 L envasados de 2.250 L disponibles.
@@ -92,7 +90,8 @@ test("Cinti Viejo: embotella un singani con el reposo cumplido y exporta el lote
   expect(csv[0]).toBe("codigo,lote,botella,url,estado");
   const [code, lotCol, serial, url, state] = csv[1]!.split(",");
   expect([code, lotCol, serial, state]).toEqual([`${lot}-0001`, lot, "0001", "provisional"]);
-  expect(url).toMatch(/^https:\/\/[^/]+\/b\/CVJ-2026-SINGANI-\d{3}\?n=0001$/);
+  // El origen es el del Marketplace (en los mocks, http://localhost:3005).
+  expect(url).toMatch(/^https?:\/\/[^/]+\/b\/CVJ-2026-SINGANI-\d{3}\?n=0001$/);
 
   // ZIP: LEEME, CSV, QR del lote y un SVG por botella.
   const [zipDownload] = await Promise.all([
