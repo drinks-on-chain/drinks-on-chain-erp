@@ -1,6 +1,8 @@
-import { LotDetail } from "@/features/lotes/lot-detail";
+import { LotDetail, isLotTab } from "@/features/lotes/lot-detail";
 
-export default async function Page({ params }: PageProps<"/lotes/[id]">) {
+// Ficha del lote. `?pestana=` abre una sección concreta (enlaces del panel y de los avisos).
+export default async function Page({ params, searchParams }: PageProps<"/lotes/[id]">) {
   const { id } = await params;
-  return <LotDetail id={id} />;
+  const { pestana } = await searchParams;
+  return <LotDetail id={id} initialTab={isLotTab(pestana) ? pestana : undefined} />;
 }

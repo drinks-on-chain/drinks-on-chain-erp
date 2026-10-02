@@ -39,8 +39,8 @@ function navigationFor(me: MeResponse | undefined): NavGroup[] {
   const show = (action: ErpAction) => can(me, action);
   const trace = (
     [
-      // "Lotes" une toda la cadena: solo para quien lee crianza, destilación y embotellado.
-      show("aging.read") && { label: "Lotes", href: "/lotes", icon: icon(Layers) },
+      // El lote es la entidad del servidor que agrupa la cadena: lo ven todos los roles (Ola 2 §14).
+      show("lot.read") && { label: "Lotes", href: "/lotes", icon: icon(Layers) },
       show("terroir.read") && { label: "Origen y terroirs", href: "/origen", icon: icon(Mountain) },
       show("harvest.read") && { label: "Vendimia y laboratorio", href: "/vendimia", icon: icon(Grape) },
       show("tank.read") && { label: "Vinificación", href: "/vinificacion", icon: icon(Cylinder) },

@@ -1,210 +1,265 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Search } from "lucide-react";
-import { LOT_STAGES, type LotStage, type LotView } from "@drinks-on-chain/mocks";
-import { Badge, Button, DataTable, EmptyState, ErrorState, Input, Pill, PillGroup } from "@drinks-on-chain/ui";
-import { LotStatusBadge } from "@/components/lot-status-badge";
+import type { LotSummary } from "@drinks-on-chain/mocks";
+import { Badge, Button, DataTable, EmptyState, Input, Pill, PillGroup, Select } from "@drinks-on-chain/ui";
 import { PageChrome } from "@/components/page-chrome";
 import { errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
-import { useLotViews } from "@/lib/erp/hooks";
-import { LOT_KIND, LOT_STAGE } from "@/lib/erp/labels";
+import { useLots } from "@/lib/erp/hooks";
+import { LOT_LAB_STATUS, LOT_PRODUCT, LOT_STAGE_CODE } from "@/lib/erp/labels";
 import { can } from "@/lib/erp/permissions";
-import { today } from "@/lib/erp/today";
-import { filterLots, lockLabel, lotLock, type LotFilters } from "./lots";
+import { fmtNumber } from "@/lib/format";
+import { LotStageBadge } from "./components/lot-stage-badge";
+import {
+  EMPTY_LOT_FILTERS,
+  FILTER_STAGES,
+  hasLotFilters,
+  lockBadgeText,
+  lotListQuery,
+  stageView,
+  type LotFilters,
+} from "./lot-model";
 
-const KINDS = [
-  { value: "todos", label: "Todos" },
-  { value: "vino", label: "Vino" },
-  { value: "singani", label: "Singani" },
+const PAGE_SIZE = 20;
+
+const PRODUCTS = [
+  { value: "ALL", label: "Todos" },
+  { value: "WINE", label: "Vino" },
+  { value: "SINGANI", label: "Singani" },
 ] as const;
 
+const STAGE_OPTIONS = [
+  { value: "ALL", label: "Todas las etapas" },
+  ...FILTER_STAGES.map((s) => ({ value: s, label: LOT_STAGE_CODE[s].label })),
+];
+
+/** Texto de búsqueda que se envía al servidor medio segundo después de dejar de escribir. */
+function useDebounced(value: string, ms = 350) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), ms);
+    return () => clearTimeout(id);
+  }, [value, ms]);
+  return debounced;
+}
+
+/** Lista de lotes (`GET /v1/lots`): filtra y pagina el servidor; etapa, candado e incidencias los calcula él. */
 export function LotList() {
   const me = useMe();
-  const lots = useLotViews();
-  const [filters, setFilters] = useState<LotFilters>({ stage: "todas", kind: "todos", q: "" });
-  const now = today();
-  const all = useMemo(() => lots.data ?? [], [lots.data]);
-  const rows = useMemo(() => filterLots(all, filters), [all, filters]);
-  const counts = useMemo(() => {
-    const c = new Map<LotStage, number>();
-    for (const l of all) c.set(l.stage, (c.get(l.stage) ?? 0) + 1);
-    return c;
-  }, [all]);
-  const filtered = filters.stage !== "todas" || filters.kind !== "todos" || filters.q !== "";
+  const [filters, setFilters] = useState<LotFilters>(EMPTY_LOT_FILTERS);
+  const [offset, setOffset] = useState(0);
+  const q = useDebounced(filters.q);
+  const lots = useLots(lotListQuery({ ...filters, q }, { limit: PAGE_SIZE, offset }), !!me.data);
+  const filtered = hasLotFilters(filters);
 
-  const register = can(me.data, "harvest.create") ? (
+  const change = (patch: Partial<LotFilters>) => {
+    setFilters((f) => ({ ...f, ...patch }));
+    setOffset(0);
+  };
+
+  const create = can(me.data, "lot.write") ? (
     <Button asChild iconStart={<Plus aria-hidden size={18} />}>
-      <Link href="/vendimia/pesaje">Registrar ingreso</Link>
+      <Link href="/lotes/nuevo">Nuevo lote</Link>
     </Button>
   ) : undefined;
 
   return (
     <div className="grid grid-cols-1 gap-6">
-      <PageChrome breadcrumbs={[{ label: "Lotes" }]} actions={register} />
+      <PageChrome breadcrumbs={[{ label: "Lotes" }]} actions={create} />
       <header className="grid grid-cols-1 gap-1">
         <h1 className="font-display text-3xl">Lotes</h1>
-        <p className="text-fg-muted">
-          Cada ingreso de uva, de la parcela a la botella: etapa actual, candados y código del lote embotellado.
+        <p className="m-0 text-fg-muted">
+          Cada lote agrupa su cadena, de la parcela a la botella: etapa, candados, laboratorio e incidencias.
         </p>
       </header>
 
-      {lots.isError ? (
-        <ErrorState description={errorMessage(lots.error)} onRetry={() => lots.refetch()} retrying={lots.isFetching} />
-      ) : (
-        <>
-          <div className="grid grid-cols-1 gap-3">
-            <PillGroup label="Filtrar por etapa" className="flex flex-wrap gap-2">
-              <Pill
-                pressed={filters.stage === "todas"}
-                onPressedChange={() => setFilters((f) => ({ ...f, stage: "todas" }))}
-              >
-                Todas · {all.length}
-              </Pill>
-              {LOT_STAGES.filter((s) => counts.has(s)).map((s) => (
-                <Pill
-                  key={s}
-                  pressed={filters.stage === s}
-                  onPressedChange={(p) => setFilters((f) => ({ ...f, stage: p ? s : "todas" }))}
-                >
-                  {LOT_STAGE[s].label} · {counts.get(s)}
-                </Pill>
-              ))}
-            </PillGroup>
-            <div className="flex flex-wrap items-center gap-3">
-              <PillGroup label="Filtrar por tipo" className="flex gap-2">
-                {KINDS.map((k) => (
-                  <Pill
-                    key={k.value}
-                    size="sm"
-                    pressed={filters.kind === k.value}
-                    onPressedChange={() => setFilters((f) => ({ ...f, kind: k.value }))}
-                  >
-                    {k.label}
-                  </Pill>
-                ))}
-              </PillGroup>
-              <Input
-                type="search"
-                aria-label="Buscar lote"
-                placeholder="Código, parcela o cepa"
-                prefix={<Search aria-hidden size={16} />}
-                value={filters.q}
-                onChange={(e) => setFilters((f) => ({ ...f, q: e.target.value }))}
-                wrapperClassName="w-full sm:ml-auto sm:w-80"
-              />
-            </div>
-          </div>
-
-          <DataTable<LotView>
-            caption="Lotes de la bodega"
-            captionHidden
-            data={rows}
-            loading={lots.isPending}
-            getRowId={(l) => l.harvestBatchId}
-            columns={[
-              {
-                id: "code",
-                header: "Lote de vendimia",
-                accessor: "harvestBatchCode",
-                sortable: true,
-                cell: (l) => (
-                  <Link href={`/lotes/${l.harvestBatchId}`} className="font-medium whitespace-nowrap hover:underline">
-                    {l.harvestBatchCode}
-                  </Link>
-                ),
-              },
-              {
-                id: "terroir",
-                header: "Parcela · cepa",
-                hideBelow: "md",
-                accessor: (l) => l.terroir.parcelName,
-                sortable: true,
-                cell: (l) => (
-                  <span>
-                    {l.terroir.parcelName}
-                    <span className="text-fg-muted"> · {l.terroir.varietyName}</span>
-                  </span>
-                ),
-              },
-              {
-                id: "kind",
-                header: "Tipo",
-                hideBelow: "lg",
-                cell: (l) => (l.kind ? LOT_KIND[l.kind] : <span className="text-fg-subtle">Por decidir</span>),
-              },
-              {
-                id: "stage",
-                header: "Etapa",
-                accessor: (l) => LOT_STAGES.indexOf(l.stage),
-                sortable: true,
-                cell: (l) => <LotStatusBadge stage={l.stage} />,
-              },
-              {
-                id: "lock",
-                header: "Candado",
-                accessor: (l) => lotLock(l, now)?.days ?? -1,
-                sortable: true,
-                cell: (l) => {
-                  const lock = lotLock(l, now);
-                  if (!lock) return <span className="text-fg-subtle">—</span>;
-                  return lock.released ? (
-                    <Badge tone="success">Liberado</Badge>
-                  ) : (
-                    <Badge tone="warning">{lockLabel(lock)}</Badge>
-                  );
-                },
-              },
-              {
-                id: "lot",
-                header: "Código de lote",
-                hideBelow: "md",
-                cell: (l) =>
-                  l.internationalLotCode && l.bottlingBatchId ? (
-                    <Link
-                      href={`/envasado/${l.bottlingBatchId}`}
-                      className="font-mono text-sm whitespace-nowrap hover:underline"
-                    >
-                      {l.internationalLotCode}
-                    </Link>
-                  ) : (
-                    <span className="text-fg-subtle">—</span>
-                  ),
-              },
-            ]}
-            rowActions={(l) => (
-              <Button asChild size="sm" variant="tertiary">
-                <Link href={`/lotes/${l.harvestBatchId}`} aria-label={`Ver ${l.harvestBatchCode}`}>
-                  Ver
-                </Link>
-              </Button>
-            )}
-            empty={
-              filtered ? (
-                <EmptyState
-                  bare
-                  title="Ningún lote coincide"
-                  description="Prueba con otra etapa, otro tipo o borra la búsqueda."
-                  action={
-                    <Button variant="secondary" onClick={() => setFilters({ stage: "todas", kind: "todos", q: "" })}>
-                      Quitar filtros
-                    </Button>
-                  }
-                />
-              ) : (
-                <EmptyState
-                  bare
-                  title="Aún no hay lotes"
-                  description="Cada ingreso de uva en la báscula abre un lote nuevo."
-                  action={register}
-                />
-              )
-            }
+      <div className="grid grid-cols-1 gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Select
+            aria-label="Filtrar por etapa"
+            className="w-56"
+            value={filters.stage}
+            onValueChange={(v) => change({ stage: v as LotFilters["stage"] })}
+            options={STAGE_OPTIONS}
           />
-        </>
-      )}
+          <PillGroup label="Filtrar por tipo" className="flex gap-2">
+            {PRODUCTS.map((p) => (
+              <Pill
+                key={p.value}
+                size="sm"
+                pressed={filters.productType === p.value}
+                onPressedChange={() => change({ productType: p.value })}
+              >
+                {p.label}
+              </Pill>
+            ))}
+          </PillGroup>
+          <Pill size="sm" pressed={filters.issuesOnly} onPressedChange={(p) => change({ issuesOnly: p })}>
+            Con incidencias
+          </Pill>
+          <Input
+            type="search"
+            aria-label="Buscar lote"
+            placeholder="Nombre, referencia o código de lote"
+            prefix={<Search aria-hidden size={16} />}
+            value={filters.q}
+            onChange={(e) => change({ q: e.target.value })}
+            wrapperClassName="w-full sm:ml-auto sm:w-80"
+          />
+        </div>
+      </div>
+
+      <DataTable<LotSummary>
+        caption="Lotes de la bodega"
+        captionHidden
+        data={lots.data?.items ?? []}
+        loading={lots.isPending}
+        error={lots.isError ? { description: errorMessage(lots.error), onRetry: () => void lots.refetch() } : undefined}
+        getRowId={(l) => l.id}
+        manualSorting
+        pagination={{
+          total: lots.data?.total ?? 0,
+          limit: PAGE_SIZE,
+          offset,
+          onOffsetChange: setOffset,
+        }}
+        columns={[
+          {
+            id: "lot",
+            header: "Lote",
+            cell: (l) => (
+              <span className="grid gap-0.5">
+                <Link href={`/lotes/${l.id}`} className="font-medium hover:underline">
+                  {l.name}
+                </Link>
+                <span className="font-mono text-xs text-fg-muted">{l.reference}</span>
+              </span>
+            ),
+          },
+          {
+            id: "type",
+            header: "Tipo",
+            hideBelow: "lg",
+            cell: (l) =>
+              l.productType ? LOT_PRODUCT[l.productType] : <span className="text-fg-muted">Por decidir</span>,
+          },
+          {
+            id: "stage",
+            header: "Etapa",
+            cell: (l) => {
+              const detail = stageView(l).detail;
+              return (
+                <span className="grid justify-items-start gap-1">
+                  <LotStageBadge lot={l} />
+                  {detail && <span className="text-xs text-fg-muted">{detail}</span>}
+                </span>
+              );
+            },
+          },
+          {
+            id: "lock",
+            header: "Candado",
+            cell: (l) =>
+              !l.nextLock ? (
+                <span className="text-fg-muted">—</span>
+              ) : (
+                <Badge tone={l.nextLock.released ? "success" : "warning"}>{lockBadgeText(l.nextLock)}</Badge>
+              ),
+          },
+          {
+            id: "bottles",
+            header: "Botellas",
+            numeric: true,
+            hideBelow: "lg",
+            cell: (l) =>
+              l.bottles != null ? (
+                fmtNumber(l.bottles)
+              ) : l.projectedBottles != null ? (
+                <span className="text-fg-muted" title="Proyección calculada por el servidor">
+                  ≈ {fmtNumber(l.projectedBottles)}
+                </span>
+              ) : l.estimatedBottles != null ? (
+                <span className="text-fg-muted" title="Estimación declarada por la bodega">
+                  est. {fmtNumber(l.estimatedBottles)}
+                </span>
+              ) : (
+                <span className="text-fg-muted">—</span>
+              ),
+          },
+          {
+            id: "lab",
+            header: "Laboratorio",
+            hideBelow: "xl",
+            cell: (l) =>
+              l.labStatus === "NOT_RECORDED" ? (
+                <span className="text-fg-muted">—</span>
+              ) : (
+                <Badge tone={LOT_LAB_STATUS[l.labStatus].tone}>{LOT_LAB_STATUS[l.labStatus].label}</Badge>
+              ),
+          },
+          {
+            id: "code",
+            header: "Código de lote",
+            hideBelow: "md",
+            cell: (l) =>
+              l.lotCode ? (
+                <span className="font-mono text-sm whitespace-nowrap">{l.lotCode}</span>
+              ) : (
+                <span className="text-fg-muted">—</span>
+              ),
+          },
+          {
+            id: "issues",
+            header: "Incidencias",
+            hideBelow: "md",
+            cell: (l) =>
+              l.complianceIssuesOpen > 0 ? (
+                <Badge tone="danger">
+                  {l.complianceIssuesOpen} {l.complianceIssuesOpen === 1 ? "abierta" : "abiertas"}
+                </Badge>
+              ) : (
+                <span className="text-fg-muted">—</span>
+              ),
+          },
+        ]}
+        rowActions={(l) => (
+          <Button asChild size="sm" variant="tertiary">
+            <Link href={`/lotes/${l.id}`} aria-label={`Ver ${l.name} (${l.reference})`}>
+              Ver
+            </Link>
+          </Button>
+        )}
+        empty={
+          filtered ? (
+            <EmptyState
+              bare
+              title="Ningún lote coincide"
+              description="Prueba con otra etapa, otro tipo o borra la búsqueda."
+              action={
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setFilters(EMPTY_LOT_FILTERS);
+                    setOffset(0);
+                  }}
+                >
+                  Quitar filtros
+                </Button>
+              }
+            />
+          ) : (
+            <EmptyState
+              bare
+              title="Aún no hay lotes"
+              description="Crea el lote en origen, o déjalo nacer al registrar un pesaje o al llenar un tanque."
+              action={create}
+            />
+          )
+        }
+      />
     </div>
   );
 }
