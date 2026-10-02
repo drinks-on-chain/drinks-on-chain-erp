@@ -18,24 +18,40 @@ import {
   TabsList,
   TabsTrigger,
   Tag,
+  toast,
 } from "@drinks-on-chain/ui";
 import { PageChrome } from "@/components/page-chrome";
+import { ReasonAction } from "@/components/reason-action";
 import { ScreenTitle } from "@/components/screen-title";
 import { ApiError, errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
-import { useLegacyLotId, useLot, useLotBalance, useTerroirs } from "@/lib/erp/hooks";
+import { useDiscardLot, useLegacyLotId, useLot, useLotBalance, useTerroirs } from "@/lib/erp/hooks";
 import { LOT_LAB_STATUS, LOT_PRODUCT } from "@/lib/erp/labels";
 import { can } from "@/lib/erp/permissions";
 import { fmtDate, fmtDateTime, fmtNumber } from "@/lib/format";
 import { BottleCodeExport } from "./components/bottle-code-export";
 import { ComplianceIssues } from "./components/compliance-issues";
 import { DoEvaluationView } from "./components/do-evaluation";
+import { DossierChecklist } from "./components/dossier-checklist";
+import { LotAttachments } from "./components/lot-attachments";
+import { LotCorrections } from "./components/lot-corrections";
+import { LotGraphView } from "./components/lot-graph";
+import { LotLab } from "./components/lot-lab";
 import { LotBalanceChart } from "./components/lot-balance-chart";
 import { LotLocks } from "./components/lot-locks";
 import { LotRecords } from "./components/lot-records";
 import { LotStageBadge } from "./components/lot-stage-badge";
 import { RulesList } from "./components/rules-list";
-import { LOT_TABS, LOT_TAB_LABEL, isLotTab, nextStep, snapshotItems, stageView, type LotTab } from "./lot-model";
+import {
+  LOT_TABS,
+  LOT_TAB_LABEL,
+  isLotTab,
+  isTerminalStage,
+  nextStep,
+  snapshotItems,
+  stageView,
+  type LotTab,
+} from "./lot-model";
 import { LotTimeline, actorText } from "./lot-timeline";
 
 const CRUMBS = [{ label: "Lotes", href: "/lotes" }];
@@ -186,7 +202,7 @@ function LotSheet({ lot, initialTab }: { lot: Lot; initialTab?: LotTab }) {
           ))}
         </TabsList>
         <TabsContent value="resumen">
-          <LotSummaryTab lot={lot} note={step?.note ?? null} />
+          <LotSummaryTab lot={lot} note={step?.note ?? null} canWrite={can(me.data, "lot.write")} />
         </TabsContent>
         {canBalance && (
           <TabsContent value="balance">
@@ -196,6 +212,12 @@ function LotSheet({ lot, initialTab }: { lot: Lot; initialTab?: LotTab }) {
         <TabsContent value="codigos">
           <BottleCodeExport lot={lot} canManage={can(me.data, "bottleCodes.manage")} />
         </TabsContent>
+        <TabsContent value="laboratorio">
+          <LotLab lot={lot} />
+        </TabsContent>
+        <TabsContent value="expediente">
+          <DossierChecklist lot={lot} canClose={can(me.data, "dossier.close")} />
+        </TabsContent>
         <TabsContent value="linea-de-tiempo">
           <Card className="grid grid-cols-1 gap-4">
             <CardHeader
@@ -204,6 +226,21 @@ function LotSheet({ lot, initialTab }: { lot: Lot; initialTab?: LotTab }) {
             />
             <LotTimeline lotId={lot.id} />
           </Card>
+        </TabsContent>
+        <TabsContent value="trazabilidad">
+          <Card className="grid grid-cols-1 gap-5">
+            <CardHeader
+              title="Trazabilidad del lote"
+              description="De la parcela a la botella, con las cantidades que pasan de una etapa a otra y las cifras registradas en cada una."
+            />
+            <LotGraphView lot={lot} />
+          </Card>
+        </TabsContent>
+        <TabsContent value="correcciones">
+          <LotCorrections lot={lot} />
+        </TabsContent>
+        <TabsContent value="archivos">
+          <LotAttachments lot={lot} />
         </TabsContent>
       </Tabs>
     </div>
@@ -235,7 +272,26 @@ function LotBalanceTab({ lot }: { lot: Lot }) {
   );
 }
 
-function LotSummaryTab({ lot, note }: { lot: Lot; note: string | null }) {
+/** Descartar el lote (`POST /v1/lots/{id}/discard`): con motivo; queda de solo lectura. */
+function DiscardLot({ lot }: { lot: Lot }) {
+  const discard = useDiscardLot();
+  return (
+    <ReasonAction
+      label="Descartar lote"
+      title={`¿Descartar ${lot.name}?`}
+      description="El lote deja de admitir registros y sale de la producción. No se puede deshacer; el motivo queda en la línea de tiempo."
+      confirmLabel="Sí, descartar"
+      destructive
+      variant="tertiary"
+      onConfirm={async (reason) => {
+        await discard.mutateAsync({ id: lot.id, reason });
+        toast({ title: "Lote descartado", description: lot.reference, tone: "success" });
+      }}
+    />
+  );
+}
+
+function LotSummaryTab({ lot, note, canWrite }: { lot: Lot; note: string | null; canWrite: boolean }) {
   const terroirs = useTerroirs();
   const terroirNames = useMemo(
     () => Object.fromEntries((terroirs.data?.items ?? []).map((t) => [t.id, t.parcelName])),
@@ -306,6 +362,7 @@ function LotSummaryTab({ lot, note }: { lot: Lot; note: string | null }) {
               ...(lot.notes ? [{ term: "Notas", value: lot.notes }] : []),
             ]}
           />
+          {canWrite && !isTerminalStage(lot.stage) && lot.links.bottlingBatchId === null && <DiscardLot lot={lot} />}
         </Card>
 
         {lot.denomination.status !== "NOT_APPLICABLE" && (

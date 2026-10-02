@@ -14,7 +14,6 @@ import {
   type TerroirResponse,
   type WineAgingResponse,
 } from "@drinks-on-chain/mocks";
-import { TEMP_ALERT_C } from "@/features/dashboard/build-dashboard";
 import {
   emptyLotForm,
   lotFieldErrors,
@@ -37,7 +36,11 @@ const dayStart = (d: Date | string) => {
   return Date.UTC(x.getUTCFullYear(), x.getUTCMonth(), x.getUTCDate());
 };
 
-export { TEMP_ALERT_C };
+/**
+ * Temperatura de fermentación a partir de la cual el mapa de tanques avisa (°C). La alerta del
+ * panel (> 32 °C o 48 h sin lecturas) la calcula el servidor.
+ */
+export const TEMP_ALERT_C = 26;
 
 /** Porcentaje de llenado (0–100) a partir de `volumeFilledLiters / capacityLiters`. */
 export function fillPercent(t: Pick<FermentationTankResponse, "capacityLiters" | "volumeFilledLiters">): number {

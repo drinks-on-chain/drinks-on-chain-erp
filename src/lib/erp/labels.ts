@@ -6,11 +6,9 @@ import type {
   DestinationType,
   DoStatus,
   LotEventType,
-  LotKind,
   LotLabStatus,
   LotLockInfo,
   LotProductType,
-  LotStage,
   LotStageCode,
   PhytosanitaryStatus,
   ProductType,
@@ -24,19 +22,6 @@ import type { Tone } from "@drinks-on-chain/ui";
 // ámbar candados y esperas, verde aprobado/listo, rojo solo rechazo o alerta, oro lo decisivo.
 
 type Label = { label: string; tone: Tone };
-
-export const LOT_STAGE: Record<LotStage, Label> = {
-  pesaje: { label: "Pesaje", tone: "neutral" },
-  vendimia: { label: "Vendimia", tone: "info" },
-  fermentacion: { label: "Fermentación", tone: "info" },
-  bifurcacion: { label: "Por bifurcar", tone: "accent" },
-  crianza: { label: "Crianza", tone: "warning" },
-  reposo: { label: "Reposo", tone: "warning" },
-  embotellado: { label: "Embotellado", tone: "success" },
-  rechazado: { label: "Rechazado", tone: "danger" },
-};
-
-export const LOT_KIND: Record<LotKind, string> = { vino: "Vino", singani: "Singani" };
 
 export const PHYTO_STATUS: Record<PhytosanitaryStatus, Label> = {
   PENDING_INSPECTION: { label: "Pendiente de inspección", tone: "warning" },

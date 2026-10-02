@@ -1,76 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import type { BottlingBatchResponse } from "@drinks-on-chain/mocks";
-import {
-  Button,
-  Card,
-  CardHeader,
-  EmptyState,
-  ErrorState,
-  KeyValueList,
-  Skeleton,
-  Timeline,
-  type TimelineItem,
-} from "@drinks-on-chain/ui";
+import { Button, Card, CardHeader, EmptyState, ErrorState, KeyValueList, Skeleton } from "@drinks-on-chain/ui";
 import { StoredFileLink } from "@/components/stored-file-link";
 import { PageChrome } from "@/components/page-chrome";
 import { ScreenTitle } from "@/components/screen-title";
 import { ApiError, errorMessage } from "@/lib/api/errors";
-import { useBottling, useTraceabilityDag } from "@/lib/erp/hooks";
+import { useBottling } from "@/lib/erp/hooks";
 import { PRODUCT_TYPE } from "@/lib/erp/labels";
 import { fmtDate, fmtDateTime, fmtNumber } from "@/lib/format";
 import { ExternalLink, HashText, explorerTxUrl } from "@/features/cuenta/stellar";
 import { BottlingBalanceMeters } from "@/features/lotes/components/lot-balance-chart";
 import { AnchorBadge } from "./anchor-badge";
-import { LabCertificateCard } from "./lab-certificate-card";
-import { dagSteps } from "./traceability";
 
 const abv = (n: number) => `${fmtNumber(n, Number.isInteger(n) ? 0 : 1)} % vol`;
-
-function TraceabilityCard({ b }: { b: BottlingBatchResponse }) {
-  const dag = useTraceabilityDag(b.id);
-  const steps = dag.data ? dagSteps(dag.data) : [];
-  const items: TimelineItem[] = steps.map((s) => ({
-    key: s.id,
-    title: s.href ? (
-      <Link href={s.href} className="hover:underline">
-        {s.stage} · {s.label}
-      </Link>
-    ) : (
-      `${s.stage} · ${s.label}`
-    ),
-    time: s.date ? (s.type === "TERROIR" ? `Registrada el ${fmtDate(s.date)}` : fmtDate(s.date)) : undefined,
-    status: "done",
-  }));
-  if (dag.data && !steps.some((s) => s.type === "LAB_ANALYSIS")) {
-    items.push({ key: "lab", title: "Certificado de laboratorio", time: "Pendiente", status: "pending" });
-  }
-  items.push({
-    key: "anchor",
-    title: "Anclaje en Stellar",
-    time: b.isAnchoredOnChain && b.anchoredAt ? fmtDateTime(b.anchoredAt) : "Pendiente de anclaje",
-    status: b.isAnchoredOnChain ? "done" : "current",
-  });
-
-  return (
-    <Card className="grid grid-cols-1 gap-4">
-      <CardHeader title="Trazabilidad del lote" description="De la parcela a la botella." />
-      {dag.isPending ? (
-        <Skeleton className="h-56" />
-      ) : dag.isError ? (
-        <ErrorState
-          bare
-          description={errorMessage(dag.error)}
-          onRetry={() => dag.refetch()}
-          retrying={dag.isFetching}
-        />
-      ) : (
-        <Timeline items={items} />
-      )}
-    </Card>
-  );
-}
 
 export function BottlingDetail({ id }: { id: string }) {
   const bottling = useBottling(id);
@@ -227,7 +170,25 @@ export function BottlingDetail({ id }: { id: string }) {
             />
           </Card>
 
-          <LabCertificateCard bottlingId={b.id} lotCode={b.internationalLotCode} />
+          {b.lotId && (
+            <Card className="grid grid-cols-1 gap-3">
+              <CardHeader
+                title="Laboratorio, expediente y trazabilidad"
+                description="Desde la Ola 2 pertenecen al lote: el análisis con su conformidad, el expediente con su huella y el grafo de la parcela a la botella."
+              />
+              <div className="flex flex-wrap gap-3">
+                <Button asChild variant="secondary">
+                  <Link href={`/lotes/${b.lotId}?pestana=laboratorio`}>Laboratorio del lote</Link>
+                </Button>
+                <Button asChild variant="secondary">
+                  <Link href={`/lotes/${b.lotId}?pestana=expediente`}>Expediente</Link>
+                </Button>
+                <Button asChild variant="secondary">
+                  <Link href={`/lotes/${b.lotId}?pestana=trazabilidad`}>Trazabilidad</Link>
+                </Button>
+              </div>
+            </Card>
+          )}
         </div>
 
         <div className="grid grid-cols-1 gap-6">
@@ -269,7 +230,6 @@ export function BottlingDetail({ id }: { id: string }) {
               </Button>
             )}
           </Card>
-          <TraceabilityCard b={b} />
         </div>
       </div>
     </div>
