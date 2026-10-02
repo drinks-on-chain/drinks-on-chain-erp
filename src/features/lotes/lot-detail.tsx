@@ -23,12 +23,14 @@ import { PageChrome } from "@/components/page-chrome";
 import { ScreenTitle } from "@/components/screen-title";
 import { ApiError, errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
-import { useLegacyLotId, useLot, useTerroirs } from "@/lib/erp/hooks";
+import { useLegacyLotId, useLot, useLotBalance, useTerroirs } from "@/lib/erp/hooks";
 import { LOT_LAB_STATUS, LOT_PRODUCT } from "@/lib/erp/labels";
 import { can } from "@/lib/erp/permissions";
 import { fmtDate, fmtDateTime, fmtNumber } from "@/lib/format";
+import { BottleCodeExport } from "./components/bottle-code-export";
 import { ComplianceIssues } from "./components/compliance-issues";
 import { DoEvaluationView } from "./components/do-evaluation";
+import { LotBalanceChart } from "./components/lot-balance-chart";
 import { LotLocks } from "./components/lot-locks";
 import { LotRecords } from "./components/lot-records";
 import { LotStageBadge } from "./components/lot-stage-badge";
@@ -115,6 +117,10 @@ function LotSheet({ lot, initialTab }: { lot: Lot; initialTab?: LotTab }) {
   const step = nextStep(lot);
   const canStep = step && can(me.data, step.action);
   const stage = stageView(lot);
+  // Cada rol ve las secciones que el servidor le deja leer (balance: sin operario; códigos:
+  // el total es de todos, la lista solo de dirección y enología).
+  const canBalance = can(me.data, "lot.balance.read");
+  const tabs = LOT_TABS.filter((t) => t !== "balance" || canBalance);
 
   const changeTab = (value: string) => {
     if (!isLotTab(value)) return;
@@ -171,9 +177,9 @@ function LotSheet({ lot, initialTab }: { lot: Lot; initialTab?: LotTab }) {
 
       <ComplianceIssues issues={lot.complianceIssues} />
 
-      <Tabs value={tab} onValueChange={changeTab}>
+      <Tabs value={tabs.includes(tab) ? tab : "resumen"} onValueChange={changeTab}>
         <TabsList aria-label="Secciones del lote">
-          {LOT_TABS.map((t) => (
+          {tabs.map((t) => (
             <TabsTrigger key={t} value={t}>
               {LOT_TAB_LABEL[t]}
             </TabsTrigger>
@@ -181,6 +187,14 @@ function LotSheet({ lot, initialTab }: { lot: Lot; initialTab?: LotTab }) {
         </TabsList>
         <TabsContent value="resumen">
           <LotSummaryTab lot={lot} note={step?.note ?? null} />
+        </TabsContent>
+        {canBalance && (
+          <TabsContent value="balance">
+            <LotBalanceTab lot={lot} />
+          </TabsContent>
+        )}
+        <TabsContent value="codigos">
+          <BottleCodeExport lot={lot} canManage={can(me.data, "bottleCodes.manage")} />
         </TabsContent>
         <TabsContent value="linea-de-tiempo">
           <Card className="grid grid-cols-1 gap-4">
@@ -193,6 +207,31 @@ function LotSheet({ lot, initialTab }: { lot: Lot; initialTab?: LotTab }) {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+/** Conciliación kilos → litros → botellas (`GET /v1/lots/{id}/balance`). */
+function LotBalanceTab({ lot }: { lot: Lot }) {
+  const balance = useLotBalance(lot.id);
+  return (
+    <Card className="grid grid-cols-1 gap-4">
+      <CardHeader
+        title="Balance del lote"
+        description="De los kilos de uva a las botellas, con la merma de cada etapa. Lo calcula el servidor con los registros del lote."
+      />
+      {balance.isPending ? (
+        <Skeleton shape="block" className="h-40" />
+      ) : balance.isError ? (
+        <ErrorState
+          bare
+          description={errorMessage(balance.error)}
+          onRetry={() => balance.refetch()}
+          retrying={balance.isFetching}
+        />
+      ) : (
+        <LotBalanceChart balance={balance.data} />
+      )}
+    </Card>
   );
 }
 
