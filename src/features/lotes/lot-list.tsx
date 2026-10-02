@@ -38,9 +38,9 @@ const STAGE_OPTIONS = [
 ];
 
 /** Lista de lotes (`GET /v1/lots`): filtra y pagina el servidor; etapa, candado e incidencias los calcula él. */
-export function LotList() {
+export function LotList({ issuesOnly = false }: { issuesOnly?: boolean }) {
   const me = useMe();
-  const [filters, setFilters] = useState<LotFilters>(EMPTY_LOT_FILTERS);
+  const [filters, setFilters] = useState<LotFilters>(() => ({ ...EMPTY_LOT_FILTERS, issuesOnly }));
   const [offset, setOffset] = useState(0);
   const q = useDebounced(filters.q);
   const lots = useLots(lotListQuery({ ...filters, q }, { limit: PAGE_SIZE, offset }), !!me.data);
