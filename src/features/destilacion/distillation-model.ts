@@ -27,11 +27,12 @@ type CutsSource = Pick<ProductionBatchResponse, "headsLiters" | "heartLiters" | 
 
 /** Cortes de la destilación; en registros antiguos, los de `additionalParams`. */
 export function cutsOf(p: CutsSource): Cuts {
-  const legacy = p.additionalParams;
+  const legacy = (p.additionalParams ?? {}) as Record<string, unknown>;
+  const liters = (value: unknown) => (typeof value === "number" ? value : null);
   return {
-    head: p.headsLiters ?? legacy?.headDiscardLiters ?? null,
-    heart: p.heartLiters ?? legacy?.heartYieldLiters ?? null,
-    tail: p.tailsLiters ?? legacy?.tailDiscardLiters ?? null,
+    head: p.headsLiters ?? liters(legacy.headDiscardLiters),
+    heart: p.heartLiters ?? liters(legacy.heartYieldLiters),
+    tail: p.tailsLiters ?? liters(legacy.tailDiscardLiters),
   };
 }
 

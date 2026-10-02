@@ -111,7 +111,6 @@ const FIELD_MAP: Record<string, BottlingField> = {
   "leftover.disposition": "leftoverDisposition",
   "leftover.notes": "leftoverNotes",
   leftover: "leftoverLiters",
-  labelDesignUrl: "labelDesignKey",
 };
 const FIELDS: readonly BottlingField[] = [
   "bottlingDate",

@@ -26,6 +26,7 @@ import {
   ProductionBatchResponseSchema,
   ProductionReportSchema,
   TerroirDetailSchema,
+  TraceDashboardSchema,
   TerroirResponseSchema,
   WineAgingResponseSchema,
   AuditEventSchema,
@@ -73,7 +74,6 @@ import { api, apiFile } from "@/lib/api/client";
 import { pageSchema, type Page } from "@/lib/api/envelope";
 import { fetchAllPages, MAX_PAGE_SIZE } from "@/lib/api/pagination";
 import { omitNulls, type Nullable } from "./omit-nulls";
-import { TraceDashboardSchema } from "./schemas";
 
 // Acceso a los endpoints del ERP (09 §3). Una función por operación; las pantallas usan
 // los hooks de hooks.ts, nunca estas funciones directamente.

@@ -8,6 +8,9 @@ import { login, trackErrors } from "./support";
 const nav = (page: Page, name: string) => page.getByRole("link", { name, exact: true }).first().click();
 const notice = (page: Page) => page.getByTestId("rule-violation-notice");
 
+/** TK-04 de Altos de Calamuchita, en fermentación (fixtures). */
+const ALTOS_FERMENTING_TANK = "f87af6c0-197d-5fa3-b85e-29d7b27f00d9";
+
 /**
  * Añade campos al cuerpo de la siguiente escritura a `path`, como haría quien manipula la petición
  * desde las herramientas del navegador: la interfaz no ofrece esos campos.
@@ -120,5 +123,36 @@ test("destino singani con uva no apta: la bifurcación lo rechaza (TRC_DO_NOT_EL
   await modal.getByRole("button", { name: "Confirmar destino y completar" }).click();
   await expect(modal).toBeHidden();
   await expect(page.getByText("Destino: Crianza (vino)", { exact: true })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("crianza desde un tanque que aún fermenta (TRC_TANK_NOT_COMPLETED)", async ({ page }) => {
+  test.setTimeout(60_000);
+  const errors = trackErrors(page, [/^409 \/api\/v1\/wine-aging$/]);
+  await login(page, "enologa@altos.test");
+  await nav(page, "Vinificación");
+  await page.getByTestId("tank-card").filter({ hasText: "TK-10" }).click();
+  await page.getByRole("button", { name: "Completar fermentación" }).click();
+  const modal = page.getByRole("dialog", { name: "Completar la fermentación de TK-10" });
+  await modal.getByRole("button", { name: /A crianza/ }).click();
+  await modal.getByRole("checkbox").click();
+  await modal.getByRole("button", { name: "Confirmar destino y completar" }).click();
+  await expect(modal).toBeHidden();
+  await page.getByRole("link", { name: "Pasar a crianza" }).click();
+  await expect(page.getByRole("heading", { name: "Iniciar crianza" })).toBeVisible();
+  await page.getByLabel("Código").fill("BAR-FR-2026-12");
+  await page.getByLabel("Meses previstos").fill("6");
+
+  // Se cuela otro tanque, que sigue fermentando: la crianza solo parte de uno completado.
+  await tamperNextPost(page, "/api/v1/wine-aging", { fermentationTankId: ALTOS_FERMENTING_TANK });
+  await page.getByRole("button", { name: "Iniciar crianza" }).first().click();
+  await expect(notice(page)).toContainText("El tanque no tiene la fermentación completada");
+  await expect(notice(page)).toContainText("Fermentando");
+  await expect(notice(page)).toContainText("complétala en la ficha del tanque");
+  await expect(notice(page)).toContainText("TRC_TANK_NOT_COMPLETED");
+
+  // Sin manipular la petición, la crianza parte del tanque completado.
+  await page.getByRole("button", { name: "Iniciar crianza" }).first().click();
+  await expect(page.getByText("Crianza iniciada", { exact: true })).toBeVisible();
   expect(errors).toEqual([]);
 });

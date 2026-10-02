@@ -182,7 +182,9 @@ test("enóloga de Altos: el destino debe coincidir con el tipo del lote", async 
   expect(errors).toEqual([]);
 });
 
-test("enóloga de Altos: la crianza no admite más litros que el tanque y queda con su candado", async ({ page }) => {
+test("enóloga de Altos: la crianza respeta el mínimo de meses y el volumen del tanque, y queda con su candado", async ({
+  page,
+}) => {
   const errors = trackErrors(page, [/^422 \/api\/v1\/wine-aging$/]);
   await login(page, "enologa@altos.test");
   await page.getByRole("link", { name: "Vinificación", exact: true }).first().click();
@@ -200,12 +202,21 @@ test("enóloga de Altos: la crianza no admite más litros que el tanque y queda 
   // El volumen parte del vino que dejó la fermentación.
   await expect(page.getByLabel("Volumen")).toHaveAttribute("placeholder", "3800");
   await page.getByLabel("Código").fill("BAR-FR-2026-11");
+  const notice = page.getByTestId("rule-violation-notice");
+
+  // Altos fija 6 meses de crianza mínima en las reglas del lote: menos, lo rechaza el servidor.
+  await expect(page.getByText("Mínimo de las reglas del lote: 6 meses.", { exact: false })).toBeVisible();
+  await page.getByLabel("Meses previstos").fill("3");
+  await page.getByRole("button", { name: "Iniciar crianza" }).first().click();
+  await expect(notice).toContainText("TRC_AGING_BELOW_MINIMUM");
+  await expect(notice).toContainText("Crianza por debajo del mínimo");
+  await expect(notice).toContainText("6 meses");
+  await expect(notice).toContainText("3 meses");
   await page.getByLabel("Meses previstos").fill("6");
 
   // Más litros de los que quedan en el tanque: lo rechaza el servidor.
   await page.getByLabel("Volumen").fill("9.000");
   await page.getByRole("button", { name: "Iniciar crianza" }).first().click();
-  const notice = page.getByTestId("rule-violation-notice");
   await expect(notice).toContainText("TRC_VOLUME_EXCEEDS_AVAILABLE");
   await expect(notice).toContainText("3.800 L");
   await expect(notice).toContainText("9.000 L");

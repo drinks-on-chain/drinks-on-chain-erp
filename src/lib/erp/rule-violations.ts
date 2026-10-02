@@ -184,9 +184,9 @@ const EXPLAINERS: Record<string, Explainer> = {
     hint: "Un tanque trasegado o limpio no admite lecturas ni tratamientos.",
   },
   TRC_TANK_NOT_COMPLETED: {
-    title: "La fermentación no está terminada",
+    title: "El tanque no tiene la fermentación completada",
     facts: (v) => fact("Estado del tanque", v.meta.status),
-    hint: "Completa la fermentación y decide el destino antes de pasar a crianza o destilación.",
+    hint: "La crianza y la destilación solo parten de un tanque con la fermentación completada: complétala en la ficha del tanque (ahí se decide el destino). Un tanque ya trasegado o limpio no tiene vino que pasar.",
   },
   FERMENTATION_TANK_ALREADY_TRANSFERRED: {
     title: "El tanque ya se trasegó",
@@ -239,11 +239,6 @@ const EXPLAINERS: Record<string, Explainer> = {
         ? `Se podrá embotellar a partir del ${fmtDate(unlock)}, con esa fecha o una posterior.`
         : "Se podrá embotellar cuando se cumpla el candado.";
     },
-  },
-  TRC_PRODUCT_TYPE_MISMATCH: {
-    title: "El tipo de producto se deriva del origen",
-    facts: (v) => [...fact("Tipo del origen", v.expected), ...fact("Tipo indicado", v.actual)],
-    hint: "Una crianza se embotella como vino y una destilación como singani.",
   },
   TRC_BOTTLING_SOURCE_INVALID: {
     title: "Fuente de embotellado no válida",

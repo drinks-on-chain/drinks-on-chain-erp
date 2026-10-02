@@ -189,8 +189,18 @@ export function NewDistillationForm() {
   return shell(
     <>
       {preselectedInvalid && (
-        <Alert tone="warning" title="Ese tanque no puede ir al alambique">
-          No tiene la fermentación completada con destino destilación (singani). Elige otro tanque.
+        <Alert
+          tone="warning"
+          title="Ese tanque no puede ir al alambique"
+          action={
+            <Button asChild size="sm" variant="tertiary">
+              <Link href={`/vinificacion/${preselected}`}>Ir al tanque</Link>
+            </Button>
+          }
+        >
+          La destilación solo parte de un tanque con la fermentación completada y destino destilación (singani). Si aún
+          fermenta, complétala en su ficha (ahí se decide el destino); si ya se trasegó o se limpió, no le queda vino
+          base: elige otro tanque.
         </Alert>
       )}
 

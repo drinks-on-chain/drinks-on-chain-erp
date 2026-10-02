@@ -79,14 +79,14 @@ describe("formulario del análisis", () => {
     }
   });
 
-  it("lleva los errores del servidor a su campo (el alias del informe incluido)", () => {
+  it("lleva los errores del servidor a su campo", () => {
     const error = new ApiError({
       status: 422,
       code: "VALIDATION_ERROR",
       message: "Datos no válidos",
       details: [
         { field: "methanolMg100mlAa", message: "No coincide con el metanol en mg/L" },
-        { field: "laboratoryReportPdfUrl", message: "Informe no encontrado" },
+        { field: "laboratoryReportKey", message: "Informe no encontrado" },
       ],
     });
     expect(labFieldErrors(error)).toEqual({

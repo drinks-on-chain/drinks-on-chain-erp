@@ -22,9 +22,7 @@ async function setMockScenario(page: Page, scenario: Scenario) {
 const SLOW = { timeout: 20_000 };
 
 const LISTS: { path: string; nav: string; empty: string[]; content: RegExp }[] = [
-  // El panel y el reporte son agregados del servidor: el escenario «empty» de los mocks no los vacía
-  // (sus estados vacíos se prueban en las unitarias); aquí solo su error y su reintento.
-  { path: "/", nav: "Panel", empty: [], content: /Tareas pendientes/ },
+  { path: "/", nav: "Panel", empty: ["Todo al día", "Sin candados"], content: /Tareas pendientes/ },
   { path: "/lotes", nav: "Lotes", empty: ["Aún no hay lotes"], content: /CVJ-L2026-/ },
   { path: "/origen", nav: "Origen y terroirs", empty: ["Aún no hay terroirs"], content: /Moscatel/ },
   {
@@ -37,7 +35,7 @@ const LISTS: { path: string; nav: string; empty: string[]; content: RegExp }[] =
   { path: "/crianza", nav: "Crianza", empty: ["Ninguna crianza todavía"], content: /BAR-/ },
   { path: "/destilacion", nav: "Destilación y reposo", empty: ["Ninguna destilación todavía"], content: /Alambique/ },
   { path: "/envasado", nav: "Envasado y QR", empty: ["Aún no hay embotellados"], content: /CVJ-2026-/ },
-  { path: "/reportes", nav: "Reportes", empty: [], content: /Singani/ },
+  { path: "/reportes", nav: "Reportes", empty: ["Aún no hay lotes"], content: /Singani/ },
   { path: "/cuenta", nav: "Cuenta Stellar", empty: ["Aún no hay lotes embotellados"], content: /CVJ-2026-/ },
   { path: "/equipo", nav: "Equipo", empty: ["Sin miembros"], content: /cintiviejo\.test/ },
 ];
@@ -94,7 +92,7 @@ async function expectErrorThenRetry(page: Page) {
 }
 
 test.describe("escenario empty", () => {
-  for (const { path, nav, empty } of LISTS.filter((l) => l.empty.length > 0)) {
+  for (const { path, nav, empty } of LISTS) {
     test(`vacío en ${path}`, async ({ page }) => {
       await openList(page, nav, "empty");
       for (const title of empty) await expect(page.getByRole("heading", { name: title })).toBeVisible(SLOW);

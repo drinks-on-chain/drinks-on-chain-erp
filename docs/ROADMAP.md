@@ -148,3 +148,10 @@ Contrato: `plan/contratos/o2-erp-confiable.md` del plan maestro (§2–§14, §1
 - [x] Los límites de laboratorio de la instantánea de reglas se leen por el nombre del parámetro (`acidezVolatil` → «Acidez volátil») · 2026-10-02
 - [x] Destilación: parte del volumen disponible del tanque (`availableLiters`) y puede cerrarlo (`closeTank`) · 2026-10-02
 - [x] Backend real (Etapa 2 completa): `e2e/backend-real.spec.ts` recorre §18 por la interfaz hasta el expediente cerrado, con siete avisos de elusión; el panel admite `pendingPhyto[].intakeDate` como fecha de calendario (`src/lib/erp/schemas.ts`); los errores de contrato dejan en consola el campo que no cumple · 2026-10-02
+
+### Fase 6 · Mocks 0.5.0-rc.3 (cierre H2)
+
+- [x] `@drinks-on-chain/mocks` 0.5.0-rc.3, sin rutas legadas ni `LotView`: el ERP no envía ningún campo retirado (los cuerpos salen de los DTO del contrato final) ni llama a rutas retiradas · 2026-10-02
+- [x] Crianza y destilación solo desde un tanque `COMPLETED`: los formularios ofrecen solo esos tanques, llevan a la ficha del tanque para completarlo y explican el 409 `TRC_TANK_NOT_COMPLETED` · 2026-10-02
+- [x] El panel vuelve al esquema de los mocks (`pendingPhyto[].intakeDate` como fecha) y se retira `src/lib/erp/schemas.ts`; fuera la regla `TRC_PRODUCT_TYPE_MISMATCH` y los alias `laboratoryReportPdfUrl`/`labelDesignUrl` · 2026-10-02
+- [x] Pruebas: elusiones `TRC_AGING_BELOW_MINIMUM` (Altos exige 6 meses) y `TRC_TANK_NOT_COMPLETED` desde la interfaz; estados vacíos del panel y del reporte con el escenario `empty` · 2026-10-02

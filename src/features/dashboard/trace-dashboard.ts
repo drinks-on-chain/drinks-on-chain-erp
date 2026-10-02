@@ -1,5 +1,4 @@
-import type { LotStageCode } from "@drinks-on-chain/mocks";
-import type { TraceDashboard } from "@/lib/erp/schemas";
+import type { LotStageCode, TraceDashboard } from "@drinks-on-chain/mocks";
 import { fmtDate, fmtDateTime, fmtNumber } from "@/lib/format";
 
 // Panel de la bodega (contrato de la Ola 2 §11.2): el servidor entrega los lotes por etapa, los

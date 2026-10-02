@@ -57,9 +57,17 @@ describe("tabla de destilaciones", () => {
     expect(restAllowsBottling({ state: "discarded" })).toBe(false);
   });
 
-  it("candidatos: tanques con la fermentación completada y destino singani", () => {
-    const codes = distillationCandidates(mine(fx.fermentationTanks)).map((t) => t.tankCode);
-    expect(codes).toEqual(["TK-08"]);
+  it("candidatos: solo tanques con la fermentación completada y destino singani", () => {
+    // En los fixtures ya no queda ninguno completado (TK-08 se trasegó entero).
+    expect(distillationCandidates(mine(fx.fermentationTanks))).toEqual([]);
+    const tank = mine(fx.fermentationTanks)[0]!;
+    const tanks = [
+      { ...tank, id: "a", tankCode: "A", destinationType: "SINGANI_DIST" as const, status: "COMPLETED" as const },
+      { ...tank, id: "b", tankCode: "B", destinationType: "SINGANI_DIST" as const, status: "TRANSFERRED" as const },
+      { ...tank, id: "c", tankCode: "C", destinationType: "SINGANI_DIST" as const, status: "FERMENTING" as const },
+      { ...tank, id: "d", tankCode: "D", destinationType: "WINE_AGING" as const, status: "COMPLETED" as const },
+    ];
+    expect(distillationCandidates(tanks).map((t) => t.tankCode)).toEqual(["A"]);
   });
 });
 
