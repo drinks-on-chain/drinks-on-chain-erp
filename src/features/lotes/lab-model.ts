@@ -7,6 +7,7 @@ import {
 } from "@drinks-on-chain/mocks";
 import type { Tone } from "@drinks-on-chain/ui";
 import { fieldErrorsFrom } from "@/lib/api/field-errors";
+import { labParameterLabel } from "@/lib/erp/labels";
 import { omitNulls, type Nullable } from "@/lib/erp/omit-nulls";
 import { fmtNumber, parseDecimal } from "@/lib/format";
 
@@ -41,15 +42,8 @@ export const CHECK_RESULT: Record<LabCheck["result"], { label: string; tone: Ton
   UNIT_UNKNOWN: { label: "Unidad del límite desconocida", tone: "warning" },
 };
 
-const PARAMETER: Record<string, string> = {
-  metanol: "Metanol",
-  cobre: "Cobre",
-  acidezVolatil: "Acidez volátil",
-  grado: "Grado alcohólico",
-};
-
 /** Nombre de un parámetro de la conformidad (`metanol`, `cobre`…); los desconocidos, tal cual. */
-export const parameterLabel = (parameter: string) => PARAMETER[parameter] ?? parameter;
+export const parameterLabel = labParameterLabel;
 
 const digitsOf = (n: number) => (Number.isInteger(n) ? 0 : 2);
 
@@ -276,11 +270,13 @@ export function labValueRows(lab: BatchLabAnalysisResponse): LabValueRow[] {
   return rows;
 }
 
-/** El vigente primero; después, los sustituidos del más reciente al más antiguo. */
+/** Análisis vigente: el que marca el servidor (`current`); uno anulado o sustituido nunca lo es. */
+export const isCurrentLab = (l: Pick<BatchLabAnalysisResponse, "current" | "supersededAt" | "voided" | "voidedAt">) =>
+  !l.voided && !l.voidedAt && (l.current ?? !l.supersededAt);
+
+/** El vigente primero; después, los sustituidos y anulados del más reciente al más antiguo. */
 export function sortLabs(items: readonly BatchLabAnalysisResponse[] | undefined): BatchLabAnalysisResponse[] {
   return [...(items ?? [])].sort(
-    (a, b) =>
-      Number(b.current ?? !b.supersededAt) - Number(a.current ?? !a.supersededAt) ||
-      b.createdAt.localeCompare(a.createdAt),
+    (a, b) => Number(isCurrentLab(b)) - Number(isCurrentLab(a)) || b.createdAt.localeCompare(a.createdAt),
   );
 }

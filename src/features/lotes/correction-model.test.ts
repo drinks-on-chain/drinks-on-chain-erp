@@ -7,6 +7,7 @@ import {
   correctionErrors,
   emptyCorrection,
   isVoidable,
+  newCorrectionIssues,
   toCorrectionDto,
 } from "./correction-model";
 
@@ -115,5 +116,29 @@ describe("texto de un cambio", () => {
     expect(changeText({ field: "bottleType", before: null, after: "Bordelesa" })).toBe(
       "Tipo de botella: sin valor → Bordelesa",
     );
+  });
+});
+
+describe("precisiones del backend (mocks 0.5.0-rc.2)", () => {
+  it("el peso neto recalculado de una corrección de pesos tiene su etiqueta", () => {
+    expect(changeText({ field: "netWeightKg", before: 18400, after: 18450 })).toBe(
+      "Peso neto (recalculado): 18.400 kg → 18.450 kg",
+    );
+  });
+
+  it("detecta la incidencia que abre una corrección en un lote ya embotellado", () => {
+    const issue = (id: string, source: "MIGRATION" | "CORRECTION", resolvedAt: string | null = null) => ({
+      id,
+      code: "TRC_BOTTLING_EXCEEDS_VOLUME",
+      message: "Más botellas que litros",
+      source,
+      details: [],
+      detectedAt: "2026-09-25T12:00:00Z",
+      resolvedAt,
+    });
+    const before = [issue("a", "MIGRATION"), issue("b", "CORRECTION")];
+    const after = [...before, issue("c", "CORRECTION"), issue("d", "CORRECTION", "2026-09-25T12:05:00Z")];
+    expect(newCorrectionIssues(before, after).map((i) => i.id)).toEqual(["c"]);
+    expect(newCorrectionIssues(before, before)).toEqual([]);
   });
 });

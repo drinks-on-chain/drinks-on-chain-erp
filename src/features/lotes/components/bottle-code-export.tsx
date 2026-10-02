@@ -205,7 +205,10 @@ function ExportCard({ lot }: { lot: Props["lot"] }) {
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone={EXPORT_STATUS[status.data.status].tone}>{EXPORT_STATUS[status.data.status].label}</Badge>
                 <span className="text-sm text-fg-muted">
-                  ZIP de {fmtNumber(status.data.rows)} códigos · solicitado el {fmtDateTime(status.data.createdAt)}
+                  {status.data.format} de {fmtNumber(status.data.rows)} códigos · series{" "}
+                  {fmtNumber(status.data.fromSerial)} a {fmtNumber(status.data.toSerial)} · solicitado el{" "}
+                  {fmtDateTime(status.data.createdAt)}
+                  {status.data.createdBy ? ` por ${status.data.createdBy.fullName}` : ""}
                 </span>
               </div>
               {status.data.status === "READY" && status.data.downloadUrl && (

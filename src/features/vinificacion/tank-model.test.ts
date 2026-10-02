@@ -63,7 +63,9 @@ describe("mapa de tanques", () => {
   it("filtra por estado y destino", () => {
     expect(filterTanks(cards, { status: "FERMENTING", destination: "ALL" })).toHaveLength(3);
     // TK-15 fermenta sin destino: se decide al completar la fermentación.
-    expect(filterTanks(cards, { status: "ALL", destination: "SINGANI_DIST" })).toEqual([]);
+    expect(filterTanks(cards, { status: "ALL", destination: "SINGANI_DIST" }).map((c) => c.tankCode)).toEqual([
+      "TK-32",
+    ]);
     expect(cards.find((c) => c.tankCode === "TK-15")!.destination).toBeNull();
     expect(filterTanks(cards, { status: "ALL", destination: "ALL" })).toHaveLength(cards.length);
   });

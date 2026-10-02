@@ -17,6 +17,9 @@ import {
   Skeleton,
 } from "@drinks-on-chain/ui";
 import { PageChrome } from "@/components/page-chrome";
+import { VoidedBadge, VoidedText } from "@/components/voided";
+import { CorrectRecordButton } from "@/features/lotes/components/correction-dialog";
+import { activeOnly, isVoided } from "@/lib/erp/voided";
 import { ScreenTitle } from "@/components/screen-title";
 import { LogForm } from "@/features/vinificacion/components/log-form";
 import {
@@ -109,7 +112,11 @@ export function TankDetail({ id }: { id: string }) {
   const terroir = terroirOfHarvest(lookup, t.harvestBatchId);
   const logs = sortLogsDesc(t.logs);
   const treatments = [...(t.treatments ?? [])].sort((a, b) => b.appliedAt.localeCompare(a.appliedAt));
-  const last = logs[0];
+  // Las lecturas anuladas siguen en la bitácora (tachadas), pero no cuentan para la última
+  // lectura, la alerta de temperatura ni las gráficas.
+  const activeLogs = activeOnly(logs);
+  const last = activeLogs[0];
+  const lotLabel = lot.data ? `${lot.data.name} · ${lot.data.reference}` : `Tanque ${t.tankCode}`;
   const hot = t.status === "FERMENTING" && isHot(last);
   const day = fermentationDay(t, today());
   const status = TANK_STATUS[t.status];
@@ -271,20 +278,20 @@ export function TankDetail({ id }: { id: string }) {
         </Card>
       </div>
 
-      {logs.length > 0 && (
+      {activeLogs.length > 0 && (
         <Card className="grid gap-6 p-5 md:grid-cols-2">
           <TrendSparkline
             label="Temperatura"
             unit="°C"
             threshold={TEMP_ALERT_C}
             alert={hot}
-            points={logs.map((l) => ({ at: l.recordedAt, value: l.temperatureCelsius }))}
+            points={activeLogs.map((l) => ({ at: l.recordedAt, value: l.temperatureCelsius }))}
           />
           <TrendSparkline
             label="Densidad"
             unit=""
             digits={3}
-            points={logs.flatMap((l) =>
+            points={activeLogs.flatMap((l) =>
               l.specificGravity != null ? [{ at: l.recordedAt, value: l.specificGravity }] : [],
             )}
           />
@@ -294,7 +301,9 @@ export function TankDetail({ id }: { id: string }) {
       <Card>
         <CardHeader
           title="Bitácora"
-          description={`${fmtNumber(logs.length)} ${logs.length === 1 ? "lectura" : "lecturas"}, la más reciente primero`}
+          description={`${fmtNumber(activeLogs.length)} ${activeLogs.length === 1 ? "lectura" : "lecturas"}, la más reciente primero${
+            logs.length > activeLogs.length ? ` · ${fmtNumber(logs.length - activeLogs.length)} anuladas` : ""
+          }`}
           divided
           className="px-5 pt-5"
         />
@@ -304,19 +313,42 @@ export function TankDetail({ id }: { id: string }) {
           caption={`Bitácora de ${t.tankCode}`}
           captionHidden
           columns={[
-            { id: "at", header: "Fecha", cell: (l) => fmtDateTime(l.recordedAt) },
+            {
+              id: "at",
+              header: "Fecha",
+              cell: (l) => (
+                <span className="flex flex-wrap items-center gap-2">
+                  <VoidedText voided={isVoided(l)}>{fmtDateTime(l.recordedAt)}</VoidedText>
+                  {isVoided(l) && <VoidedBadge at={l.voidedAt} feminine />}
+                  {!isVoided(l) && (l.correctedFields?.length ?? 0) > 0 && <Badge tone="info">Corregida</Badge>}
+                </span>
+              ),
+            },
             {
               id: "temp",
               header: "Temp. °C",
               numeric: true,
               cell: (l) => (
-                <span className={isHot(l) ? "font-medium text-warning-text" : undefined}>
-                  {fmtNumber(l.temperatureCelsius, 1)}
-                </span>
+                <VoidedText voided={isVoided(l)}>
+                  <span className={!isVoided(l) && isHot(l) ? "font-medium text-warning-text" : undefined}>
+                    {fmtNumber(l.temperatureCelsius, 1)}
+                  </span>
+                </VoidedText>
               ),
             },
-            { id: "sg", header: "Densidad", numeric: true, cell: (l) => orDash(l.specificGravity, 3) },
-            { id: "ph", header: "pH", numeric: true, hideBelow: "md", cell: (l) => orDash(l.phValue, 2) },
+            {
+              id: "sg",
+              header: "Densidad",
+              numeric: true,
+              cell: (l) => <VoidedText voided={isVoided(l)}>{orDash(l.specificGravity, 3)}</VoidedText>,
+            },
+            {
+              id: "ph",
+              header: "pH",
+              numeric: true,
+              hideBelow: "md",
+              cell: (l) => <VoidedText voided={isVoided(l)}>{orDash(l.phValue, 2)}</VoidedText>,
+            },
             {
               id: "co2",
               header: "CO₂ y notas",
@@ -324,6 +356,14 @@ export function TankDetail({ id }: { id: string }) {
               cell: (l) => [l.co2Observations, l.notes].filter(Boolean).join(" · ") || "—",
             },
           ]}
+          rowActions={(l) => (
+            <CorrectRecordButton
+              lotId={t.lotId}
+              lotLabel={lotLabel}
+              voided={isVoided(l)}
+              record={{ id: l.id, type: "FERMENTATION_LOG", label: `Lectura del ${fmtDateTime(l.recordedAt)}` }}
+            />
+          )}
           empty={
             <EmptyState
               bare
@@ -361,10 +401,34 @@ export function TankDetail({ id }: { id: string }) {
           caption={`Tratamientos de ${t.tankCode}`}
           captionHidden
           columns={[
-            { id: "at", header: "Fecha", cell: (x) => fmtDate(x.appliedAt) },
-            { id: "type", header: "Tipo", cell: (x) => TREATMENT_TYPE[x.treatmentType] },
-            { id: "additive", header: "Aditivo", hideBelow: "md", cell: (x) => x.additiveName },
-            { id: "dose", header: "Dosis g/hL", numeric: true, cell: (x) => fmtNumber(x.dosageAppliedGPerHl, 1) },
+            {
+              id: "at",
+              header: "Fecha",
+              cell: (x) => (
+                <span className="flex flex-wrap items-center gap-2">
+                  <VoidedText voided={isVoided(x)}>{fmtDate(x.appliedAt)}</VoidedText>
+                  {isVoided(x) && <VoidedBadge at={x.voidedAt} />}
+                  {!isVoided(x) && (x.correctedFields?.length ?? 0) > 0 && <Badge tone="info">Corregido</Badge>}
+                </span>
+              ),
+            },
+            {
+              id: "type",
+              header: "Tipo",
+              cell: (x) => <VoidedText voided={isVoided(x)}>{TREATMENT_TYPE[x.treatmentType]}</VoidedText>,
+            },
+            {
+              id: "additive",
+              header: "Aditivo",
+              hideBelow: "md",
+              cell: (x) => <VoidedText voided={isVoided(x)}>{x.additiveName}</VoidedText>,
+            },
+            {
+              id: "dose",
+              header: "Dosis g/hL",
+              numeric: true,
+              cell: (x) => <VoidedText voided={isVoided(x)}>{fmtNumber(x.dosageAppliedGPerHl, 1)}</VoidedText>,
+            },
             { id: "total", header: "Total g", numeric: true, hideBelow: "lg", cell: (x) => orDash(x.totalAppliedG, 0) },
             {
               id: "code",
@@ -373,6 +437,14 @@ export function TankDetail({ id }: { id: string }) {
               cell: (x) => <span className="font-mono text-xs">{x.regulatoryAuthCode}</span>,
             },
           ]}
+          rowActions={(x) => (
+            <CorrectRecordButton
+              lotId={t.lotId}
+              lotLabel={lotLabel}
+              voided={isVoided(x)}
+              record={{ id: x.id, type: "TREATMENT", label: `${x.additiveName} del ${fmtDate(x.appliedAt)}` }}
+            />
+          )}
           empty={<EmptyState bare title="Sin tratamientos" description="No se aplicaron aditivos en este tanque." />}
         />
       </Card>

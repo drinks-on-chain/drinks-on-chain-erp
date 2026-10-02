@@ -42,6 +42,8 @@ const dayStart = (d: Date | string) => {
  */
 export const TEMP_ALERT_C = 26;
 
+import { activeOnly, type Voidable } from "@/lib/erp/voided";
+
 /** Porcentaje de llenado (0–100) a partir de `volumeFilledLiters / capacityLiters`. */
 export function fillPercent(t: Pick<FermentationTankResponse, "capacityLiters" | "volumeFilledLiters">): number {
   const cap = t.capacityLiters ?? 0;
@@ -55,10 +57,11 @@ export function sortLogsDesc<T extends Pick<FermentationLog, "recordedAt">>(logs
   return [...(logs ?? [])].sort((a, b) => b.recordedAt.localeCompare(a.recordedAt));
 }
 
-export function latestLog<T extends Pick<FermentationLog, "recordedAt">>(
+/** Última lectura que cuenta: las anuladas por una corrección quedan fuera. */
+export function latestLog<T extends Pick<FermentationLog, "recordedAt"> & Voidable>(
   logs: readonly T[] | undefined,
 ): T | undefined {
-  return sortLogsDesc(logs)[0];
+  return sortLogsDesc(activeOnly(logs))[0];
 }
 
 /** Temperatura por encima del umbral del panel (> 26 °C). */

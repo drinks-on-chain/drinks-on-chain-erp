@@ -2,6 +2,7 @@ import {
   CORRECTABLE_FIELDS,
   CreateLotCorrectionSchema,
   VOIDABLE_TARGET_TYPES,
+  type ComplianceIssue,
   type Correction,
   type CreateLotCorrectionDto,
   type LotGraphNode,
@@ -101,8 +102,15 @@ export function correctableFields(target: CorrectionTarget): FieldSpec[] {
   return CORRECTABLE_FIELDS[target].filter((key) => key in SPEC).map((key) => ({ key, ...SPEC[key]! }));
 }
 
+/** Campos que el servidor recalcula al corregir otros (no se corrigen a mano). */
+const DERIVED: Record<string, Omit<FieldSpec, "key">> = {
+  netWeightKg: { label: "Peso neto (recalculado)", kind: "number", unit: "kg" },
+};
+
+const specOf = (field: string) => SPEC[field] ?? DERIVED[field];
+
 /** Etiqueta de un campo de una corrección ya registrada (los desconocidos, por su clave). */
-export const fieldLabel = (field: string) => SPEC[field]?.label ?? field;
+export const fieldLabel = (field: string) => specOf(field)?.label ?? field;
 
 /** Registros que se pueden anular (dejan de contar): análisis, dictámenes, lecturas y tratamientos. */
 export const isVoidable = (target: CorrectionTarget) => (VOIDABLE_TARGET_TYPES as readonly string[]).includes(target);
@@ -175,7 +183,7 @@ export function correctionErrors(error: unknown): CorrectionErrors {
 
 const valueText = (field: string, value: unknown): string => {
   if (value === null || value === undefined || value === "") return "sin valor";
-  const spec = SPEC[field];
+  const spec = specOf(field);
   if (typeof value === "number")
     return `${fmtNumber(value, Number.isInteger(value) ? 0 : 2)}${spec?.unit ? ` ${spec.unit}` : ""}`;
   if (typeof value === "string")
@@ -186,3 +194,16 @@ const valueText = (field: string, value: unknown): string => {
 /** "Peso bruto: 18.550 kg → 18.600 kg". */
 export const changeText = (change: Correction["changes"][number]) =>
   `${fieldLabel(change.field)}: ${valueText(change.field, change.before)} → ${valueText(change.field, change.after)}`;
+
+/**
+ * Incidencias que una corrección acaba de abrir (`source: 'CORRECTION'`): en un lote ya embotellado,
+ * la corrección que incumple una regla del embotellado se registra igualmente (201) y deja una
+ * incidencia de cumplimiento en lugar de rechazarse.
+ */
+export function newCorrectionIssues(
+  before: readonly ComplianceIssue[],
+  after: readonly ComplianceIssue[],
+): ComplianceIssue[] {
+  const known = new Set(before.map((i) => i.id));
+  return after.filter((i) => i.source === "CORRECTION" && !i.resolvedAt && !known.has(i.id));
+}

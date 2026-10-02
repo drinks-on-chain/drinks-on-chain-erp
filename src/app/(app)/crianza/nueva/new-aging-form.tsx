@@ -92,7 +92,7 @@ export function NewAgingForm() {
   // Reglas del lote del tanque: el mínimo de meses es el de su instantánea (lo aplica el servidor).
   const lot = useLot(tank?.lotId ?? "", !!tank?.lotId);
   const minMonths = lot.data?.rules.wine.minAgingMonths ?? null;
-  const tankLiters = tank?.finalVolumeLiters ?? tank?.volumeFilledLiters ?? null;
+  const tankLiters = tank?.availableLiters ?? tank?.finalVolumeLiters ?? tank?.volumeFilledLiters ?? null;
   // Sin cifra escrita, pasa a crianza lo que quedó en el tanque al completar la fermentación.
   const volumeLiters = values.volumeLiters.trim() || (tankLiters != null ? String(tankLiters) : "");
 

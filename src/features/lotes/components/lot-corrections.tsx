@@ -3,60 +3,23 @@
 import { useMemo, useState } from "react";
 import { PenLine } from "lucide-react";
 import type { Correction, Lot, LotGraphNode } from "@drinks-on-chain/mocks";
-import {
-  Alert,
-  Badge,
-  Button,
-  Card,
-  CardHeader,
-  EmptyState,
-  ErrorState,
-  Field,
-  Input,
-  Modal,
-  ModalClose,
-  RadioGroup,
-  Select,
-  Skeleton,
-  Textarea,
-  toast,
-} from "@drinks-on-chain/ui";
-import { RuleViolationNotice } from "@/components/rule-violation-notice";
+import { Alert, Badge, Button, Card, CardHeader, EmptyState, ErrorState, Skeleton } from "@drinks-on-chain/ui";
 import { errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
-import { useCorrections, useCreateCorrection, useCreateTerroirCorrection, useLotGraph } from "@/lib/erp/hooks";
-import { canCorrect, type CorrectionTarget } from "@/lib/erp/permissions";
+import { useCorrections, useLotGraph } from "@/lib/erp/hooks";
+import { canCorrect } from "@/lib/erp/permissions";
 import { fmtDateTime } from "@/lib/format";
-import { useReturnFocus } from "@/lib/use-return-focus";
-import {
-  NODE_TARGET,
-  REASON_MAX,
-  REASON_MIN,
-  TARGET_LABEL,
-  changeText,
-  correctableFields,
-  correctionErrors,
-  emptyCorrection,
-  isVoidable,
-  toCorrectionDto,
-  type CorrectionErrors,
-  type CorrectionValues,
-} from "../correction-model";
+import { NODE_TARGET, TARGET_LABEL, changeText, correctableFields, isVoidable } from "../correction-model";
 import { actorText } from "../lot-timeline";
+import { CorrectionDialog, type CorrectableRecord } from "./correction-dialog";
 
-type Props = { lot: Pick<Lot, "id" | "name" | "reference" | "dossierStatus"> };
-
-type Record_ = { id: string; type: CorrectionTarget; label: string };
-
-const KINDS = [
-  { value: "AMEND", label: "Corregir valores", description: "Se guarda el valor anterior junto al nuevo." },
-  { value: "VOID", label: "Anular el registro", description: "Deja de contar para el lote; no se borra." },
-];
+type Props = { lot: Pick<Lot, "id" | "name" | "reference" | "dossierStatus" | "complianceIssues"> };
 
 /**
  * Correcciones del lote (contrato de la Ola 2 §9): lista de lo corregido (qué, de qué valor a cuál,
- * por qué y quién) y el diálogo para registrar una nueva. Ningún registro se edita ni se borra; el
- * servidor vuelve a validar las reglas del lote y, si la corrección las incumple, lo explica.
+ * por qué y quién) y el diálogo para registrar una nueva sobre los registros principales del lote.
+ * Los análisis de madurez, los dictámenes, las lecturas y los tratamientos se corrigen o anulan
+ * desde la ficha del pesaje y del tanque. Ningún registro se edita ni se borra.
  */
 export function LotCorrections({ lot }: Props) {
   const me = useMe();
@@ -65,7 +28,7 @@ export function LotCorrections({ lot }: Props) {
   const [open, setOpen] = useState(false);
 
   // Registros del lote que esta persona puede corregir (S-17: quien puede crearlos).
-  const records = useMemo<Record_[]>(
+  const records = useMemo<CorrectableRecord[]>(
     () =>
       (graph.data?.nodes ?? [])
         .map((n: LotGraphNode) => ({ id: n.id, type: NODE_TARGET[n.type], label: n.label }))
@@ -73,6 +36,7 @@ export function LotCorrections({ lot }: Props) {
     [graph.data, me.data],
   );
   const labels = useMemo(() => new Map((graph.data?.nodes ?? []).map((n) => [n.id, n.label] as const)), [graph.data]);
+  const fromCorrections = lot.complianceIssues.filter((i) => i.source === "CORRECTION" && !i.resolvedAt).length;
   const add =
     records.length > 0 ? (
       <Button variant="secondary" iconStart={<PenLine aria-hidden size={16} />} onClick={() => setOpen(true)}>
@@ -87,10 +51,24 @@ export function LotCorrections({ lot }: Props) {
           Su huella ya está fijada: el servidor no admite más correcciones en este lote.
         </Alert>
       )}
+      {fromCorrections > 0 && (
+        <Alert
+          tone="warning"
+          title={
+            fromCorrections === 1
+              ? "Una corrección dejó una incidencia abierta"
+              : `${fromCorrections} incidencias abiertas por correcciones`
+          }
+        >
+          El lote ya estaba embotellado cuando se corrigió: la corrección quedó registrada aunque incumple una regla del
+          embotellado, y el servidor abrió una incidencia de cumplimiento. Bloquea el cierre del expediente hasta que
+          otra corrección la resuelva.
+        </Alert>
+      )}
       <Card className="grid grid-cols-1 gap-4">
         <CardHeader
           title="Correcciones"
-          description="Un registro no se edita ni se borra: se corrige con otro registro que guarda el valor anterior, el motivo y quién lo hizo."
+          description="Un registro no se edita ni se borra: se corrige con otro registro que guarda el valor anterior, el motivo y quién lo hizo. Los análisis, dictámenes, lecturas y tratamientos se corrigen desde su pesaje o su tanque."
           action={add}
         />
         {corrections.isError ? (
@@ -116,7 +94,15 @@ export function LotCorrections({ lot }: Props) {
           </ul>
         )}
       </Card>
-      {records.length > 0 && <CorrectionDialog lot={lot} records={records} open={open} onOpenChange={setOpen} />}
+      {records.length > 0 && (
+        <CorrectionDialog
+          lotId={lot.id}
+          lotLabel={`${lot.name} · ${lot.reference}`}
+          records={records}
+          open={open}
+          onOpenChange={setOpen}
+        />
+      )}
     </div>
   );
 }
@@ -131,7 +117,7 @@ function CorrectionItem({ correction: c, label }: { correction: Correction; labe
         </span>
         <Badge tone={c.kind === "VOID" ? "warning" : "info"}>{c.kind === "VOID" ? "Anulado" : "Corregido"}</Badge>
       </div>
-      {c.kind === "AMEND" && (
+      {c.kind === "AMEND" && c.changes.length > 0 && (
         <ul className="m-0 grid list-none gap-0.5 p-0 text-sm tabular-nums">
           {c.changes.map((change) => (
             <li key={change.field}>{changeText(change)}</li>
@@ -143,175 +129,5 @@ function CorrectionItem({ correction: c, label }: { correction: Correction; labe
         {fmtDateTime(c.createdAt)} · {actorText(c.createdBy)}
       </p>
     </li>
-  );
-}
-
-function CorrectionDialog({
-  lot,
-  records,
-  open,
-  onOpenChange,
-}: Props & { records: Record_[]; open: boolean; onOpenChange: (open: boolean) => void }) {
-  const create = useCreateCorrection();
-  const createTerroir = useCreateTerroirCorrection();
-  const [recordId, setRecordId] = useState("");
-  const [values, setValues] = useState<CorrectionValues>(emptyCorrection);
-  const [errors, setErrors] = useState<CorrectionErrors>({ fields: {} });
-  useReturnFocus(open);
-
-  const record = records.find((r) => r.id === recordId);
-  const fields = record ? correctableFields(record.type) : [];
-  const voidable = record ? isVoidable(record.type) : false;
-  const busy = create.isPending || createTerroir.isPending;
-  const failure = create.error ?? createTerroir.error;
-
-  const change = (next: boolean) => {
-    if (busy) return;
-    if (next) {
-      setRecordId("");
-      setValues(emptyCorrection());
-      setErrors({ fields: {} });
-      create.reset();
-      createTerroir.reset();
-    }
-    onOpenChange(next);
-  };
-
-  const pick = (id: string) => {
-    setRecordId(id);
-    setValues((v) => ({ ...emptyCorrection(), reason: v.reason }));
-    setErrors({ fields: {} });
-  };
-
-  async function submit() {
-    create.reset();
-    createTerroir.reset();
-    if (!record) return;
-    const result = toCorrectionDto({ type: record.type, id: record.id }, values);
-    if (!result.ok) {
-      setErrors(result.errors);
-      return;
-    }
-    setErrors({ fields: {} });
-    try {
-      // La parcela se corrige en su propia ruta: afecta a todos los lotes abiertos que la usan.
-      if (record.type === "TERROIR") {
-        await createTerroir.mutateAsync({
-          terroirId: record.id,
-          body: { changes: result.dto.changes ?? {}, reason: result.dto.reason },
-        });
-      } else {
-        await create.mutateAsync({ lotId: lot.id, body: result.dto });
-      }
-      toast({
-        title: values.kind === "VOID" ? "Registro anulado" : "Corrección registrada",
-        description: `${TARGET_LABEL[record.type]} · ${record.label}`,
-        tone: "success",
-      });
-      onOpenChange(false);
-    } catch (err) {
-      setErrors(correctionErrors(err));
-    }
-  }
-
-  return (
-    <Modal
-      open={open}
-      onOpenChange={change}
-      dismissible={!busy}
-      size="lg"
-      title="Registrar corrección"
-      description={`${lot.name} · ${lot.reference}. El registro original se conserva; el servidor vuelve a comprobar las reglas del lote.`}
-      footer={
-        <>
-          <ModalClose asChild>
-            <Button variant="secondary" size="lg" disabled={busy}>
-              Cancelar
-            </Button>
-          </ModalClose>
-          <Button size="lg" loading={busy} disabled={!record} onClick={submit}>
-            {values.kind === "VOID" ? "Anular registro" : "Registrar corrección"}
-          </Button>
-        </>
-      }
-    >
-      <div className="grid grid-cols-1 gap-5">
-        <Field label="Registro que se corrige" required>
-          <Select
-            size="lg"
-            placeholder="Elige el registro"
-            value={recordId || undefined}
-            onValueChange={pick}
-            options={records.map((r) => ({ value: r.id, label: `${TARGET_LABEL[r.type]} · ${r.label}` }))}
-          />
-        </Field>
-
-        {record && voidable && (
-          <Field label="Qué se hace">
-            <RadioGroup
-              variant="card"
-              value={values.kind}
-              onValueChange={(kind) => setValues((v) => ({ ...v, kind: kind as CorrectionValues["kind"] }))}
-              options={fields.length > 0 ? KINDS : KINDS.filter((k) => k.value === "VOID")}
-            />
-          </Field>
-        )}
-
-        {record && values.kind === "AMEND" && (
-          <fieldset className="m-0 grid gap-3 border-0 p-0">
-            <legend className="mb-2 p-0 font-ui text-sm font-semibold">Valores nuevos</legend>
-            <p className="m-0 text-sm text-fg-muted">
-              Escribe solo lo que cambia; lo que quede vacío no se toca. Estos son los únicos campos corregibles de este
-              registro.
-            </p>
-            <div className="grid items-start gap-4 sm:grid-cols-2">
-              {fields.map((f) => (
-                <Field key={f.key} label={f.label} error={errors.fields[f.key]}>
-                  <Input
-                    type={f.kind === "date" ? "date" : "text"}
-                    numeric={f.kind === "number" || f.kind === "integer"}
-                    inputMode={f.kind === "number" ? "decimal" : f.kind === "integer" ? "numeric" : undefined}
-                    suffix={f.unit}
-                    value={values.changes[f.key] ?? ""}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setValues((v) => ({ ...v, changes: { ...v.changes, [f.key]: value } }));
-                      setErrors((x) => ({ ...x, changes: undefined, fields: { ...x.fields, [f.key]: "" } }));
-                    }}
-                  />
-                </Field>
-              ))}
-            </div>
-            {errors.changes && (
-              <p role="alert" className="m-0 text-sm text-danger-text">
-                {errors.changes}
-              </p>
-            )}
-          </fieldset>
-        )}
-
-        {record && (
-          <Field
-            label="Motivo"
-            required
-            error={errors.reason}
-            help={`Queda en la línea de tiempo y en la bitácora. De ${REASON_MIN} a ${REASON_MAX} caracteres.`}
-          >
-            <Textarea
-              rows={3}
-              maxLength={REASON_MAX}
-              value={values.reason}
-              onChange={(e) => {
-                const reason = e.target.value;
-                setValues((v) => ({ ...v, reason }));
-                setErrors((x) => ({ ...x, reason: undefined }));
-              }}
-            />
-          </Field>
-        )}
-
-        <RuleViolationNotice error={failure} fields={["reason", "changes", "kind"]} />
-      </div>
-    </Modal>
   );
 }
