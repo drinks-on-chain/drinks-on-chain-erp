@@ -219,7 +219,7 @@ export function toLotLabDto(v: LabValues): Result {
     copperContentMgL: numbers.copperContentMgL,
     conformsToEuStandards: v.conformsToEuStandards,
     conformsToUsaStandards: v.conformsToUsaStandards,
-    laboratoryReportKey: v.laboratoryReportKey,
+    laboratoryReportKey: v.laboratoryReportKey!,
   };
   const dto = omitNulls<CreateLotLabAnalysisDto>(draft);
   const parsed = CreateLotLabAnalysisSchema.safeParse(dto);
@@ -243,11 +243,10 @@ const FIELDS: readonly LabField[] = [
 ];
 
 function labField(field: string): LabField | undefined {
-  if (field === "laboratoryReportPdfUrl") return "laboratoryReportKey";
   return (FIELDS as readonly string[]).includes(field) ? (field as LabField) : undefined;
 }
 
-export const LAB_ERROR_FIELDS: readonly string[] = [...FIELDS, "laboratoryReportPdfUrl"];
+export const LAB_ERROR_FIELDS: readonly string[] = FIELDS;
 
 /** `details[].field` de un 409/422 del análisis → campos del formulario. */
 export const labFieldErrors = (error: unknown): LabErrors => fieldErrorsFrom<LabField>(error, labField).fieldErrors;

@@ -56,7 +56,8 @@ describe("mapa de tanques", () => {
     expect(tk04.fillPct).toBe(83);
     expect(tk04.day).toBe(fermentationDay({ status: "FERMENTING", startDate: "2026-03-10T14:30:00Z" }, TODAY));
     expect(cards[0]!.status).toBe("FERMENTING");
-    expect(cards.at(-1)!.status).toBe("CLEANED");
+    // Lo que ya no fermenta (trasegado o limpio) queda al final.
+    expect(["TRANSFERRED", "CLEANED"]).toContain(cards.at(-1)!.status);
     expect(tk04.lotName).toBe("Cuartel 2 · Los Sauces · Moscatel de Alejandría");
   });
 

@@ -211,8 +211,17 @@ export function NewAgingForm() {
   return shell(
     <>
       {preselectedInvalid && (
-        <Alert tone="warning" title="Ese tanque no puede pasar a crianza">
-          No tiene la fermentación completada con destino vino, o ya inició su crianza. Elige otro tanque.
+        <Alert
+          tone="warning"
+          title="Ese tanque no puede pasar a crianza"
+          action={
+            <Button asChild size="sm" variant="tertiary">
+              <Link href={`/vinificacion/${preselected}`}>Ir al tanque</Link>
+            </Button>
+          }
+        >
+          La crianza solo parte de un tanque con la fermentación completada y destino vino, y una sola vez. Si aún
+          fermenta, complétala en su ficha (ahí se decide el destino); si no, elige otro tanque.
         </Alert>
       )}
 
