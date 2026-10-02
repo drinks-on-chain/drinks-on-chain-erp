@@ -92,45 +92,92 @@ test("enóloga de Altos: la crianza en barrica muestra su cuenta regresiva", asy
   expect(errors).toEqual([]);
 });
 
-test("enóloga de Altos: llenar un tanque fija el destino con confirmación explícita", async ({ page }) => {
-  const errors = trackErrors(page);
+test("enóloga de Altos: llenar un tanque exige uva aprobada y la bifurcación se decide al completar", async ({
+  page,
+}) => {
+  // Los 422 del dictamen pendiente y de la capacidad son parte del recorrido.
+  const errors = trackErrors(page, [/^422 \/api\/v1\/fermentation-tanks$/]);
   await login(page, "enologa@altos.test");
-  // La uva entra a un tanque solo con dictamen aprobado: se aprueba el pesaje pendiente.
+  await page.getByRole("link", { name: "Vinificación", exact: true }).first().click();
+  await page.getByRole("link", { name: "Llenar tanque" }).click();
+  await expect(page.getByRole("heading", { name: "Llenar tanque" })).toBeVisible();
+  // Solo se ofrece la uva con kilos disponibles; la ya vinificada no aparece.
+  await expect(page.getByRole("checkbox", { name: "HARV-2025-ANGOSTURA-06" })).toHaveCount(0);
+
+  // Uva pendiente de dictamen: el servidor la rechaza y el aviso explica la regla del lote.
+  await page.getByRole("checkbox", { name: "HARV-2026-SAUCES-12" }).click();
+  await expect(page.getByLabel("Código del tanque")).toHaveValue("TK-17");
+  await page.getByLabel("Volumen llenado").fill("4.000");
+  await page.getByRole("button", { name: "Llenar tanque" }).first().click();
+  const notice = page.getByTestId("rule-violation-notice");
+  await expect(notice).toContainText("Uva sin dictamen fitosanitario aprobado");
+  await expect(notice).toContainText("Dictamen fitosanitario aprobado para fermentar");
+  await expect(notice).toContainText("Pendiente de inspección");
+  await expect(notice).toContainText("TRC_PHYTO_NOT_APPROVED");
+
+  // Se aprueba el pesaje y se vuelve a llenar el tanque, ya con la uva elegida.
   await page.getByRole("link", { name: "Vendimia y laboratorio", exact: true }).first().click();
   await page.getByRole("link", { name: "HARV-2026-SAUCES-12", exact: true }).click();
   await page.getByRole("button", { name: "Aprobar lote" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Sí, aprobar" }).click();
   await expect(page.getByText("Lote aprobado").first()).toBeVisible();
   await page.getByRole("link", { name: "Llenar tanque" }).first().click();
-  await expect(page.getByRole("heading", { name: "Llenar tanque" })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: "HARV-2026-SAUCES-12" })).toBeChecked();
 
-  // Un Tannat no puede ir a destilación.
-  await page.getByRole("combobox", { name: "Lote" }).click();
-  await page.getByRole("option", { name: /HARV-2025-ANGOSTURA-06/ }).click();
-  await expect(page.getByText(/La D.O. Singani exige Moscatel de Alejandría/).first()).toBeVisible();
-
-  await page.getByRole("combobox", { name: "Lote" }).click();
-  await page.getByRole("option", { name: /HARV-2026-SAUCES-12/ }).click();
-  await expect(page.getByText("Apto para Singani D.O.")).toBeVisible();
-  await expect(page.getByLabel("Código del tanque")).toHaveValue("TK-17");
+  // La capacidad la comprueba el servidor.
   await page.getByLabel("Capacidad").fill("8000");
   await page.getByLabel("Volumen llenado").fill("9000");
-  await page.getByRole("button", { name: "Llenar tanque" }).click();
-  await expect(page.getByText("El volumen supera la capacidad del tanque.")).toBeVisible();
+  await page.getByRole("button", { name: "Llenar tanque" }).first().click();
+  await expect(notice).toContainText("El llenado supera la capacidad");
+  await expect(notice).toContainText("TRC_TANK_CAPACITY_EXCEEDED");
   await page.getByLabel("Volumen llenado").fill("6.500");
-  await page.getByRole("button", { name: "Llenar tanque" }).click();
+  await page.getByRole("button", { name: "Llenar tanque" }).first().click();
 
-  const modal = page.getByRole("dialog", { name: "Destino técnico de este lote" });
+  await expect(page.getByRole("heading", { name: "TK-17" })).toBeVisible();
+  await expect(page.getByText("Se decide al completar la fermentación", { exact: true })).toBeVisible();
+  // Mientras fermenta no hay paso siguiente: antes hay que completar la fermentación.
+  await expect(page.getByRole("link", { name: "Pasar a destilación" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Completar fermentación" }).click();
+  const modal = page.getByRole("dialog", { name: "Completar la fermentación de TK-17" });
   await expect(modal).toBeVisible();
-  const confirm = modal.getByRole("button", { name: "Confirmar destino y llenar" });
+  const confirm = modal.getByRole("button", { name: "Confirmar destino y completar" });
   await expect(confirm).toBeDisabled();
   await modal.getByRole("button", { name: /A destilación/ }).click();
   await expect(confirm).toBeDisabled();
   await modal.getByRole("checkbox").click();
+  await modal.getByLabel("Volumen final").fill("6.300");
   await confirm.click();
 
-  await expect(page.getByRole("heading", { name: "TK-17" })).toBeVisible();
+  await expect(modal).toBeHidden();
   await expect(page.getByText("Destino: Destilación (singani)", { exact: true })).toBeVisible();
+  await expect(page.getByText("Fermentación terminada").first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Pasar a destilación" })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("enóloga de Altos: el destino debe coincidir con el tipo del lote", async ({ page }) => {
+  const errors = trackErrors(page, [/^422 \/api\/v1\/fermentation-tanks\/[\w-]+\/complete$/]);
+  await login(page, "enologa@altos.test");
+  await page.getByRole("link", { name: "Vinificación", exact: true }).first().click();
+  // TK-10 fermenta uva de un lote que ya es de vino.
+  await page.getByTestId("tank-card").filter({ hasText: "TK-10" }).click();
+  await expect(page.getByRole("heading", { name: "TK-10" })).toBeVisible();
+  await page.getByRole("button", { name: "Completar fermentación" }).click();
+  const modal = page.getByRole("dialog", { name: "Completar la fermentación de TK-10" });
+  await modal.getByRole("button", { name: /A destilación/ }).click();
+  await modal.getByRole("checkbox").click();
+  await modal.getByRole("button", { name: "Confirmar destino y completar" }).click();
+  const notice = modal.getByTestId("rule-violation-notice");
+  await expect(notice).toContainText("El destino no coincide con el tipo del lote");
+  await expect(notice).toContainText("Crianza (vino)");
+  await expect(notice).toContainText("TRC_DESTINATION_MISMATCH");
+
+  // Con el destino del lote, la fermentación se completa.
+  await modal.getByRole("button", { name: /A crianza/ }).click();
+  await modal.getByRole("button", { name: "Confirmar destino y completar" }).click();
+  await expect(modal).toBeHidden();
+  await expect(page.getByText("Destino: Crianza (vino)", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Pasar a crianza" })).toBeVisible();
   expect(errors).toEqual([]);
 });

@@ -1,9 +1,24 @@
-import type { HarvestBatchResponse, PhytosanitaryStatus } from "@drinks-on-chain/mocks";
+import type {
+  HarvestBatchResponse,
+  PhytoDecision as PhytoDecisionRecord,
+  PhytosanitaryStatus,
+} from "@drinks-on-chain/mocks";
 
-// Dictamen fitosanitario (3.2): qué decisiones hay, cuándo se puede decidir y los filtros
-// de la lista de vendimia.
+// Dictamen fitosanitario (contrato de la Ola 2 §3.4): qué decisiones se ofrecen, cuáles piden
+// motivo, el historial y los filtros de la lista de vendimia. El servidor decide si un dictamen
+// aún se admite (409 `TRC_PHYTO_DECISION_FINAL`).
 
 export type PhytoDecision = Exclude<PhytosanitaryStatus, "PENDING_INSPECTION">;
+
+/** Rechazar y poner en cuarentena exigen el motivo (`notes`). */
+export const requiresReason = (decision: PhytoDecision) => decision === "REJECTED" || decision === "QUARANTINE";
+
+/** Dictámenes del más reciente al más antiguo: el primero es el vigente. */
+export function sortDecisions(items: readonly PhytoDecisionRecord[] | undefined): PhytoDecisionRecord[] {
+  return [...(items ?? [])].sort(
+    (a, b) => b.decidedAt.localeCompare(a.decidedAt) || b.recordedAt.localeCompare(a.recordedAt),
+  );
+}
 
 export const PHYTO_DECISIONS: Record<
   PhytoDecision,
@@ -45,7 +60,7 @@ export function availableDecisions(status: PhytosanitaryStatus): PhytoDecision[]
 
 export type HarvestFilters = { status?: PhytosanitaryStatus | null; year?: number | null };
 
-export function filterHarvests(items: readonly HarvestBatchResponse[], f: HarvestFilters): HarvestBatchResponse[] {
+export function filterHarvests<T extends HarvestBatchResponse>(items: readonly T[], f: HarvestFilters): T[] {
   return items
     .filter((h) => (!f.status || h.phytosanitaryStatus === f.status) && (!f.year || h.harvestYear === f.year))
     .sort((a, b) => b.intakeDate.localeCompare(a.intakeDate));

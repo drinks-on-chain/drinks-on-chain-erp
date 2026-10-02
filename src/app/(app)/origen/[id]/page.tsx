@@ -9,7 +9,7 @@ import { PageChrome } from "@/components/page-chrome";
 import { ScreenTitle } from "@/components/screen-title";
 import { DoBadge } from "@/features/origen/components/do-badge";
 import { ParcelMap } from "@/features/origen/components/parcel-map";
-import { doEligibility, doReasonText } from "@/features/origen/do-eligibility";
+import { DoEvaluationView } from "@/features/lotes/components/do-evaluation";
 import { HarvestBatchTable } from "@/features/vendimia/components/harvest-batch-table";
 import { ApiError, errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
@@ -39,7 +39,6 @@ export default function TerroirDetailPage({ params }: PageProps<"/origen/[id]">)
   ) : undefined;
 
   const notFound = terroir.error instanceof ApiError && terroir.error.isNotFound;
-  const eligibility = t ? doEligibility(t) : null;
 
   return (
     <div className="grid grid-cols-1 gap-6">
@@ -78,7 +77,7 @@ export default function TerroirDetailPage({ params }: PageProps<"/origen/[id]">)
             retrying={terroir.isFetching}
           />
         )
-      ) : !t || !eligibility ? (
+      ) : !t ? (
         <div className="grid grid-cols-1 gap-6" aria-busy="true">
           <Skeleton className="h-10 w-80" />
           <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
@@ -90,7 +89,7 @@ export default function TerroirDetailPage({ params }: PageProps<"/origen/[id]">)
         <>
           <header className="flex flex-wrap items-center gap-3">
             <h1 className="font-display text-3xl">{t.parcelName}</h1>
-            <DoBadge {...t} />
+            <DoBadge terroir={t} />
             {!t.isActive && <Tag>Inactiva</Tag>}
           </header>
 
@@ -123,20 +122,16 @@ export default function TerroirDetailPage({ params }: PageProps<"/origen/[id]">)
 
               <Card className="grid grid-cols-1 gap-3">
                 <CardHeader title="Denominación de origen" />
-                <DoBadge {...t} explain className="justify-self-start" />
-                {!eligibility.eligible && (
-                  <ul className="m-0 grid list-disc gap-1 pl-5 text-sm text-fg-muted">
-                    {eligibility.reasons.map((r) => (
-                      <li key={r}>{doReasonText(r)}</li>
-                    ))}
-                  </ul>
+                {t.doEvaluation ? (
+                  <DoEvaluationView evaluation={t.doEvaluation} />
+                ) : (
+                  <DoBadge terroir={t} explain className="justify-self-start" />
                 )}
-                <KeyValueList
-                  items={[
-                    { term: "Aptitud declarada", value: t.isDoEligible ? "Sí" : "No" },
-                    { term: "Tipo de D.O.", value: orDash(t.doType) },
-                  ]}
-                />
+                <p className="m-0 text-xs text-fg-subtle">
+                  La aptitud la calcula el servidor con la altitud y la cepa de la parcela; no se declara. Cada lote la
+                  vuelve a comprobar con sus propias reglas.
+                </p>
+                <KeyValueList items={[{ term: "Tipo de D.O.", value: orDash(t.doType) }]} />
                 {t.doCertificateUrl ? (
                   <StoredFileLink reference={t.doCertificateUrl}>Ver certificado D.O.</StoredFileLink>
                 ) : (

@@ -13,38 +13,42 @@ import {
   ErrorState,
   KeyValueList,
   Skeleton,
+  Tag,
 } from "@drinks-on-chain/ui";
-import { StoredFileLink } from "@/components/stored-file-link";
-import { LabReadingCard } from "@/features/vendimia/components/lab-reading-card";
+import { DoEvaluationView } from "@/features/lotes/components/do-evaluation";
+import { MaturityPanel } from "@/features/vendimia/components/maturity-panel";
 import { PhytoBadge } from "@/features/vendimia/components/phyto-badge";
 import { PhytoDecisionPanel } from "@/features/vendimia/components/phyto-decision";
-import { harvestReadings } from "@/features/vendimia/lab-targets";
+import { PhytoHistory } from "@/features/vendimia/components/phyto-history";
 import { canDecidePhyto } from "@/features/vendimia/phyto";
 import { PageChrome } from "@/components/page-chrome";
 import { ScreenTitle } from "@/components/screen-title";
 import { ApiError, errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
-import { useHarvestBatch, useTerroirs } from "@/lib/erp/hooks";
+import { useHarvestBatch, useLot } from "@/lib/erp/hooks";
 import { DESTINATION, TANK_STATUS } from "@/lib/erp/labels";
 import { can } from "@/lib/erp/permissions";
 import { fmtDate, fmtDateTime, fmtKg, fmtLiters, fmtNumber } from "@/lib/format";
 
-// 3.2 Análisis y dictamen fitosanitario del lote de vendimia.
+// Ficha del pesaje (contrato de la Ola 2 §3): pesaje, análisis de madurez aparte, dictamen
+// fitosanitario con historial y rol, lote al que pertenece (o uva sin lote) y sus tanques.
 export default function HarvestDetailPage({ params }: PageProps<"/vendimia/[id]">) {
   const { id } = use(params);
   const me = useMe();
   const batch = useHarvestBatch(id);
-  const terroirs = useTerroirs();
   const h = batch.data;
-  const terroir = h ? terroirs.data?.items.find((t) => t.id === h.terroirId) : undefined;
+  const lot = useLot(h?.lotId ?? "", !!h?.lotId);
   const tanks = h?.fermentationTanks ?? [];
+  // La parcela tal como era al pesar; si el registro no la trae, la actual.
+  const parcel = h?.terroirSnapshot ?? h?.terroir ?? null;
 
   const canPhyto = can(me.data, "harvest.phyto");
   const canFill = can(me.data, "tank.create");
   const approved = h?.phytosanitaryStatus === "APPROVED";
+  const available = h?.availableKg ?? null;
   const fillHref = `/vinificacion/nuevo?vendimia=${id}`;
   const fillAction =
-    approved && canFill ? (
+    approved && canFill && (available === null || available > 0) ? (
       <Button asChild iconStart={<Cylinder aria-hidden size={18} />}>
         <Link href={fillHref}>Llenar tanque</Link>
       </Button>
@@ -55,16 +59,19 @@ export default function HarvestDetailPage({ params }: PageProps<"/vendimia/[id]"
   return (
     <div className="grid grid-cols-1 gap-6">
       <PageChrome
-        breadcrumbs={[{ label: "Vendimia y laboratorio", href: "/vendimia" }, { label: h?.harvestBatchCode ?? "Lote" }]}
+        breadcrumbs={[
+          { label: "Vendimia y laboratorio", href: "/vendimia" },
+          { label: h?.harvestBatchCode ?? "Pesaje" },
+        ]}
         actions={fillAction}
       />
 
-      {(batch.isError || !h) && <ScreenTitle busy={!batch.isError}>Lote de vendimia</ScreenTitle>}
+      {(batch.isError || !h) && <ScreenTitle busy={!batch.isError}>Pesaje</ScreenTitle>}
       {batch.isError ? (
         notFound ? (
           <EmptyState
-            title="Lote no encontrado"
-            description="El lote de vendimia no existe o pertenece a otra bodega."
+            title="Pesaje no encontrado"
+            description="El pesaje no existe o pertenece a otra bodega."
             action={
               <Button asChild variant="secondary">
                 <Link href="/vendimia">Volver a vendimia</Link>
@@ -94,26 +101,29 @@ export default function HarvestDetailPage({ params }: PageProps<"/vendimia/[id]"
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="font-display text-3xl">{h.harvestBatchCode}</h1>
               <PhytoBadge status={h.phytosanitaryStatus} strong />
+              {!h.lotId && <Tag>Uva sin lote</Tag>}
+              {h.lateEntry && (
+                <Badge tone="warning" title="Registrado más de 7 días después del ingreso">
+                  Registro tardío
+                </Badge>
+              )}
             </div>
             <p className="m-0 text-sm text-fg-muted">
-              {terroir?.parcelName ?? "Parcela"} · Cosecha {h.harvestYear} · {fmtKg(h.netWeightKg)} netos · ingreso el{" "}
+              {parcel?.parcelName ?? "Parcela"} · Cosecha {h.harvestYear} · {fmtKg(h.netWeightKg)} netos · ingreso el{" "}
               {fmtDateTime(h.intakeDate)}
             </p>
           </header>
 
-          <section aria-labelledby="lab-title" className="grid grid-cols-1 gap-4">
-            <h2 id="lab-title" className="font-ui text-lg font-semibold">
-              Análisis preliminar
-            </h2>
-            <div className="grid gap-4 sm:grid-cols-3">
-              {harvestReadings(h).map(({ target, value }) => (
-                <LabReadingCard key={target.key} target={target} value={value} />
-              ))}
-            </div>
-          </section>
+          {!h.lotId && (
+            <Alert tone="info" title="Uva recibida sin lote">
+              Se asigna a un lote al llenar el tanque: allí se elige un lote existente o se crea uno nuevo.
+            </Alert>
+          )}
+
+          <MaturityPanel batch={h} canAnalyze={can(me.data, "harvest.maturity")} />
 
           <section aria-labelledby="phyto-title" className="grid grid-cols-1 gap-4">
-            <h2 id="phyto-title" className="font-ui text-lg font-semibold">
+            <h2 id="phyto-title" className="m-0 font-ui text-lg font-semibold">
               Dictamen fitosanitario
             </h2>
             {canDecidePhyto(h.phytosanitaryStatus) ? (
@@ -129,56 +139,64 @@ export default function HarvestDetailPage({ params }: PageProps<"/vendimia/[id]"
                 tone="success"
                 title="Lote aprobado"
                 action={
-                  canFill ? (
+                  fillAction ? (
                     <Button asChild size="sm" variant="tertiary">
                       <Link href={fillHref}>Llenar tanque</Link>
                     </Button>
                   ) : undefined
                 }
               >
-                {canFill
-                  ? "Listo para llenar un tanque de fermentación y fijar su destino."
-                  : "Listo para que enología llene un tanque de fermentación."}
+                {available === 0
+                  ? "Toda la uva de este pesaje ya entró a tanques."
+                  : canFill
+                    ? "Lista para llenar un tanque de fermentación."
+                    : "Lista para que enología llene un tanque de fermentación."}
               </Alert>
             ) : (
               <Alert tone="danger" title="Lote rechazado">
                 La uva no entra en producción.
               </Alert>
             )}
+            <PhytoHistory decisions={h.phytoDecisions} />
           </section>
 
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+          <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
             <Card>
               <CardHeader title="Datos del ingreso" className="mb-4" />
               <KeyValueList
                 items={[
                   {
-                    term: "Parcela",
-                    value: terroir ? (
-                      <Link href={`/origen/${terroir.id}`} className="hover:underline">
-                        {terroir.parcelName}
+                    term: "Lote",
+                    value: h.lotId ? (
+                      <Link href={`/lotes/${h.lotId}`} className="hover:underline">
+                        {lot.data ? `${lot.data.name} · ${lot.data.reference}` : "Ver lote"}
                       </Link>
                     ) : (
-                      "—"
+                      "Sin lote"
                     ),
                   },
-                  { term: "Cepa", value: terroir?.varietyName ?? "—" },
+                  {
+                    term: "Parcela",
+                    value: (
+                      <Link href={`/origen/${h.terroirId}`} className="hover:underline">
+                        {parcel?.parcelName ?? "Ver parcela"}
+                      </Link>
+                    ),
+                  },
+                  { term: "Cepa al pesar", value: parcel?.varietyName ?? "—" },
+                  {
+                    term: "Altitud al pesar",
+                    value: parcel ? `${fmtNumber(parcel.altitudeMasl)} m s. n. m.` : "—",
+                  },
                   { term: "Cosecha", value: h.harvestYear },
                   { term: "Ingreso", value: fmtDateTime(h.intakeDate) },
                   { term: "Peso bruto", value: fmtKg(h.grossWeightKg) },
                   { term: "Tara", value: fmtKg(h.tareWeightKg) },
                   { term: "Peso neto", value: <strong>{fmtKg(h.netWeightKg)}</strong> },
+                  ...(available !== null ? [{ term: "Disponible para tanque", value: fmtKg(available) }] : []),
                   {
                     term: "Temperatura",
                     value: h.temperatureAtIntakeC == null ? "—" : `${fmtNumber(h.temperatureAtIntakeC, 1)} °C`,
-                  },
-                  {
-                    term: "Informe de inspección",
-                    value: h.phytoInspectionPdfUrl ? (
-                      <StoredFileLink reference={h.phytoInspectionPdfUrl}>Ver informe</StoredFileLink>
-                    ) : (
-                      "—"
-                    ),
                   },
                   { term: "Notas", value: h.notes || "—" },
                   { term: "Registrado", value: fmtDate(h.createdAt) },
@@ -186,39 +204,48 @@ export default function HarvestDetailPage({ params }: PageProps<"/vendimia/[id]"
               />
             </Card>
 
-            <Card>
-              <CardHeader title="Tanques vinculados" className="mb-4" />
-              {tanks.length === 0 ? (
-                <EmptyState
-                  bare
-                  title="Sin tanques todavía"
-                  description={
-                    approved
-                      ? "El lote está aprobado y puede fermentar."
-                      : "Se llena un tanque cuando el lote se aprueba."
-                  }
-                  action={fillAction}
-                />
-              ) : (
-                <ul className="m-0 grid list-none gap-3 p-0">
-                  {tanks.map((t) => (
-                    <li key={t.id} className="grid gap-1 rounded-md border border-border p-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <Link href={`/vinificacion/${t.id}`} className="font-medium hover:underline">
-                          {t.tankCode}
-                        </Link>
-                        <Badge tone={TANK_STATUS[t.status].tone}>{TANK_STATUS[t.status].label}</Badge>
-                      </div>
-                      <p className="m-0 text-sm text-fg-muted">
-                        {t.destinationType ? DESTINATION[t.destinationType] : "Sin destino"}
-                        {t.volumeFilledLiters != null && ` · ${fmtLiters(t.volumeFilledLiters)}`} · desde{" "}
-                        {fmtDate(t.startDate)}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
+            <div className="grid grid-cols-1 gap-6">
+              {h.doEvaluation && (
+                <Card className="grid grid-cols-1 gap-3">
+                  <CardHeader title="Denominación de origen" />
+                  <DoEvaluationView evaluation={h.doEvaluation} />
+                </Card>
               )}
-            </Card>
+
+              <Card>
+                <CardHeader title="Tanques vinculados" className="mb-4" />
+                {tanks.length === 0 ? (
+                  <EmptyState
+                    bare
+                    title="Sin tanques todavía"
+                    description={
+                      approved
+                        ? "La uva está aprobada y puede fermentar."
+                        : "La uva entra a un tanque cuando se aprueba."
+                    }
+                    action={fillAction}
+                  />
+                ) : (
+                  <ul className="m-0 grid list-none gap-3 p-0">
+                    {tanks.map((t) => (
+                      <li key={t.id} className="grid gap-1 rounded-md border border-border p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <Link href={`/vinificacion/${t.id}`} className="font-medium hover:underline">
+                            {t.tankCode}
+                          </Link>
+                          <Badge tone={TANK_STATUS[t.status].tone}>{TANK_STATUS[t.status].label}</Badge>
+                        </div>
+                        <p className="m-0 text-sm text-fg-muted">
+                          {t.destinationType ? DESTINATION[t.destinationType] : "Destino por decidir"}
+                          {t.volumeFilledLiters != null && ` · ${fmtLiters(t.volumeFilledLiters)}`} · desde{" "}
+                          {fmtDate(t.startDate)}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Card>
+            </div>
           </div>
         </>
       )}

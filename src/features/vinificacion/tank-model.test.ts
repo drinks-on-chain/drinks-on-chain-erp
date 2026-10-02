@@ -9,12 +9,18 @@ import {
   lotLookup,
   nextStep,
   sortLogsDesc,
+  lotOfInputs,
   suggestTankCode,
+  tankFieldErrors,
+  tankLotErrors,
+  toCompleteTankDto,
+  toCreateTankDto,
   validateLog,
-  validateNewTank,
   validateTreatment,
   type NewTankValues,
 } from "./tank-model";
+import { emptyLotForm } from "@/features/lotes/lot-model";
+import { ApiError } from "@/lib/api/errors";
 
 const TODAY = new Date("2026-09-25T12:00:00Z");
 
@@ -76,19 +82,32 @@ describe("mapa de tanques", () => {
   });
 });
 
-describe("aptitud D.O. Singani", () => {
-  const byName = (n: string) => fx.terroirs.find((t) => t.parcelName.includes(n))!;
-  it("Moscatel de Alejandría sobre 1.600 m y apta", () => {
-    expect(doEligibility(byName("Los Sauces")).eligible).toBe(true);
-    expect(doEligibility(byName("Los Parrales")).eligible).toBe(true);
+describe("aptitud D.O. Singani (evaluación del servidor)", () => {
+  const parcel = (pass: boolean, actual: number) => ({
+    parcelName: "Cuartel 3 · El Portillo",
+    isDoEligible: pass,
+    doEvaluation: {
+      status: pass ? ("ELIGIBLE" as const) : ("NOT_ELIGIBLE" as const),
+      rulesSource: "EFFECTIVE_SETTINGS" as const,
+      evaluatedAt: "2026-09-25T12:00:00Z",
+      checks: [
+        {
+          rule: "ALTITUDE" as const,
+          settingKey: "trazabilidad.singani.altitudMinimaMsnm",
+          required: 1600,
+          legalMinimum: 1600,
+          actual,
+          pass,
+          terroirId: "t",
+        },
+      ],
+    },
   });
-  it("explica por qué no es apta", () => {
-    const portillo = doEligibility(byName("El Portillo"));
+  it("traduce a frases las comprobaciones que el servidor da por fallidas", () => {
+    expect(doEligibility(parcel(true, 1875))).toEqual({ eligible: true, reasons: [] });
+    const portillo = doEligibility(parcel(false, 1540));
     expect(portillo.eligible).toBe(false);
-    expect(portillo.reasons.join(" ")).toMatch(/1\.540 m/);
-    const tannat = doEligibility(byName("La Angostura"));
-    expect(tannat.eligible).toBe(false);
-    expect(tannat.reasons[0]).toMatch(/Tannat/);
+    expect(portillo.reasons).toEqual(["Cuartel 3 · El Portillo: altitud < 1.600 m s. n. m."]);
     expect(doEligibility(undefined).eligible).toBe(false);
   });
 });
@@ -111,6 +130,8 @@ describe("siguiente paso", () => {
     const step = nextStep(tank, [], [{ id: "p1", fermentationTankId: "t2", equipmentIdentifier: "AL-01" }])!;
     expect(step).toMatchObject({ kind: "destilacion", available: true, href: "/destilacion/nueva?tanque=t2" });
     expect(nextStep({ ...tank, status: "FILLING" }, [], [])!.available).toBe(false);
+    // Fermentando aún no se continúa: antes hay que completar la fermentación (bifurcación).
+    expect(nextStep({ ...tank, status: "FERMENTING" }, [], [])!.available).toBe(false);
     expect(nextStep({ ...tank, destinationType: "OTHER" }, [], [])).toBeNull();
   });
 });
@@ -122,23 +143,107 @@ describe("formularios", () => {
   });
 
   const base: NewTankValues = {
-    harvestBatchId: "h1",
+    inputs: { h1: "18.400" },
+    lotChoice: "auto",
     tankCode: "TK-11",
-    capacityLiters: "10000",
+    capacityLiters: "15000",
     material: "Acero inoxidable",
-    volumeFilledLiters: "8.300",
-    status: "FERMENTING",
+    volumeFilledLiters: "12.100",
+    startFermentation: true,
     startDate: "2026-09-25",
   };
-  const ctx = { approvedHarvestIds: new Set(["h1"]), activeCodes: ["TK-04"], today: TODAY };
+  const harvests = [
+    { id: "h1", lotId: "lot-1", harvestYear: 2026, availableKg: 18400, netWeightKg: 18400 },
+    { id: "h2", lotId: null, harvestYear: 2026, availableKg: 4200, netWeightKg: 4200 },
+  ];
+  const ctx = { harvests, today: TODAY };
 
-  it("alta de tanque válida y con errores", () => {
-    expect(validateNewTank(base, ctx)).toEqual({});
-    const e = validateNewTank(
-      { ...base, harvestBatchId: "h2", tankCode: "tk-04", volumeFilledLiters: "12000", startDate: "2026-09-26" },
+  it("alta de tanque: entradas por pesaje, sin destino ni estado final", () => {
+    expect(toCreateTankDto(base, ctx)).toEqual({
+      ok: true,
+      dto: {
+        inputs: [{ harvestBatchId: "h1", kg: 18400 }],
+        tankCode: "TK-11",
+        capacityLiters: 15000,
+        material: "Acero inoxidable",
+        volumeFilledLiters: 12100,
+        startFermentation: true,
+        startDate: "2026-09-25",
+      },
+    });
+    expect(lotOfInputs(base.inputs, harvests)).toBe("lot-1");
+    // Sin cifra, entra todo lo disponible del pesaje: lo calcula el servidor.
+    const all = toCreateTankDto({ ...base, inputs: { h1: "" } }, ctx);
+    expect(all.ok && all.dto.inputs).toEqual([{ harvestBatchId: "h1" }]);
+  });
+
+  it("uva sin lote: se asigna a un lote existente o nace uno con la añada de la uva", () => {
+    const loose = { ...base, inputs: { h2: "4.200" } };
+    expect(lotOfInputs(loose.inputs, harvests)).toBeNull();
+    const undecided = toCreateTankDto(loose, ctx);
+    expect(undecided.ok).toBe(false);
+    expect(!undecided.ok && undecided.errors.lotChoice).toBeDefined();
+
+    const existing = toCreateTankDto({ ...loose, lotChoice: "lot-9" }, ctx);
+    expect(existing.ok && existing.dto.lotId).toBe("lot-9");
+
+    const lot = { ...emptyLotForm(TODAY), name: "Singani Gran Reserva 2026", productType: "SINGANI" as const };
+    const created = toCreateTankDto({ ...loose, lotChoice: "new" }, { ...ctx, newLot: lot });
+    expect(created.ok && created.dto.newLot).toEqual({
+      name: "Singani Gran Reserva 2026",
+      harvestYear: 2026,
+      productType: "SINGANI",
+    });
+    expect(created.ok && created.dto).not.toHaveProperty("lotId");
+
+    const unnamed = toCreateTankDto({ ...loose, lotChoice: "new" }, ctx);
+    expect(!unnamed.ok && unnamed.lotErrors.name).toBeDefined();
+  });
+
+  it("solo valida forma: capacidad, código en uso y dictamen los decide el servidor", () => {
+    // Volumen sobre la capacidad y código repetido no son errores del formulario.
+    expect(
+      toCreateTankDto({ ...base, capacityLiters: "8000", volumeFilledLiters: "9000", tankCode: "TK-04" }, ctx).ok,
+    ).toBe(true);
+    const e = toCreateTankDto(
+      { ...base, inputs: {}, tankCode: " ", volumeFilledLiters: "", startDate: "2026-09-26" },
       ctx,
     );
-    expect(Object.keys(e).sort()).toEqual(["harvestBatchId", "startDate", "tankCode", "volumeFilledLiters"]);
+    expect(e.ok).toBe(false);
+    if (e.ok) return;
+    expect(Object.keys(e.errors).sort()).toEqual(["inputs", "startDate", "tankCode", "volumeFilledLiters"]);
+    const kg = toCreateTankDto({ ...base, inputs: { h1: "-5" } }, ctx);
+    expect(!kg.ok && kg.inputErrors.h1).toBeDefined();
+  });
+
+  it("lleva los details del servidor a los campos del tanque y del lote nuevo", () => {
+    const error = new ApiError({
+      status: 422,
+      code: "TRC_PHYTO_NOT_APPROVED",
+      message: "Uva sin dictamen fitosanitario aprobado",
+      details: [
+        { field: "inputs", message: "El pesaje HARV-1 está en QUARANTINE", code: "TRC_PHYTO_NOT_APPROVED" },
+        { field: "inputs.0.kg", message: "Kilos por encima de lo disponible" },
+        { field: "tankCode", message: "Tanque físico ocupado" },
+        { field: "newLot.name", message: "muy corto" },
+      ],
+    });
+    expect(tankFieldErrors(error)).toEqual({
+      inputs: "El pesaje HARV-1 está en QUARANTINE",
+      tankCode: "Tanque físico ocupado",
+    });
+    expect(tankLotErrors(error)).toEqual({ name: "muy corto" });
+  });
+
+  it("completar la fermentación: fecha, volumen final y destino", () => {
+    expect(toCompleteTankDto({ endDate: "2026-09-25", finalVolumeLiters: "12.100" }, "SINGANI_DIST", TODAY)).toEqual({
+      ok: true,
+      dto: { endDate: "2026-09-25", finalVolumeLiters: 12100, destination: "SINGANI_DIST" },
+    });
+    const e = toCompleteTankDto({ endDate: "2026-09-26", finalVolumeLiters: "" }, "WINE_AGING", TODAY);
+    expect(e.ok).toBe(false);
+    if (e.ok) return;
+    expect(Object.keys(e.errors).sort()).toEqual(["endDate", "finalVolumeLiters"]);
   });
 
   it("lectura diaria: la temperatura es obligatoria", () => {

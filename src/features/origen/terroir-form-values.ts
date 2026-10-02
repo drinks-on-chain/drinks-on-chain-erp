@@ -10,7 +10,8 @@ import { omitNulls } from "@/lib/erp/omit-nulls";
 import { outerRing } from "./parcel-shape";
 
 // Valores del formulario de terroir (texto tal como se escribe) y su conversión al DTO de
-// alta/edición (09 §3), con la misma validación que el backend (CreateTerroirSchema).
+// alta/edición (09 §3), con la misma validación que el backend (CreateTerroirSchema). La aptitud
+// D.O. no se envía: la calcula el servidor (contrato de la Ola 2 §3.1).
 
 export type TerroirFormValues = {
   parcelName: string;
@@ -23,7 +24,6 @@ export type TerroirFormValues = {
   varietyName: string;
   soilType: string;
   irrigationSystem: string;
-  isDoEligible: boolean;
   doType: string;
   polygon: string;
   doCertificateUrl: string | null;
@@ -44,7 +44,6 @@ export const EMPTY_TERROIR: TerroirFormValues = {
   varietyName: "",
   soilType: "",
   irrigationSystem: "",
-  isDoEligible: false,
   doType: "",
   polygon: "",
   doCertificateUrl: null,
@@ -74,7 +73,6 @@ export function terroirToValues(t: TerroirResponse): TerroirFormValues {
     varietyName: t.varietyName,
     soilType: str(t.soilType),
     irrigationSystem: str(t.irrigationSystem),
-    isDoEligible: t.isDoEligible,
     doType: str(t.doType),
     polygon: formatGeometry(t.geographicPolygonGeojson),
     doCertificateUrl: t.doCertificateUrl ?? null,
@@ -144,7 +142,6 @@ export function toTerroirDto(v: TerroirFormValues): Result {
     varietyName: v.varietyName.trim(),
     soilType: optionalText(v.soilType),
     irrigationSystem: optionalText(v.irrigationSystem),
-    isDoEligible: v.isDoEligible,
     doType: optionalText(v.doType),
     doCertificateUrl: v.doCertificateUrl,
   });

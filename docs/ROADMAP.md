@@ -109,3 +109,12 @@ Contrato: `plan/contratos/o2-erp-confiable.md` del plan maestro (§2–§14, §1
 - [x] «Nuevo lote» en origen (`/lotes/nuevo`) y desde el pesaje (`newLot`), con las reglas vigentes que se fijarán a la vista; pesaje con lote, lote nuevo o uva sin lote, con el análisis opcional y sin dictamen en el alta · 2026-10-02
 - [x] Retirados la lista y la ficha derivadas de `LotView` (`lots.ts`, `LotStatusBadge`); `useLotViews` queda solo para el panel y el embotellado hasta las fases 3 y 4 · 2026-10-02
 - [x] Pruebas: unitarias de reglas, lote, idempotencia, descargas y pesaje; e2e `lotes.spec.ts` (lista, ficha, redirección, alta con D.O. rechazada, incidencia de migración, operario) y el resto adaptado a los fixtures de la Ola 2 · 2026-10-02
+
+### Fase 2 · Origen, vendimia y vinificación
+
+- [x] Parcelas: aptitud D.O. calculada por el servidor (`isDoEligible` y `doEvaluation` con las reglas vigentes de la bodega): badge, filtro y ficha con cada comprobación y el mínimo legal; fuera la casilla «apta para D.O.» y la evaluación en el cliente; una parcela con pesajes no cambia altitud, cepa ni materia prima por edición (409 `TRC_TERROIR_IN_USE`, explicado) · 2026-10-02
+- [x] Vendimia: pesaje sin análisis y uva sin lote (filtro `lotId=none`, columna «Lote»); ficha del pesaje con la parcela tal como era al pesar, kilos disponibles, registro tardío y D.O. con las reglas del lote · 2026-10-02
+- [x] Análisis de madurez aparte (`POST …/maturity-analyses`): historial, vigente y alta en un diálogo; solo inserción · 2026-10-02
+- [x] Dictamen fitosanitario (`POST …/phyto-decisions`): historial con autor y rol, motivo obligatorio al rechazar o poner en cuarentena, informe por `key` · 2026-10-02
+- [x] Tanques: alta con entradas por pesaje (`inputs` con kilos), lote de la uva, lote existente o «Nuevo lote» desde el tanque (`newLot`), sin destino al llenar; acciones `start`, `complete` (bifurcación con confirmación explícita, volumen final y D.O. comprobada) y `clean`; capacidad, código en uso y dictamen los decide el servidor · 2026-10-02
+- [x] Pruebas: unitarias de D.O., análisis, dictámenes y alta/cierre de tanque; e2e de origen, vendimia, vinificación y `elusion.spec.ts` (`TRC_PHYTO_IN_CREATE`, `TRC_PHYTO_NOT_APPROVED`, `TRC_DO_TERROIR_NOT_ELIGIBLE`, `TRC_DO_NOT_ELIGIBLE`, `TRC_DESTINATION_MISMATCH`, `TRC_TANK_CAPACITY_EXCEEDED`, `TRC_TERROIR_IN_USE`); axe en los diálogos nuevos · 2026-10-02

@@ -105,13 +105,13 @@ export const useTankDetails = (ids: readonly string[]) =>
     combine: combineTankDetails,
   });
 
-export const useAgings = () =>
-  useQuery({ queryKey: erpKeys.agings(), queryFn: ({ signal }) => erpApi.agings({}, signal) });
+export const useAgings = (enabled = true) =>
+  useQuery({ queryKey: erpKeys.agings(), queryFn: ({ signal }) => erpApi.agings({}, signal), enabled });
 export const useAging = (id: string) =>
   useQuery({ queryKey: erpKeys.aging(id), queryFn: ({ signal }) => erpApi.aging(id, signal) });
 
-export const useProductions = (q: ProductionQuery = {}) =>
-  useQuery({ queryKey: erpKeys.productions(q), queryFn: ({ signal }) => erpApi.productions(q, signal) });
+export const useProductions = (q: ProductionQuery = {}, enabled = true) =>
+  useQuery({ queryKey: erpKeys.productions(q), queryFn: ({ signal }) => erpApi.productions(q, signal), enabled });
 export const useProduction = (id: string) =>
   useQuery({ queryKey: erpKeys.production(id), queryFn: ({ signal }) => erpApi.production(id, signal) });
 export const useRestStatus = (id: string) =>
@@ -277,11 +277,26 @@ export const useCreateHarvestBatch = () =>
     (body: Parameters<typeof erpApi.createHarvestBatch>[0]) => body,
     (body, key) => erpApi.createHarvestBatch(body, key),
   );
-export const useUpdatePhytoStatus = () =>
-  useErpMutation((v: { id: string; body: Parameters<typeof erpApi.updatePhytoStatus>[1] }) =>
-    erpApi.updatePhytoStatus(v.id, v.body),
+/** Análisis de madurez de un pesaje (solo inserción; el último es el vigente). */
+export const useCreateMaturityAnalysis = () =>
+  useErpMutation((v: { harvestBatchId: string; body: Parameters<typeof erpApi.createMaturityAnalysis>[1] }) =>
+    erpApi.createMaturityAnalysis(v.harvestBatchId, v.body),
+  );
+/** Dictamen fitosanitario de un pesaje (solo inserción, con su autor). */
+export const useCreatePhytoDecision = () =>
+  useErpMutation((v: { harvestBatchId: string; body: Parameters<typeof erpApi.createPhytoDecision>[1] }) =>
+    erpApi.createPhytoDecision(v.harvestBatchId, v.body),
   );
 export const useCreateTank = () => useErpMutation(erpApi.createTank);
+/** Transiciones del tanque por acciones: iniciar, completar (con la bifurcación) y limpiar. */
+export const useStartTank = () =>
+  useErpMutation((v: { id: string; body?: Parameters<typeof erpApi.startTank>[1] }) => erpApi.startTank(v.id, v.body));
+export const useCompleteTank = () =>
+  useErpMutation((v: { id: string; body: Parameters<typeof erpApi.completeTank>[1] }) =>
+    erpApi.completeTank(v.id, v.body),
+  );
+export const useCleanTank = () =>
+  useErpMutation((v: { id: string; body?: Parameters<typeof erpApi.cleanTank>[1] }) => erpApi.cleanTank(v.id, v.body));
 export const useAddTankLog = () =>
   useIdempotentErpMutation(
     (v: { id: string; body: Parameters<typeof erpApi.addTankLog>[1] }) => v,

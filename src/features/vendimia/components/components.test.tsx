@@ -52,14 +52,35 @@ describe("BigNumberInput", () => {
 });
 
 describe("DoBadge", () => {
-  it("oro si es apto, ámbar con motivo si no, etiqueta Vino para otras cepas", () => {
-    const { rerender } = render(<DoBadge varietyName="Moscatel de Alejandría" altitudeMasl={2350} isDoEligible />);
+  const check = (rule: "ALTITUDE" | "VARIETY", pass: boolean, actual: number | string) => ({
+    rule,
+    settingKey:
+      rule === "ALTITUDE" ? "trazabilidad.singani.altitudMinimaMsnm" : "trazabilidad.singani.variedadesExigidas",
+    required: rule === "ALTITUDE" ? 1600 : ["Moscatel de Alejandría"],
+    legalMinimum: rule === "ALTITUDE" ? 1600 : ["Moscatel de Alejandría"],
+    actual,
+    pass,
+    terroirId: "t1",
+  });
+  const terroir = (status: "ELIGIBLE" | "NOT_ELIGIBLE", checks: ReturnType<typeof check>[]) => ({
+    isDoEligible: status === "ELIGIBLE",
+    doEvaluation: {
+      status,
+      checks,
+      rulesSource: "EFFECTIVE_SETTINGS" as const,
+      evaluatedAt: "2026-09-25T12:00:00Z",
+    },
+  });
+
+  it("oro si el servidor la da por apta, ámbar con motivo si no, etiqueta Vino para otras cepas", () => {
+    const { rerender } = render(<DoBadge terroir={terroir("ELIGIBLE", [check("ALTITUDE", true, 2350)])} />);
     expect(screen.getByText("Apto para Singani D.O.")).toBeInTheDocument();
-    rerender(<DoBadge varietyName="Moscatel de Alejandría" altitudeMasl={1540} isDoEligible={false} />);
-    expect(screen.getByText("No apto D.O. · altitud < 1.600 m")).toBeInTheDocument();
-    rerender(<DoBadge varietyName="Tannat" altitudeMasl={1860} isDoEligible />);
+    rerender(<DoBadge terroir={terroir("NOT_ELIGIBLE", [check("ALTITUDE", false, 1540)])} />);
+    expect(screen.getByText("No apto D.O. · altitud < 1.600 m s. n. m.")).toBeInTheDocument();
+    const tannat = terroir("NOT_ELIGIBLE", [check("VARIETY", false, "Tannat")]);
+    rerender(<DoBadge terroir={tannat} />);
     expect(screen.getByText("Vino")).toBeInTheDocument();
-    rerender(<DoBadge varietyName="Tannat" altitudeMasl={1860} isDoEligible explain />);
+    rerender(<DoBadge terroir={tannat} explain />);
     expect(screen.getByText("No apto D.O. · cepa distinta de Moscatel de Alejandría")).toBeInTheDocument();
   });
 });

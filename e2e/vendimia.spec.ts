@@ -17,7 +17,6 @@ test("el agrónomo registra un terroir, pesa uva de esa parcela y aprueba el lot
   await page.getByLabel("Superficie").fill("3,1");
   await page.getByLabel("Altitud").fill("2380");
   await page.getByLabel("Cepa").fill("Moscatel de Alejandría");
-  await page.getByRole("checkbox", { name: /Parcela apta para D.O./ }).click();
   await page.getByLabel("Tipo de D.O.").fill("D.O. Singani");
   await page.getByRole("button", { name: "Crear terroir" }).click();
   await expect(page.getByRole("heading", { name: "Parcela 7 · Alto Cinti" })).toBeVisible();
@@ -54,6 +53,27 @@ test("el agrónomo registra un terroir, pesa uva de esa parcela y aprueba el lot
   await expect(dialog).toHaveCount(0);
   await expect(page.getByText("Lote aprobado").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Aprobar lote" })).toHaveCount(0);
+  // El dictamen queda en el historial con su autor, su rol y sus notas.
+  const history = page.getByRole("list", { name: "Historial de dictámenes" });
+  await expect(history).toContainText("Aprobado");
+  await expect(history).toContainText("Agronomía");
+  await expect(history).toContainText("Inspección visual sin botritis.");
+
+  // El análisis se registró con el pesaje; otro posterior pasa a ser el vigente (solo inserción).
+  const analyses = page.getByRole("table", { name: /Historial de análisis/ });
+  await expect(analyses.getByRole("row")).toHaveCount(2);
+  await page.getByRole("button", { name: "Registrar análisis" }).click();
+  const form = page.getByRole("dialog", { name: "Registrar análisis de madurez" });
+  await form.getByRole("button", { name: "Guardar análisis" }).click();
+  await expect(form.getByText("Mide los grados Brix.")).toBeVisible();
+  await form.getByLabel("Grados Brix").fill("24,6");
+  await form.getByLabel("pH").fill("3,5");
+  await form.getByLabel("Acidez total").fill("5,6");
+  await form.getByRole("button", { name: "Guardar análisis" }).click();
+  await expect(form).toBeHidden();
+  await expect(analyses.getByRole("row")).toHaveCount(3);
+  await expect(analyses.getByRole("row").nth(1)).toContainText("24,6");
+  await expect(analyses.getByRole("row").nth(1)).toContainText("Vigente");
 
   // 4. En la lista de vendimia figura como aprobado
   await page.getByRole("link", { name: "Vendimia y laboratorio" }).first().click();

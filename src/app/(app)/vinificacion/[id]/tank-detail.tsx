@@ -19,6 +19,11 @@ import {
 import { PageChrome } from "@/components/page-chrome";
 import { ScreenTitle } from "@/components/screen-title";
 import { LogForm } from "@/features/vinificacion/components/log-form";
+import {
+  CleanTankButton,
+  CompleteFermentationButton,
+  StartFermentationButton,
+} from "@/features/vinificacion/components/tank-actions";
 import { TreatmentForm } from "@/features/vinificacion/components/treatment-form";
 import { TrendSparkline } from "@/features/vinificacion/components/trend-sparkline";
 import {
@@ -33,11 +38,11 @@ import {
 } from "@/features/vinificacion/tank-model";
 import { ApiError, errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
-import { useAgings, useHarvestBatches, useProductions, useTank, useTerroirs } from "@/lib/erp/hooks";
+import { useAgings, useHarvestBatches, useLot, useProductions, useTank, useTerroirs } from "@/lib/erp/hooks";
 import { DESTINATION, TANK_STATUS, TREATMENT_TYPE } from "@/lib/erp/labels";
 import { can } from "@/lib/erp/permissions";
 import { today } from "@/lib/erp/today";
-import { fmtDate, fmtDateTime, fmtLiters, fmtNumber } from "@/lib/format";
+import { fmtDate, fmtDateTime, fmtKg, fmtLiters, fmtNumber } from "@/lib/format";
 
 const orDash = (n: number | null | undefined, digits = 0, suffix = "") =>
   n === null || n === undefined ? "—" : `${fmtNumber(n, digits)}${suffix}`;
@@ -47,8 +52,10 @@ export function TankDetail({ id }: { id: string }) {
   const tank = useTank(id);
   const harvest = useHarvestBatches();
   const terroirs = useTerroirs();
-  const agings = useAgings();
-  const productions = useProductions();
+  // Crianza y destilación solo las leen dirección, enología y contabilidad.
+  const agings = useAgings(can(me.data, "aging.read"));
+  const productions = useProductions({}, can(me.data, "distillation.read"));
+  const lot = useLot(tank.data?.lotId ?? "", !!tank.data?.lotId);
   const [logOpen, setLogOpen] = useState(false);
   const [treatmentOpen, setTreatmentOpen] = useState(false);
 
@@ -111,6 +118,9 @@ export function TankDetail({ id }: { id: string }) {
     step?.available && can(me.data, step.kind === "crianza" ? "aging.create" : "distillation.create") ? step : null;
   const canLog = can(me.data, "tank.log") && (t.status === "FILLING" || t.status === "FERMENTING");
   const canTreat = can(me.data, "tank.treatment") && t.status !== "CLEANED" && t.status !== "TRANSFERRED";
+  // Las transiciones del tanque (iniciar, completar, limpiar) son de enología y dirección.
+  const canTransition = can(me.data, "tank.create");
+  const inputs = t.inputs ?? [];
 
   // Una sola acción principal: la bitácora mientras fermenta; si no, el siguiente paso.
   const primary = canLog ? (
@@ -161,36 +171,88 @@ export function TankDetail({ id }: { id: string }) {
             items={[
               {
                 term: "Lote",
-                value: h ? (
-                  <Link className="text-accent-text hover:underline" href={`/vendimia/${h.id}`}>
-                    {h.harvestBatchCode}
+                value: t.lotId ? (
+                  <Link className="text-accent-text hover:underline" href={`/lotes/${t.lotId}`}>
+                    {lot.data ? `${lot.data.name} · ${lot.data.reference}` : "Ver lote"}
                   </Link>
                 ) : (
                   "—"
                 ),
               },
+              {
+                term: inputs.length > 1 ? "Pesajes" : "Pesaje",
+                value:
+                  inputs.length > 0 ? (
+                    <span className="grid gap-0.5">
+                      {inputs.map((i) => {
+                        const code = lookup.harvestById.get(i.harvestBatchId)?.harvestBatchCode ?? "Pesaje";
+                        return (
+                          <span key={i.harvestBatchId}>
+                            <Link className="text-accent-text hover:underline" href={`/vendimia/${i.harvestBatchId}`}>
+                              {code}
+                            </Link>{" "}
+                            · {fmtKg(i.kg)}
+                          </span>
+                        );
+                      })}
+                    </span>
+                  ) : h ? (
+                    <Link className="text-accent-text hover:underline" href={`/vendimia/${h.id}`}>
+                      {h.harvestBatchCode}
+                    </Link>
+                  ) : (
+                    "—"
+                  ),
+              },
               { term: "Parcela", value: terroir ? `${terroir.parcelName} · ${terroir.varietyName}` : "—" },
               { term: "Material", value: t.material ?? "—" },
               { term: "Inicio", value: fmtDate(t.startDate) },
               ...(t.endDate ? [{ term: "Fin", value: fmtDate(t.endDate) }] : []),
+              ...(t.finalVolumeLiters != null
+                ? [{ term: "Volumen final", value: fmtLiters(t.finalVolumeLiters) }]
+                : []),
               ...(day !== null ? [{ term: "Fermentación", value: `Día ${fmtNumber(day)}` }] : []),
-              { term: "Destino", value: t.destinationType ? DESTINATION[t.destinationType] : "Sin destino" },
+              {
+                term: "Destino",
+                value: t.destinationType ? DESTINATION[t.destinationType] : "Se decide al completar la fermentación",
+              },
             ]}
           />
         </Card>
 
         <Card className="grid content-start gap-3 p-5">
           <CardHeader title="Siguiente paso" />
-          {!step ? (
+          {t.status === "FILLING" && (
+            <>
+              <p className="m-0 text-sm text-fg-muted">
+                El mosto aún está entrando. Al iniciar la fermentación empieza la bitácora diaria.
+              </p>
+              {canTransition && <StartFermentationButton tank={t} />}
+            </>
+          )}
+          {t.status === "FERMENTING" && (
+            <>
+              <p className="m-0 text-sm text-fg-muted">
+                Cuando la fermentación termine (densidad estable), complétala: ahí se registra el volumen final y se
+                decide el destino, vino o singani.
+              </p>
+              {canTransition && <CompleteFermentationButton tank={t} />}
+            </>
+          )}
+          {t.status === "CLEANED" && (
+            <p className="m-0 text-sm text-fg-muted">Tanque limpio: su código está libre para otro llenado.</p>
+          )}
+          {(t.status === "COMPLETED" || t.status === "TRANSFERRED") && !step && (
             <p className="m-0 text-sm text-fg-muted">
-              Este tanque no va a crianza ni a destilación: no tiene etapa siguiente en el ERP.
+              Este tanque se cerró sin un destino de vino o singani: no tiene etapa siguiente en el ERP.
             </p>
-          ) : (
+          )}
+          {(t.status === "COMPLETED" || t.status === "TRANSFERRED") && step && (
             <>
               <p className="m-0 text-sm text-fg-muted">
                 {step.kind === "crianza"
-                  ? "El destino fijado al llenar es crianza (vino): la ruta de destilación está bloqueada."
-                  : "El destino fijado al llenar es destilación (singani): la ruta de crianza está bloqueada."}
+                  ? "El destino decidido es crianza (vino): la ruta de destilación está bloqueada."
+                  : "El destino decidido es destilación (singani): la ruta de crianza está bloqueada."}
               </p>
               {step.existing.length > 0 && (
                 <ul className="m-0 grid gap-1 p-0">
@@ -203,22 +265,7 @@ export function TankDetail({ id }: { id: string }) {
                   ))}
                 </ul>
               )}
-              {t.status === "FILLING" && (
-                <p className="m-0 text-sm text-fg-muted">Podrás continuar cuando el tanque esté fermentando.</p>
-              )}
-              {t.status === "FERMENTING" && step.available && (
-                <p className="m-0 text-sm text-fg-muted">
-                  Continúa cuando la fermentación haya concluido (densidad estable).
-                </p>
-              )}
-              {stepAction && canLog && (
-                <Button asChild variant="secondary" iconEnd={<ArrowRight aria-hidden size={16} />}>
-                  <Link href={stepAction.href}>{stepAction.label}</Link>
-                </Button>
-              )}
-              <p className="m-0 text-xs text-fg-subtle">
-                El ERP aún no puede marcar la fermentación como terminada: el backend no expone ese cambio de estado.
-              </p>
+              {t.status === "TRANSFERRED" && canTransition && <CleanTankButton tank={t} />}
             </>
           )}
         </Card>

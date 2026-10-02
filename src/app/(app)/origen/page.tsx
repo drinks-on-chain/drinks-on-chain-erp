@@ -6,7 +6,7 @@ import { Plus, Search } from "lucide-react";
 import { Button, EmptyState, ErrorState, Input, Pill, PillGroup, Skeleton } from "@drinks-on-chain/ui";
 import { PageChrome } from "@/components/page-chrome";
 import { TerroirCard } from "@/features/origen/components/terroir-card";
-import { doEligibility } from "@/features/origen/do-eligibility";
+import { isDoApt } from "@/features/origen/do-eligibility";
 import { filterTerroirs, shortVariety, varietiesOf } from "@/features/origen/filter-terroirs";
 import { errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
@@ -25,7 +25,7 @@ export default function TerroirDirectoryPage() {
   const items = useMemo(() => terroirs.data?.items ?? [], [terroirs.data]);
   const varieties = useMemo(() => varietiesOf(items), [items]);
   const visible = useMemo(() => filterTerroirs(items, { search, variety, doOnly }), [items, search, variety, doOnly]);
-  const doCount = useMemo(() => items.filter((t) => doEligibility(t).eligible).length, [items]);
+  const doCount = useMemo(() => items.filter(isDoApt).length, [items]);
   const canWrite = can(me.data, "terroir.write");
   const filtered = search.trim() !== "" || variety !== null || doOnly;
 
