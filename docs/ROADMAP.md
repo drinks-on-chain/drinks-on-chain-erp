@@ -93,3 +93,19 @@ Contrato: `plan/contratos/o1-backoffice-y-bodegas.md` §11 y `o0-sesiones-y-esta
 - [x] Aviso "Tu sesión se cerró por seguridad" en el login también al recargar con una sesión revocada (E2E de humo) · 2026-09-27
 - [x] Enlace "Perfil" del menú de usuario con `linkComponent`: el fallo estaba en `@drinks-on-chain/ui` (`SidebarShell` no pasaba `linkComponent` al `Menu` del bloque de usuario); corregido en `@drinks-on-chain/ui` 0.3.1-rc.1, que llega con la plantilla, y cubierto por el e2e de humo (navega sin recargar) · 2026-09-27
 - [x] `@drinks-on-chain/mocks` 0.4.0-rc.2 (retirada de H1 en los mocks) con la plantilla: esquemas de sesión y `me` reexportados salvo `tokens.refreshToken` (obsoleto hasta 0.5), panel `/__mocks` con `DemoUser.role` y pruebas sin campos de 0.1 · 2026-09-27
+
+## Ola 2 · O2-ERP-1 (sub-etapa 1J) · ERP confiable sobre el lote del servidor
+
+Contrato: `plan/contratos/o2-erp-confiable.md` del plan maestro (§2–§14, §16.3, §17 fila «ERP», §18) y `docs/CONTRATO.md` §10 de los mocks 0.5 (donde difieren, manda el OpenAPI). Se construye y se prueba contra mocks: el backend responde 501 en buena parte de las rutas nuevas. Sin bandera `NEXT_PUBLIC_ERP_LOTS_V2`: `dev` trabaja con el lote nuevo; producción sigue en `main` hasta el cierre de la ola.
+
+### Fase 1 · Base y lote
+
+- [x] `@drinks-on-chain/mocks` 0.5.0-rc.1 y escenarios de datos en `/__mocks` (`lote-en-reposo`, `lote-listo`, `lote-con-incidencia`, `laboratorio-no-conforme`) · 2026-10-02
+- [x] Cliente: `Idempotency-Key` (pesajes, lecturas, embotellado y cierre del expediente; la clave se repite solo si el envío quedó sin respuesta), `apiFile()` para CSV y JSON canónico, lectura de los `details` ampliados (`code`, `rule`, `expected`, `actual`, `meta`) · 2026-10-02
+- [x] `src/lib/erp`: un acceso por operación de `/v1/lots*` y de las acciones nuevas (análisis de madurez, dictámenes, transiciones de tanque, descartes, cierre de destilación, panel, reportes), hooks, etiquetas y permisos del contrato §14 · 2026-10-02
+- [x] `RuleViolationNotice` (local, pendiente de mover a `@drinks-on-chain/ui`): explica los 46 códigos `TRC_…` con la regla de la instantánea, lo exigido, lo registrado y qué hacer; sustituye a `FormErrorAlert` en los formularios · 2026-10-02
+- [x] Lista de lotes con filtros y paginación del servidor (etapa, tipo, búsqueda, incidencias), etapas de §16.3, candado (`nextLock`), laboratorio, botellas e incidencias · 2026-10-02
+- [x] Ficha del lote `/lotes/{lotId}`: candados con motivo y fecha, D.O. calculada, instantánea de reglas, registros del lote (grafo), línea de tiempo e incidencias de migración; los enlaces antiguos `/lotes/{harvestBatchId}` redirigen por `GET /v1/harvest-batches/{id}` → `lotId` · 2026-10-02
+- [x] «Nuevo lote» en origen (`/lotes/nuevo`) y desde el pesaje (`newLot`), con las reglas vigentes que se fijarán a la vista; pesaje con lote, lote nuevo o uva sin lote, con el análisis opcional y sin dictamen en el alta · 2026-10-02
+- [x] Retirados la lista y la ficha derivadas de `LotView` (`lots.ts`, `LotStatusBadge`); `useLotViews` queda solo para el panel y el embotellado hasta las fases 3 y 4 · 2026-10-02
+- [x] Pruebas: unitarias de reglas, lote, idempotencia, descargas y pesaje; e2e `lotes.spec.ts` (lista, ficha, redirección, alta con D.O. rechazada, incidencia de migración, operario) y el resto adaptado a los fixtures de la Ola 2 · 2026-10-02

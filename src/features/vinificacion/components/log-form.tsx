@@ -7,7 +7,7 @@ import { today } from "@/lib/erp/today";
 import { dateTimeInputToIso, hasErrors, toDateTimeInput } from "../form-utils";
 import { parseDecimal } from "@/lib/format";
 import { TEMP_ALERT_C, validateLog, type LogField, type LogValues } from "../tank-model";
-import { FormErrorAlert } from "./form-error";
+import { RuleViolationNotice } from "@/components/rule-violation-notice";
 import { useReturnFocus } from "@/lib/use-return-focus";
 import { fieldErrorsFrom } from "@/lib/api/field-errors";
 
@@ -160,7 +160,7 @@ export function LogForm({
         <Field label="Notas">
           <Textarea value={values.notes} onChange={set("notes")} rows={2} />
         </Field>
-        <FormErrorAlert error={addLog.error} fields={SERVER_FIELDS} />
+        <RuleViolationNotice error={addLog.error} fields={SERVER_FIELDS} />
       </form>
     </SlideOver>
   );

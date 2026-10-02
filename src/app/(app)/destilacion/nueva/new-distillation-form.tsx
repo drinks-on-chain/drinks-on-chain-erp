@@ -31,7 +31,7 @@ import {
   type DistillationField,
   type DistillationValues,
 } from "@/features/destilacion/distillation-model";
-import { FormErrorAlert } from "@/features/vinificacion/components/form-error";
+import { RuleViolationNotice } from "@/components/rule-violation-notice";
 import { hasErrors, toDateInput } from "@/features/vinificacion/form-utils";
 import { parseDecimal, fmtDate, fmtLiters, fmtNumber } from "@/lib/format";
 import { doEligibility, lotLookup, lotName, terroirOfHarvest } from "@/features/vinificacion/tank-model";
@@ -348,7 +348,7 @@ export function NewDistillationForm() {
           <Field label="Notas">
             <Textarea value={values.notes} onChange={(e) => set("notes", e.target.value)} rows={2} />
           </Field>
-          <FormErrorAlert error={createDistillation.error} fields={SERVER_FIELDS} />
+          <RuleViolationNotice error={createDistillation.error} fields={SERVER_FIELDS} />
         </Card>
 
         <aside className="grid content-start gap-4">

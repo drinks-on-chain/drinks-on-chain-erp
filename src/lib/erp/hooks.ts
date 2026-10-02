@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { deriveLotViews, type LotChain, type LotView, type TerroirResponse } from "@drinks-on-chain/mocks";
 import type { Page } from "@/lib/api/envelope";
 import { ApiError } from "@/lib/api/errors";
+import { createIdempotencyKeys, withIdempotency } from "@/lib/api/idempotency";
 import { useMe } from "@/lib/auth/hooks";
 import { erpKeys } from "./keys";
 import { can } from "./permissions";
@@ -12,6 +13,7 @@ import {
   erpApi,
   type AuditQuery,
   type HarvestQuery,
+  type LotQuery,
   type ProductionQuery,
   type TankQuery,
   type TerroirQuery,
@@ -21,6 +23,40 @@ import { today } from "./today";
 // Hooks de datos del ERP. Las pantallas solo importan de aquí.
 
 // ---------- Lecturas ----------
+
+// Lote del servidor (contrato de la Ola 2 §2). La lista se filtra y pagina en el servidor: la
+// página anterior sigue visible mientras llega la siguiente.
+export const useLots = (q: LotQuery = {}, enabled = true) =>
+  useQuery({
+    queryKey: erpKeys.lots(q),
+    queryFn: ({ signal }) => erpApi.lots(q, signal),
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+export const useLot = (id: string, enabled = true) =>
+  useQuery({ queryKey: erpKeys.lot(id), queryFn: ({ signal }) => erpApi.lot(id, signal), enabled });
+export const useLotTimeline = (id: string, enabled = true) =>
+  useQuery({ queryKey: erpKeys.lotTimeline(id), queryFn: ({ signal }) => erpApi.lotTimeline(id, signal), enabled });
+export const useLotGraph = (id: string, enabled = true) =>
+  useQuery({ queryKey: erpKeys.lotGraph(id), queryFn: ({ signal }) => erpApi.lotGraph(id, signal), enabled });
+
+/**
+ * Enlaces antiguos `/lotes/{harvestBatchId}` (contrato §16.3): el id era el del pesaje. Devuelve
+ * el `lotId` de ese pesaje, o `null` si no existe o es uva sin lote.
+ */
+export const useLegacyLotId = (harvestBatchId: string, enabled: boolean) =>
+  useQuery({
+    queryKey: [...erpKeys.harvestBatch(harvestBatchId), "lot-id"] as const,
+    queryFn: ({ signal }) =>
+      erpApi.harvestBatch(harvestBatchId, signal).then(
+        (h) => h.lotId,
+        (e: unknown) => {
+          if (e instanceof ApiError && (e.isNotFound || e.isValidation)) return null;
+          throw e;
+        },
+      ),
+    enabled,
+  });
 
 const NO_TERROIRS: Page<TerroirResponse> = { items: [], total: 0, limit: 0, offset: 0 };
 
@@ -214,14 +250,43 @@ export const useUpdateTerroir = () =>
   useErpMutation((v: { id: string; body: Parameters<typeof erpApi.updateTerroir>[1] }) =>
     erpApi.updateTerroir(v.id, v.body),
   );
-export const useCreateHarvestBatch = () => useErpMutation(erpApi.createHarvestBatch);
+/**
+ * Escritura con `Idempotency-Key` (pesajes, lecturas, embotellado y cierre del expediente,
+ * contrato de la Ola 2 §0): un reintento del mismo envío sin respuesta repite la clave.
+ */
+function useIdempotentErpMutation<TVars, TData>(
+  body: (vars: TVars) => unknown,
+  send: (vars: TVars, key: string) => Promise<TData>,
+) {
+  const [keys] = useState(() => createIdempotencyKeys());
+  return useErpMutation(withIdempotency(keys, body, send));
+}
+
+export const useCreateLot = () =>
+  useIdempotentErpMutation(
+    (body: Parameters<typeof erpApi.createLot>[0]) => body,
+    (body, key) => erpApi.createLot(body, key),
+  );
+export const useUpdateLot = () =>
+  useErpMutation((v: { id: string; body: Parameters<typeof erpApi.updateLot>[1] }) => erpApi.updateLot(v.id, v.body));
+export const useDiscardLot = () =>
+  useErpMutation((v: { id: string; reason: string }) => erpApi.discardLot(v.id, { reason: v.reason }));
+
+export const useCreateHarvestBatch = () =>
+  useIdempotentErpMutation(
+    (body: Parameters<typeof erpApi.createHarvestBatch>[0]) => body,
+    (body, key) => erpApi.createHarvestBatch(body, key),
+  );
 export const useUpdatePhytoStatus = () =>
   useErpMutation((v: { id: string; body: Parameters<typeof erpApi.updatePhytoStatus>[1] }) =>
     erpApi.updatePhytoStatus(v.id, v.body),
   );
 export const useCreateTank = () => useErpMutation(erpApi.createTank);
 export const useAddTankLog = () =>
-  useErpMutation((v: { id: string; body: Parameters<typeof erpApi.addTankLog>[1] }) => erpApi.addTankLog(v.id, v.body));
+  useIdempotentErpMutation(
+    (v: { id: string; body: Parameters<typeof erpApi.addTankLog>[1] }) => v,
+    (v, key) => erpApi.addTankLog(v.id, v.body, key),
+  );
 export const useAddTreatment = () =>
   useErpMutation((v: { id: string; body: Parameters<typeof erpApi.addTreatment>[1] }) =>
     erpApi.addTreatment(v.id, v.body),

@@ -48,10 +48,16 @@ describe("tabla de barricas", () => {
   });
 
   it("pone primero las crianzas en curso, por días restantes", () => {
-    expect(rows.map((r) => r.containerCode)).toEqual(["BAR-FR-2024-01", "BAR-US-2024-07", "BAR-FR-2023-04"]);
+    expect(rows.slice(0, 2).map((r) => r.containerCode)).toEqual(["BAR-FR-2024-01", "BAR-US-2024-07"]);
     expect(rows[0]!.lotName).toBe("Cuartel 1 · La Angostura · Tannat");
     expect(rows[0]!.lock.daysRemaining).toBe(39);
-    expect(rows[2]!.status).toBe("BOTTLED");
+    // Las cerradas (embotellada y descartada), al final.
+    expect(
+      rows
+        .slice(2)
+        .map((r) => r.status)
+        .sort(),
+    ).toEqual(["BOTTLED", "DISCARDED"]);
   });
 
   it("solo ofrece tanques de vino sin crianza previa", () => {

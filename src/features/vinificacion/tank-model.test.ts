@@ -40,8 +40,8 @@ describe("mapa de tanques", () => {
 
   it("marca en ámbar el tanque con la última lectura por encima de 26 °C", () => {
     const hot = cards.filter((c) => c.hot);
-    expect(hot.map((c) => c.tankCode)).toEqual(["TK-04"]);
-    expect(hot[0]!.temperature).toBe(27.5);
+    expect(hot.map((c) => c.tankCode).sort()).toEqual(["TK-04", "TK-15"]);
+    expect(hot.find((c) => c.tankCode === "TK-04")!.temperature).toBe(27.5);
     expect(cards.find((c) => c.tankCode === "TK-10")!.hot).toBe(false);
   });
 
@@ -55,8 +55,10 @@ describe("mapa de tanques", () => {
   });
 
   it("filtra por estado y destino", () => {
-    expect(filterTanks(cards, { status: "FERMENTING", destination: "ALL" })).toHaveLength(2);
-    expect(filterTanks(cards, { status: "ALL", destination: "OTHER" }).map((c) => c.tankCode)).toEqual(["TK-07"]);
+    expect(filterTanks(cards, { status: "FERMENTING", destination: "ALL" })).toHaveLength(3);
+    // TK-15 fermenta sin destino: se decide al completar la fermentación.
+    expect(filterTanks(cards, { status: "ALL", destination: "SINGANI_DIST" })).toEqual([]);
+    expect(cards.find((c) => c.tankCode === "TK-15")!.destination).toBeNull();
     expect(filterTanks(cards, { status: "ALL", destination: "ALL" })).toHaveLength(cards.length);
   });
 

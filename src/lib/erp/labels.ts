@@ -2,9 +2,16 @@ import type {
   AgingStatus,
   BeverageCategory,
   CertificationStatus,
+  ComplianceIssue,
   DestinationType,
+  DoStatus,
+  LotEventType,
   LotKind,
+  LotLabStatus,
+  LotLockInfo,
+  LotProductType,
   LotStage,
+  LotStageCode,
   PhytosanitaryStatus,
   ProductType,
   RestStatus,
@@ -104,4 +111,77 @@ export const BEVERAGE_CATEGORY: Record<BeverageCategory, string> = {
   BREWERY: "Cervecería",
   DISTILLERY: "Destilería",
   OTHER: "Otra",
+};
+
+// ---------------------------------------------------------------------------
+// Lote del servidor (contrato de la Ola 2 §2, §8, §11)
+// ---------------------------------------------------------------------------
+
+/** Etapas del lote, en el orden del proceso. */
+export const LOT_STAGE_CODE: Record<LotStageCode, Label> = {
+  ORIGIN: { label: "Origen", tone: "neutral" },
+  HARVEST: { label: "Vendimia", tone: "info" },
+  FERMENTING: { label: "Fermentación", tone: "info" },
+  AGING: { label: "Crianza", tone: "warning" },
+  DISTILLING: { label: "Destilación", tone: "info" },
+  RESTING: { label: "Reposo", tone: "warning" },
+  BOTTLED: { label: "Embotellado", tone: "success" },
+  CERTIFIED: { label: "Expediente cerrado", tone: "success" },
+  ANCHORED: { label: "Anclado", tone: "success" },
+  REJECTED: { label: "Rechazado", tone: "danger" },
+  DISCARDED: { label: "Descartado", tone: "neutral" },
+};
+
+export const LOT_PRODUCT: Record<LotProductType, string> = { WINE: "Vino", SINGANI: "Singani" };
+
+export const LOT_LAB_STATUS: Record<LotLabStatus, Label> = {
+  NOT_RECORDED: { label: "Sin análisis", tone: "neutral" },
+  CONFORMING: { label: "Conforme", tone: "success" },
+  NON_CONFORMING: { label: "No conforme", tone: "danger" },
+  INCOMPLETE: { label: "Incompleto", tone: "warning" },
+};
+
+export const DO_STATUS: Record<DoStatus, Label> = {
+  ELIGIBLE: { label: "Apto para D.O. Singani", tone: "success" },
+  ELIGIBLE_BY_EXCEPTION: { label: "Apto por excepción legal", tone: "warning" },
+  NOT_ELIGIBLE: { label: "No apto para D.O. Singani", tone: "danger" },
+  NOT_APPLICABLE: { label: "D.O. no aplica", tone: "neutral" },
+};
+
+export const LOCK_KIND: Record<LotLockInfo["kind"], string> = {
+  AGING: "Candado de crianza",
+  REST: "Reposo obligatorio",
+};
+
+export const COMPLIANCE_SOURCE: Record<ComplianceIssue["source"], string> = {
+  MIGRATION: "Detectada al migrar los datos",
+  CORRECTION: "Surgió de una corrección",
+  RULES_REEVALUATION: "Surgió al reevaluar las reglas",
+};
+
+export const LOT_EVENT: Record<LotEventType, string> = {
+  LOT_CREATED: "Lote creado",
+  ESTIMATE_CHANGED: "Estimación de botellas",
+  HARVEST_WEIGHED: "Pesaje",
+  MATURITY_ANALYZED: "Análisis de madurez",
+  PHYTO_DECIDED: "Dictamen fitosanitario",
+  TANK_FILLED: "Tanque lleno",
+  FERMENTATION_STARTED: "Inicio de fermentación",
+  FERMENTATION_READINGS: "Lecturas de fermentación",
+  TREATMENT_APPLIED: "Tratamiento enológico",
+  FERMENTATION_COMPLETED: "Fermentación terminada",
+  PRODUCT_DECIDED: "Destino decidido",
+  AGING_STARTED: "Inicio de crianza",
+  DISTILLATION_STARTED: "Inicio de destilación",
+  DISTILLATION_CLOSED: "Destilación cerrada",
+  LOCK_RELEASED: "Candado liberado",
+  BOTTLED: "Embotellado",
+  BOTTLE_CODES_GENERATED: "Códigos de botella",
+  BOTTLE_CODE_VOIDED: "Código anulado",
+  LAB_REGISTERED: "Laboratorio",
+  CORRECTION: "Corrección",
+  FILE_ATTACHED: "Archivo adjunto",
+  DOSSIER_CLOSED: "Expediente cerrado",
+  LOT_REJECTED: "Lote rechazado",
+  LOT_DISCARDED: "Lote descartado",
 };

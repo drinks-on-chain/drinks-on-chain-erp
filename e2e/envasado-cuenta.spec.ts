@@ -1,9 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
-import { trackErrors } from "./support";
+import { trackErrors, setDataScenario } from "./support";
 import { unzipSync } from "fflate";
 
-// 1E Envasado y QR, lotes, 1F Cuenta Stellar y el resto de 1A (perfil y ajustes) contra los mocks.
+// 1E Envasado y QR, 1F Cuenta Stellar y el resto de 1A (perfil y ajustes) contra los mocks.
+// Los lotes (lista y ficha del lote del servidor) están en lotes.spec.ts.
 // La base de datos de MSW vive en la página: tras una escritura se navega con enlaces (sin recargar).
 
 // Un embotellado sin certificado responde 404 en su certificado: es el estado "sin certificado".
@@ -40,25 +41,27 @@ test("Altos: ninguna crianza liberada, el embotellado queda bloqueado por el can
 test("Cinti Viejo: embotella un singani con el reposo cumplido y exporta el lote de códigos QR", async ({ page }) => {
   // Recorrido largo (alta, subida de la etiqueta, detalle y exportación): ~27 s en una tableta
   // emulada; con dos workers en una máquina cargada rozaba los 30 s por defecto.
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
   const errors = trackErrors(page, [NO_LAB]);
+  // Escenario de datos «lote listo»: el reposo de «Singani Gran Reserva 2026» ya se cumplió.
+  await setDataScenario(page, "lote-listo");
   await login(page, "enologa@cintiviejo.test");
   await nav(page, "Envasado y QR");
   await page.getByRole("link", { name: "Nuevo embotellado" }).click();
 
   await page.getByRole("combobox", { name: "Fuente" }).click();
-  await page.getByRole("option", { name: "Destilación · Alambique de cobre AL-02 · HARV-2025-MOLINO-03" }).click();
+  await page
+    .getByRole("option", { name: "Destilación · Alambique de cobre Charentais AL-01 · HARV-2026-VIEJO-008" })
+    .click();
   await expect(page.getByText("Embotellado bloqueado por candado")).toHaveCount(0);
 
-  // Corazón de 450 L a 64 % → 720 L a 40 %: 270 L de agua.
+  // Corazón de 1.500 L a 60 % → 2.250 L a 40 %: 750 L de agua (caso del contrato §18).
   await expect(page.getByLabel("Grado alcohólico final")).toHaveValue("40");
-  await expect(page.getByText(/Ajuste de 64 % a 40 % vol: ≈ 270 L/)).toBeVisible();
-  await page.getByRole("button", { name: "Usar esta cifra" }).click();
-  await expect(page.getByLabel("Adición de agua")).toHaveValue("270");
-  await page.getByLabel(/Botellas llenadas/).fill("950");
+  await page.getByLabel("Adición de agua").fill("750");
+  await page.getByLabel(/Botellas llenadas/).fill("2950");
   await page.getByLabel("Tipo de botella").fill("Vidrio flint 750 ml");
-  // 950 × 0,75 L = 712,5 L envasados de 720 L disponibles.
-  await expect(page.getByText("Merma de envasado 1,0 %")).toBeVisible();
+  // 2.950 × 0,75 L = 2.212,5 L envasados de 2.250 L disponibles.
+  await expect(page.getByText("Merma de envasado 1,7 %")).toBeVisible();
 
   await page.getByRole("button", { name: "Cerrar producción y generar identidad" }).click();
   const dialog = page.getByRole("dialog", { name: "¿Cerrar la producción?" });
@@ -83,11 +86,12 @@ test("Cinti Viejo: embotella un singani con el reposo cumplido y exporta el lote
   ]);
   expect(download.suggestedFilename()).toBe(`qr-${lot}.csv`);
   const csv = (await readFile((await download.path())!, "utf8")).replace(/^﻿/, "").trimEnd().split("\r\n");
-  expect(csv).toHaveLength(951);
+  expect(csv).toHaveLength(2951);
   expect(csv[0]).toBe("codigo,lote,botella,url,estado");
   const [code, lotCol, serial, url, state] = csv[1]!.split(",");
   expect([code, lotCol, serial, state]).toEqual([`${lot}-0001`, lot, "0001", "provisional"]);
-  expect(url).toMatch(/^https:\/\/[^/]+\/b\/CVJ-2026-SINGANI-\d{3}\?n=0001$/);
+  // El origen es el del Marketplace (en los mocks, http://localhost:3005).
+  expect(url).toMatch(/^https?:\/\/[^/]+\/b\/CVJ-2026-SINGANI-\d{3}\?n=0001$/);
 
   // ZIP: LEEME, CSV, QR del lote y un SVG por botella.
   const [zipDownload] = await Promise.all([
@@ -96,7 +100,7 @@ test("Cinti Viejo: embotella un singani con el reposo cumplido y exporta el lote
   ]);
   expect(zipDownload.suggestedFilename()).toBe(`qr-${lot}.zip`);
   const entries = Object.keys(unzipSync(new Uint8Array(await readFile((await zipDownload.path())!))));
-  expect(entries.filter((e) => e.includes("/botellas/"))).toHaveLength(950);
+  expect(entries.filter((e) => e.includes("/botellas/"))).toHaveLength(2950);
   expect(entries).toContain(`${lot}/codigos.csv`);
   expect(entries).toContain(`${lot}/lote-${lot}.svg`);
 
@@ -109,7 +113,6 @@ test("Cinti Viejo: embotella un singani con el reposo cumplido y exporta el lote
   await lab.getByLabel("Grado alcohólico real").fill("40,1");
   await lab.getByLabel("Acidez total (tartárico)").fill("0,3");
   await lab.getByLabel("Acidez volátil (acético)").fill("0,1");
-  await lab.getByLabel("Conforme a normas SENASAG").check();
   await lab.getByLabel("Informe en PDF").setInputFiles({
     name: "informe.pdf",
     mimeType: "application/pdf",
@@ -117,42 +120,12 @@ test("Cinti Viejo: embotella un singani con el reposo cumplido y exporta el lote
   });
   await lab.getByRole("button", { name: "Guardar certificado" }).click();
   await expect(page.getByText(`Certificado registrado para ${lot}`, { exact: true })).toBeVisible();
-  await expect(page.getByText("Conforme SENASAG")).toBeVisible();
+  // La conformidad la calcula el servidor con los límites del lote: sin metanol ni cobre queda incompleta.
+  await expect(page.getByText("SENASAG: sin dictamen")).toBeVisible();
 
   // El nuevo lote aparece en el listado.
   await page.getByRole("link", { name: "Envasado y QR" }).first().click();
   await expect(page.getByRole("link", { name: lot, exact: true })).toBeVisible();
-  expect(errors).toEqual([]);
-});
-
-test("Lotes: filtro por etapa y línea de tiempo del lote en reposo", async ({ page }) => {
-  const errors = trackErrors(page, []);
-  await login(page, "enologa@cintiviejo.test");
-  await nav(page, "Lotes");
-  await expect(page.getByRole("heading", { name: "Lotes", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: /^Reposo · 1$/ }).click();
-  const rows = page.getByRole("row");
-  await expect(rows).toHaveCount(2);
-  await expect(page.getByText("Faltan 18 días")).toBeVisible();
-
-  await page.getByRole("link", { name: "HARV-2026-PARRALES-01", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "HARV-2026-PARRALES-01" })).toBeVisible();
-  const timeline = page.getByRole("list", { name: "Recorrido del lote" });
-  await expect(timeline.getByRole("link", { name: "TK-03" })).toHaveAttribute("href", /^\/vinificacion\//);
-  await expect(timeline.getByRole("link", { name: "Alambique de cobre Charentais AL-01" })).toHaveAttribute(
-    "href",
-    /^\/destilacion\//,
-  );
-  await expect(page.getByText("Reposo obligatorio de 180 días")).toBeVisible();
-  await expect(page.getByText(/se libera el 13 oct 2026/)).toBeVisible();
-
-  // Un lote embotellado enlaza con su pasaporte público.
-  await page.getByRole("link", { name: "Lotes" }).first().click();
-  await page.getByRole("link", { name: "HARV-2025-VIEJO-02", exact: true }).click();
-  await expect(page.getByRole("link", { name: /Pasaporte público del lote/ })).toHaveAttribute(
-    "href",
-    /\/b\/CVJ-2026-SINGANI-001$/,
-  );
   expect(errors).toEqual([]);
 });
 

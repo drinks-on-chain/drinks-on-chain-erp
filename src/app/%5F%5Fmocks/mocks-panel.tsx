@@ -29,6 +29,10 @@ const SCENARIO_LABELS: Record<ScenarioName, string> = {
   error: "Error del servidor (500)",
   slow: "Lento (+2,5 s)",
   offline: "Sin conexión",
+  "lote-en-reposo": "Lote en reposo (faltan 10 días)",
+  "lote-listo": "Lote listo para embotellar",
+  "lote-con-incidencia": "Lote con incidencia de migración",
+  "laboratorio-no-conforme": "Laboratorio no conforme",
 };
 
 /** Enlace del correo: dentro de la app si es de este origen; si no, a la otra app. */

@@ -2,6 +2,25 @@
 // una escritura (las entidades están encadenadas: un embotellado cambia el lote, el panel…).
 export const erpKeys = {
   all: ["erp"] as const,
+  lots: (params?: object) => ["erp", "lots", params ?? {}] as const,
+  lot: (id: string) => ["erp", "lots", "detail", id] as const,
+  lotTimeline: (id: string) => ["erp", "lots", "detail", id, "timeline"] as const,
+  lotGraph: (id: string) => ["erp", "lots", "detail", id, "graph"] as const,
+  lotBalance: (id: string) => ["erp", "lots", "detail", id, "balance"] as const,
+  lotLabs: (id: string) => ["erp", "lots", "detail", id, "lab"] as const,
+  lotCorrections: (id: string) => ["erp", "lots", "detail", id, "corrections"] as const,
+  lotAttachments: (id: string) => ["erp", "lots", "detail", id, "attachments"] as const,
+  dossier: (id: string) => ["erp", "lots", "detail", id, "dossier"] as const,
+  dossierPreview: (id: string) => ["erp", "lots", "detail", id, "dossier-preview"] as const,
+  bottleCodes: (id: string, params?: object) => ["erp", "lots", "detail", id, "bottle-codes", params ?? {}] as const,
+  bottleCodeExport: (id: string, exportId: string) =>
+    ["erp", "lots", "detail", id, "bottle-code-export", exportId] as const,
+  bottlingPreview: (id: string, body: object) => ["erp", "lots", "detail", id, "bottling-preview", body] as const,
+  traceDashboard: () => ["erp", "trace-dashboard"] as const,
+  productionReport: (params?: object) => ["erp", "production-report", params ?? {}] as const,
+  maturityAnalyses: (harvestBatchId: string) =>
+    ["erp", "harvest-batches", "detail", harvestBatchId, "maturity"] as const,
+  phytoDecisions: (harvestBatchId: string) => ["erp", "harvest-batches", "detail", harvestBatchId, "phyto"] as const,
   terroirs: (params?: object) => ["erp", "terroirs", params ?? {}] as const,
   terroir: (id: string) => ["erp", "terroirs", "detail", id] as const,
   harvestBatches: (params?: object) => ["erp", "harvest-batches", params ?? {}] as const,

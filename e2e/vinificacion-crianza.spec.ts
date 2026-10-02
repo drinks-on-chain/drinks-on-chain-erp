@@ -95,8 +95,13 @@ test("enóloga de Altos: la crianza en barrica muestra su cuenta regresiva", asy
 test("enóloga de Altos: llenar un tanque fija el destino con confirmación explícita", async ({ page }) => {
   const errors = trackErrors(page);
   await login(page, "enologa@altos.test");
-  await page.goto("/vinificacion");
-  await page.getByRole("link", { name: "Llenar tanque" }).click();
+  // La uva entra a un tanque solo con dictamen aprobado: se aprueba el pesaje pendiente.
+  await page.getByRole("link", { name: "Vendimia y laboratorio", exact: true }).first().click();
+  await page.getByRole("link", { name: "HARV-2026-SAUCES-12", exact: true }).click();
+  await page.getByRole("button", { name: "Aprobar lote" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Sí, aprobar" }).click();
+  await expect(page.getByText("Lote aprobado").first()).toBeVisible();
+  await page.getByRole("link", { name: "Llenar tanque" }).first().click();
   await expect(page.getByRole("heading", { name: "Llenar tanque" })).toBeVisible();
 
   // Un Tannat no puede ir a destilación.
@@ -105,9 +110,9 @@ test("enóloga de Altos: llenar un tanque fija el destino con confirmación expl
   await expect(page.getByText(/La D.O. Singani exige Moscatel de Alejandría/).first()).toBeVisible();
 
   await page.getByRole("combobox", { name: "Lote" }).click();
-  await page.getByRole("option", { name: /HARV-2026-SAUCES-07/ }).click();
+  await page.getByRole("option", { name: /HARV-2026-SAUCES-12/ }).click();
   await expect(page.getByText("Apto para Singani D.O.")).toBeVisible();
-  await expect(page.getByLabel("Código del tanque")).toHaveValue("TK-11");
+  await expect(page.getByLabel("Código del tanque")).toHaveValue("TK-17");
   await page.getByLabel("Capacidad").fill("8000");
   await page.getByLabel("Volumen llenado").fill("9000");
   await page.getByRole("button", { name: "Llenar tanque" }).click();
@@ -124,7 +129,7 @@ test("enóloga de Altos: llenar un tanque fija el destino con confirmación expl
   await modal.getByRole("checkbox").click();
   await confirm.click();
 
-  await expect(page.getByRole("heading", { name: "TK-11" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "TK-17" })).toBeVisible();
   await expect(page.getByText("Destino: Destilación (singani)", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Pasar a destilación" })).toBeVisible();
   expect(errors).toEqual([]);

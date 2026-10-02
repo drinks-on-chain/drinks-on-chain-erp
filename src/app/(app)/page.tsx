@@ -148,7 +148,7 @@ export default function DashboardPage() {
                     key: l.harvestBatchId,
                     title: (
                       <Link
-                        href={`/lotes/${l.harvestBatchId}`}
+                        href={`/lotes/${l.lotId ?? l.harvestBatchId}`}
                         className="hover:underline"
                       >{`${l.title} · ${l.kind}`}</Link>
                     ),

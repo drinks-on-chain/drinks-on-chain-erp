@@ -27,7 +27,7 @@ export function LabSummary({ batch }: { batch: HarvestBatchResponse }) {
               className={cn(out && "rounded-sm bg-warning-soft px-1 font-medium")}
             >
               <span className="sr-only">{target.label} </span>
-              {fmtNumber(value, target.digits)}
+              {value == null ? "—" : fmtNumber(value, target.digits)}
             </span>
           </span>
         );

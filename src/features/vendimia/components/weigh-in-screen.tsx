@@ -8,7 +8,13 @@ import { can } from "@/lib/erp/permissions";
 import { WeighInForm } from "./weigh-in-form";
 
 /** Pantalla de pesaje con migas y control de rol (harvest.create). */
-export function WeighInScreen({ initialTerroirId }: { initialTerroirId?: string }) {
+export function WeighInScreen({
+  initialTerroirId,
+  initialLotId,
+}: {
+  initialTerroirId?: string;
+  initialLotId?: string;
+}) {
   const me = useMe();
   return (
     <div className="grid grid-cols-1 gap-6">
@@ -17,7 +23,7 @@ export function WeighInScreen({ initialTerroirId }: { initialTerroirId?: string 
       />
       <header className="grid grid-cols-1 gap-1">
         <h1 className="font-display text-3xl">Registrar ingreso</h1>
-        <p className="m-0 text-sm text-fg-muted">Pesaje y análisis preliminar de la uva que llega a la bodega.</p>
+        <p className="m-0 text-sm text-fg-muted">Pesaje de la uva que llega a la bodega, con o sin lote.</p>
       </header>
       {!me.data ? (
         <Skeleton shape="block" className="h-96" />
@@ -32,7 +38,7 @@ export function WeighInScreen({ initialTerroirId }: { initialTerroirId?: string 
           }
         />
       ) : (
-        <WeighInForm initialTerroirId={initialTerroirId} />
+        <WeighInForm initialTerroirId={initialTerroirId} initialLotId={initialLotId} />
       )}
     </div>
   );

@@ -34,7 +34,7 @@ describe("doEligibility", () => {
   });
 
   it("otra cepa no aplica a la D.O. Singani aunque esté declarada apta", () => {
-    const r = doEligibility(byName("La Angostura"));
+    const r = doEligibility({ ...byName("La Angostura"), isDoEligible: true });
     expect(r).toMatchObject({ eligible: false, applicable: false, reasons: ["variety"] });
   });
 
