@@ -278,6 +278,15 @@ async function request(path: string, opts: RequestOptions<unknown>): Promise<Res
   return res;
 }
 
+/** Ruta sin identificadores (`/v1/lots/:id/timeline`), para el diagnóstico de contrato. */
+const contractPath = (path: string) => path.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f-]{22,}/gi, ":id");
+
+/** "pendingPhyto.0.intakeDate: Invalid ISO datetime; …" (hasta 6 campos). */
+function contractSummary(issues: readonly { path: PropertyKey[]; message: string }[]): string {
+  const lines = issues.slice(0, 6).map((i) => `${i.path.map(String).join(".") || "(raíz)"}: ${i.message}`);
+  return lines.join("; ") + (issues.length > 6 ? `; … y ${issues.length - 6} más` : "");
+}
+
 /**
  * Llama al backend y devuelve `data` ya validado.
  * Lanza ApiError (respuesta de error), NetworkError (sin conexión) o ContractError (forma inesperada).
@@ -292,7 +301,9 @@ export async function api<T = unknown>(path: string, opts: RequestOptions<T> = {
 
   const data = opts.schema.safeParse(envelope.data.data);
   if (!data.success) {
-    if (process.env.NODE_ENV !== "production") console.error(`[api] ${path}`, data.error.issues);
+    // Qué campo no cumple el contrato (solo la ruta del campo y el motivo, nunca sus valores): es
+    // lo que hace falta para diagnosticar un "datos inesperados" contra el backend real.
+    console.error(`[api] contrato ${contractPath(path)}: ${contractSummary(data.error.issues)}`);
     throw new ContractError(path, data.error.issues);
   }
   return data.data;
