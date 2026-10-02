@@ -26,7 +26,25 @@ const needsPassword = () => test.skip(!PASSWORD, "Falta E2E_PASSWORD (contraseñ
 const shellUser = (page: Page) => page.getByRole("button", { name: /Menú de usuario/ });
 const orgSelector = (page: Page) => page.getByRole("combobox", { name: "Organización activa" });
 
+/**
+ * El backend limita el login a 10 por minuto y por IP. Un corredor rápido (la CI) los supera con
+ * los cambios de persona del recorrido: se espera lo justo para no pasar de 8 en 65 segundos.
+ */
+const recentLogins: number[] = [];
+async function paceLogin() {
+  const WINDOW_MS = 65_000;
+  const MAX = 8;
+  const now = Date.now();
+  while (recentLogins.length > 0 && now - recentLogins[0]! > WINDOW_MS) recentLogins.shift();
+  if (recentLogins.length >= MAX) {
+    await new Promise((resolve) => setTimeout(resolve, WINDOW_MS - (now - recentLogins[0]!) + 500));
+    recentLogins.shift();
+  }
+  recentLogins.push(Date.now());
+}
+
 async function login(page: Page, email: string) {
+  await paceLogin();
   await page.goto("/login");
   await page.getByLabel("Correo electrónico").fill(email);
   await page.getByLabel("Contraseña").fill(PASSWORD);
@@ -57,6 +75,7 @@ async function openModule(page: Page, name: string, heading: string | RegExp) {
 }
 
 test("credenciales inválidas: 401 con el envoltorio del contrato", async ({ page }) => {
+  await paceLogin();
   await page.goto("/login");
   await page.getByLabel("Correo electrónico").fill(`nadie-${Date.now()}@ejemplo.test`);
   await page.getByLabel("Contraseña").fill("no-es-la-clave");
@@ -940,6 +959,7 @@ async function actor(browser: Browser) {
 }
 
 async function signIn(page: Page, email: string, password: string) {
+  await paceLogin();
   await page.goto("/login");
   await page.getByLabel("Correo electrónico").fill(email);
   await page.getByLabel("Contraseña").fill(password);
