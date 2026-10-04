@@ -1,26 +1,142 @@
 "use client";
 
-import { useMemo } from "react";
+import { useState } from "react";
 import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { deriveLotViews, type LotChain, type LotView, type TerroirResponse } from "@drinks-on-chain/mocks";
+import type { TerroirResponse } from "@drinks-on-chain/mocks";
 import type { Page } from "@/lib/api/envelope";
 import { ApiError } from "@/lib/api/errors";
+import { createIdempotencyKeys, withIdempotency } from "@/lib/api/idempotency";
 import { useMe } from "@/lib/auth/hooks";
 import { erpKeys } from "./keys";
 import { can } from "./permissions";
 import {
   erpApi,
   type AuditQuery,
+  type BottleCodeQuery,
   type HarvestQuery,
+  type LotQuery,
   type ProductionQuery,
+  type ProductionReportQuery,
   type TankQuery,
   type TerroirQuery,
 } from "./resources";
-import { today } from "./today";
 
 // Hooks de datos del ERP. Las pantallas solo importan de aquí.
 
 // ---------- Lecturas ----------
+
+// Lote del servidor (contrato de la Ola 2 §2). La lista se filtra y pagina en el servidor: la
+// página anterior sigue visible mientras llega la siguiente.
+export const useLots = (q: LotQuery = {}, enabled = true) =>
+  useQuery({
+    queryKey: erpKeys.lots(q),
+    queryFn: ({ signal }) => erpApi.lots(q, signal),
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+export const useLot = (id: string, enabled = true) =>
+  useQuery({ queryKey: erpKeys.lot(id), queryFn: ({ signal }) => erpApi.lot(id, signal), enabled });
+export const useLotTimeline = (id: string, enabled = true) =>
+  useQuery({ queryKey: erpKeys.lotTimeline(id), queryFn: ({ signal }) => erpApi.lotTimeline(id, signal), enabled });
+export const useLotGraph = (id: string, enabled = true) =>
+  useQuery({ queryKey: erpKeys.lotGraph(id), queryFn: ({ signal }) => erpApi.lotGraph(id, signal), enabled });
+
+export const useLotBalance = (id: string, enabled = true) =>
+  useQuery({ queryKey: erpKeys.lotBalance(id), queryFn: ({ signal }) => erpApi.lotBalance(id, signal), enabled });
+
+/**
+ * Vista previa del embotellado (`POST …/bottling/preview`): no escribe nada, así que se trata como
+ * una lectura. Devuelve el balance y las reglas que el servidor daría por incumplidas; la vista
+ * anterior sigue visible mientras llega la nueva.
+ */
+export const useBottlingPreview = (lotId: string, body: Parameters<typeof erpApi.bottlingPreview>[1] | null) =>
+  useQuery({
+    queryKey: erpKeys.bottlingPreview(lotId, body ?? {}),
+    queryFn: ({ signal }) => erpApi.bottlingPreview(lotId, body!, signal),
+    enabled: body !== null,
+    placeholderData: keepPreviousData,
+    retry: false,
+  });
+
+/** Códigos de botella del lote, paginados en el servidor (solo dirección y enología). */
+export const useBottleCodes = (lotId: string, q: BottleCodeQuery, enabled = true) =>
+  useQuery({
+    queryKey: erpKeys.bottleCodes(lotId, q),
+    queryFn: ({ signal }) => erpApi.bottleCodes(lotId, q, signal),
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+
+/** Estado de una exportación ZIP: se consulta cada 2 s mientras el worker la genera. */
+export const useBottleCodeExport = (lotId: string, exportId: string | null) =>
+  useQuery({
+    queryKey: erpKeys.bottleCodeExport(lotId, exportId ?? ""),
+    queryFn: ({ signal }) => erpApi.bottleCodeExport(lotId, exportId!, signal),
+    enabled: !!exportId,
+    refetchInterval: (query) => (query.state.data?.status === "PENDING" || !query.state.data ? 2_000 : false),
+  });
+
+/** Análisis de laboratorio del lote (§8): todos, con `current` en el vigente. */
+export const useLotLabAnalyses = (lotId: string, enabled = true) =>
+  useQuery({
+    queryKey: erpKeys.lotLabs(lotId),
+    queryFn: ({ signal }) => erpApi.lotLabAnalyses(lotId, signal),
+    enabled,
+  });
+/** Correcciones compensatorias del lote (§9). */
+export const useCorrections = (lotId: string, enabled = true) =>
+  useQuery({
+    queryKey: erpKeys.lotCorrections(lotId),
+    queryFn: ({ signal }) => erpApi.corrections(lotId, signal),
+    enabled,
+  });
+/** Requisitos del expediente y la huella que tendría si se cerrara ahora (§10). */
+export const useDossierPreview = (lotId: string, enabled = true) =>
+  useQuery({
+    queryKey: erpKeys.dossierPreview(lotId),
+    queryFn: ({ signal }) => erpApi.dossierPreview(lotId, signal),
+    enabled,
+  });
+export const useDossier = (lotId: string, enabled = true) =>
+  useQuery({ queryKey: erpKeys.dossier(lotId), queryFn: ({ signal }) => erpApi.dossier(lotId, signal), enabled });
+/** Archivos del lote (§11.5), con su URL firmada de 15 minutos: se renuevan pasados 10. */
+export const useAttachments = (lotId: string, enabled = true) =>
+  useQuery({
+    queryKey: erpKeys.lotAttachments(lotId),
+    queryFn: ({ signal }) => erpApi.attachments(lotId, signal),
+    enabled,
+    staleTime: 10 * 60_000,
+    refetchInterval: 10 * 60_000,
+  });
+/** Panel de la bodega (§11.2): lo calcula el servidor. */
+export const useTraceDashboard = (enabled = true) =>
+  useQuery({ queryKey: erpKeys.traceDashboard(), queryFn: ({ signal }) => erpApi.traceDashboard(signal), enabled });
+/** Reporte de producción (§11.4): una fila por lote y totales por tipo. */
+export const useProductionReport = (q: ProductionReportQuery, enabled = true) =>
+  useQuery({
+    queryKey: erpKeys.productionReport(q),
+    queryFn: ({ signal }) => erpApi.productionReport(q, signal),
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+
+/**
+ * Enlaces antiguos `/lotes/{harvestBatchId}` (contrato §16.3): el id era el del pesaje. Devuelve
+ * el `lotId` de ese pesaje, o `null` si no existe o es uva sin lote.
+ */
+export const useLegacyLotId = (harvestBatchId: string, enabled: boolean) =>
+  useQuery({
+    queryKey: [...erpKeys.harvestBatch(harvestBatchId), "lot-id"] as const,
+    queryFn: ({ signal }) =>
+      erpApi.harvestBatch(harvestBatchId, signal).then(
+        (h) => h.lotId,
+        (e: unknown) => {
+          if (e instanceof ApiError && (e.isNotFound || e.isValidation)) return null;
+          throw e;
+        },
+      ),
+    enabled,
+  });
 
 const NO_TERROIRS: Page<TerroirResponse> = { items: [], total: 0, limit: 0, offset: 0 };
 
@@ -69,26 +185,20 @@ export const useTankDetails = (ids: readonly string[]) =>
     combine: combineTankDetails,
   });
 
-export const useAgings = () =>
-  useQuery({ queryKey: erpKeys.agings(), queryFn: ({ signal }) => erpApi.agings({}, signal) });
+export const useAgings = (enabled = true) =>
+  useQuery({ queryKey: erpKeys.agings(), queryFn: ({ signal }) => erpApi.agings({}, signal), enabled });
 export const useAging = (id: string) =>
   useQuery({ queryKey: erpKeys.aging(id), queryFn: ({ signal }) => erpApi.aging(id, signal) });
 
-export const useProductions = (q: ProductionQuery = {}) =>
-  useQuery({ queryKey: erpKeys.productions(q), queryFn: ({ signal }) => erpApi.productions(q, signal) });
+export const useProductions = (q: ProductionQuery = {}, enabled = true) =>
+  useQuery({ queryKey: erpKeys.productions(q), queryFn: ({ signal }) => erpApi.productions(q, signal), enabled });
 export const useProduction = (id: string) =>
   useQuery({ queryKey: erpKeys.production(id), queryFn: ({ signal }) => erpApi.production(id, signal) });
-export const useRestStatus = (id: string) =>
-  useQuery({ queryKey: erpKeys.restStatus(id), queryFn: ({ signal }) => erpApi.restStatus(id, signal) });
 
 export const useBottlings = () =>
   useQuery({ queryKey: erpKeys.bottlings(), queryFn: ({ signal }) => erpApi.bottlings({}, signal) });
 export const useBottling = (id: string) =>
   useQuery({ queryKey: erpKeys.bottling(id), queryFn: ({ signal }) => erpApi.bottling(id, signal) });
-export const useLabAnalysis = (bottlingId: string) =>
-  useQuery({ queryKey: erpKeys.lab(bottlingId), queryFn: ({ signal }) => erpApi.labAnalysis(bottlingId, signal) });
-export const useTraceabilityDag = (bottlingId: string) =>
-  useQuery({ queryKey: erpKeys.dag(bottlingId), queryFn: ({ signal }) => erpApi.dag(bottlingId, signal) });
 
 export const useWinery = (enabled = true) =>
   useQuery({ queryKey: erpKeys.winery(), queryFn: ({ signal }) => erpApi.winery(signal), enabled });
@@ -109,94 +219,9 @@ export const useAudit = (q: AuditQuery, enabled = true) =>
     placeholderData: keepPreviousData,
   });
 
-/**
- * Vista derivada "Lote" (09 §2): une toda la cadena de la bodega y calcula etapa y candado
- * de cada lote de vendimia. Carga las seis colecciones completas.
- */
-const NONE: never[] = [];
-
-export function useLotViews() {
-  // Cada rol lee solo parte de la cadena (matriz del backend): lo que no puede leer no se pide y
-  // cuenta como vacío, así el panel del operario o de agronomía no falla con un 403.
-  const me = useMe();
-  const allowed = [
-    can(me.data, "harvest.read"),
-    can(me.data, "terroir.read"),
-    can(me.data, "tank.read"),
-    can(me.data, "aging.read"),
-    can(me.data, "distillation.read"),
-    can(me.data, "bottling.read"),
-  ];
-  const results = useQueries({
-    queries: [
-      {
-        queryKey: erpKeys.harvestBatches(),
-        queryFn: ({ signal }) => erpApi.harvestBatches({}, signal),
-        enabled: allowed[0],
-      },
-      { queryKey: erpKeys.terroirs(), queryFn: ({ signal }) => erpApi.terroirs({}, signal), enabled: allowed[1] },
-      { queryKey: erpKeys.tanks(), queryFn: ({ signal }) => erpApi.tanks({}, signal), enabled: allowed[2] },
-      { queryKey: erpKeys.agings(), queryFn: ({ signal }) => erpApi.agings({}, signal), enabled: allowed[3] },
-      { queryKey: erpKeys.productions(), queryFn: ({ signal }) => erpApi.productions({}, signal), enabled: allowed[4] },
-      { queryKey: erpKeys.bottlings(), queryFn: ({ signal }) => erpApi.bottlings({}, signal), enabled: allowed[5] },
-    ],
-  });
-  const used = results.filter((_, i) => allowed[i]);
-  // Lo que el rol no lee cuenta como vacío (una misma lista para no recalcular); lo que lee, cuando llega.
-  const items = <T>(i: number, page: { items: T[] } | undefined): T[] | undefined =>
-    me.data ? (allowed[i] ? page?.items : (NONE as T[])) : undefined;
-  const harvestBatches = items(0, results[0].data);
-  const terroirs = items(1, results[1].data);
-  const tanks = items(2, results[2].data);
-  const wineAgings = items(3, results[3].data);
-  const productionBatches = items(4, results[4].data);
-  const bottlings = items(5, results[5].data);
-
-  const chain = useMemo<LotChain | undefined>(
-    () =>
-      harvestBatches && terroirs && tanks && wineAgings && productionBatches && bottlings
-        ? { harvestBatches, terroirs, tanks, wineAgings, productionBatches, bottlings }
-        : undefined,
-    [harvestBatches, terroirs, tanks, wineAgings, productionBatches, bottlings],
-  );
-
-  const data = useMemo<LotView[] | undefined>(
-    () => (chain ? deriveLotViews(chain, { today: today() }) : undefined),
-    [chain],
-  );
-
-  return {
-    data,
-    chain,
-    isPending: !me.data || used.some((r) => r.isPending),
-    isError: used.some((r) => r.isError),
-    error: used.find((r) => r.error)?.error ?? null,
-    isFetching: used.some((r) => r.isFetching),
-    refetch: () => Promise.all(used.map((r) => r.refetch())),
-  };
-}
-
 /** Como useHarvestBatches, pero solo consulta si `enabled` (p. ej. cuando el detalle del terroir no trae sus lotes). */
 export const useHarvestBatchesIf = (q: HarvestQuery, enabled: boolean) =>
   useQuery({ queryKey: erpKeys.harvestBatches(q), queryFn: ({ signal }) => erpApi.harvestBatches(q, signal), enabled });
-
-/**
- * Certificado de laboratorio de varios embotellados (no hay endpoint de lista). `null` si el
- * embotellado aún no tiene certificado (el backend responde 404).
- */
-export function useLabAnalysesOf(bottlingIds: string[]) {
-  const results = useQueries({
-    queries: bottlingIds.map((id) => ({
-      queryKey: [...erpKeys.lab(id), "optional"] as const,
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        erpApi.labAnalysis(id, signal).catch((e: unknown) => {
-          if (e instanceof ApiError && e.isNotFound) return null;
-          throw e;
-        }),
-    })),
-  });
-  return new Map(bottlingIds.map((id, i) => [id, results[i]]));
-}
 
 // ---------- Escrituras ----------
 
@@ -214,22 +239,137 @@ export const useUpdateTerroir = () =>
   useErpMutation((v: { id: string; body: Parameters<typeof erpApi.updateTerroir>[1] }) =>
     erpApi.updateTerroir(v.id, v.body),
   );
-export const useCreateHarvestBatch = () => useErpMutation(erpApi.createHarvestBatch);
-export const useUpdatePhytoStatus = () =>
-  useErpMutation((v: { id: string; body: Parameters<typeof erpApi.updatePhytoStatus>[1] }) =>
-    erpApi.updatePhytoStatus(v.id, v.body),
+/**
+ * Escritura con `Idempotency-Key` (pesajes, lecturas, embotellado y cierre del expediente,
+ * contrato de la Ola 2 §0): un reintento del mismo envío sin respuesta repite la clave.
+ */
+function useIdempotentErpMutation<TVars, TData>(
+  body: (vars: TVars) => unknown,
+  send: (vars: TVars, key: string) => Promise<TData>,
+) {
+  const [keys] = useState(() => createIdempotencyKeys());
+  return useErpMutation(withIdempotency(keys, body, send));
+}
+
+export const useCreateLot = () =>
+  useIdempotentErpMutation(
+    (body: Parameters<typeof erpApi.createLot>[0]) => body,
+    (body, key) => erpApi.createLot(body, key),
+  );
+export const useUpdateLot = () =>
+  useErpMutation((v: { id: string; body: Parameters<typeof erpApi.updateLot>[1] }) => erpApi.updateLot(v.id, v.body));
+export const useDiscardLot = () =>
+  useErpMutation((v: { id: string; reason: string }) => erpApi.discardLot(v.id, { reason: v.reason }));
+
+export const useCreateHarvestBatch = () =>
+  useIdempotentErpMutation(
+    (body: Parameters<typeof erpApi.createHarvestBatch>[0]) => body,
+    (body, key) => erpApi.createHarvestBatch(body, key),
+  );
+/** Análisis de madurez de un pesaje (solo inserción; el último es el vigente). */
+export const useCreateMaturityAnalysis = () =>
+  useErpMutation((v: { harvestBatchId: string; body: Parameters<typeof erpApi.createMaturityAnalysis>[1] }) =>
+    erpApi.createMaturityAnalysis(v.harvestBatchId, v.body),
+  );
+/** Dictamen fitosanitario de un pesaje (solo inserción, con su autor). */
+export const useCreatePhytoDecision = () =>
+  useErpMutation((v: { harvestBatchId: string; body: Parameters<typeof erpApi.createPhytoDecision>[1] }) =>
+    erpApi.createPhytoDecision(v.harvestBatchId, v.body),
   );
 export const useCreateTank = () => useErpMutation(erpApi.createTank);
+/** Transiciones del tanque por acciones: iniciar, completar (con la bifurcación) y limpiar. */
+export const useStartTank = () =>
+  useErpMutation((v: { id: string; body?: Parameters<typeof erpApi.startTank>[1] }) => erpApi.startTank(v.id, v.body));
+export const useCompleteTank = () =>
+  useErpMutation((v: { id: string; body: Parameters<typeof erpApi.completeTank>[1] }) =>
+    erpApi.completeTank(v.id, v.body),
+  );
+export const useCleanTank = () =>
+  useErpMutation((v: { id: string; body?: Parameters<typeof erpApi.cleanTank>[1] }) => erpApi.cleanTank(v.id, v.body));
 export const useAddTankLog = () =>
-  useErpMutation((v: { id: string; body: Parameters<typeof erpApi.addTankLog>[1] }) => erpApi.addTankLog(v.id, v.body));
+  useIdempotentErpMutation(
+    (v: { id: string; body: Parameters<typeof erpApi.addTankLog>[1] }) => v,
+    (v, key) => erpApi.addTankLog(v.id, v.body, key),
+  );
 export const useAddTreatment = () =>
   useErpMutation((v: { id: string; body: Parameters<typeof erpApi.addTreatment>[1] }) =>
     erpApi.addTreatment(v.id, v.body),
   );
 export const useCreateAging = () => useErpMutation(erpApi.createAging);
+export const useDiscardAging = () =>
+  useErpMutation((v: { id: string; body: Parameters<typeof erpApi.discardAging>[1] }) =>
+    erpApi.discardAging(v.id, v.body),
+  );
 export const useCreateDistillation = () => useErpMutation(erpApi.createDistillation);
-export const useCreateBottling = () => useErpMutation(erpApi.createBottling);
-export const useCreateLabAnalysis = () => useErpMutation(erpApi.createLabAnalysis);
+/** Cierre de la destilación con sus cortes: empieza el reposo. */
+export const useCloseDistillation = () =>
+  useErpMutation((v: { id: string; body: Parameters<typeof erpApi.closeDistillation>[1] }) =>
+    erpApi.closeDistillation(v.id, v.body),
+  );
+export const useDiscardProduction = () =>
+  useErpMutation((v: { id: string; reason: string }) => erpApi.discardProduction(v.id, { reason: v.reason }));
+/** Embotellado del lote (una sola vez), con `Idempotency-Key`. */
+export const useCreateLotBottling = () =>
+  useIdempotentErpMutation(
+    (v: { lotId: string; body: Parameters<typeof erpApi.createLotBottling>[1] }) => v,
+    (v, key) => erpApi.createLotBottling(v.lotId, v.body, key),
+  );
+/** CSV de los códigos de botella (queda en la bitácora con su rango). */
+export const useBottleCodesCsv = () =>
+  useErpMutation((v: { lotId: string; range?: Parameters<typeof erpApi.bottleCodesCsv>[1] }) =>
+    erpApi.bottleCodesCsv(v.lotId, v.range),
+  );
+export const useCreateBottleCodeExport = () =>
+  useErpMutation((v: { lotId: string; body: Parameters<typeof erpApi.createBottleCodeExport>[1] }) =>
+    erpApi.createBottleCodeExport(v.lotId, v.body),
+  );
+export const useVoidBottleCode = () =>
+  useErpMutation((v: { code: string; body: Parameters<typeof erpApi.voidBottleCode>[1] }) =>
+    erpApi.voidBottleCode(v.code, v.body),
+  );
+/**
+ * Lote recién leído del servidor (sin caché), para comparar su estado antes y después de una
+ * escritura: p. ej. las incidencias que abre una corrección en un lote ya embotellado.
+ */
+export function useFreshLot() {
+  const client = useQueryClient();
+  return (lotId: string) =>
+    client.fetchQuery({ queryKey: erpKeys.lot(lotId), queryFn: () => erpApi.lot(lotId), staleTime: 0 });
+}
+/** Análisis de laboratorio del lote: uno nuevo sustituye al vigente (reanálisis). */
+export const useCreateLotLabAnalysis = () =>
+  useErpMutation((v: { lotId: string; body: Parameters<typeof erpApi.createLotLabAnalysis>[1] }) =>
+    erpApi.createLotLabAnalysis(v.lotId, v.body),
+  );
+/** Corrección compensatoria de un registro del lote: nada se edita ni se borra. */
+export const useCreateCorrection = () =>
+  useErpMutation((v: { lotId: string; body: Parameters<typeof erpApi.createCorrection>[1] }) =>
+    erpApi.createCorrection(v.lotId, v.body),
+  );
+export const useCreateTerroirCorrection = () =>
+  useErpMutation((v: { terroirId: string; body: Parameters<typeof erpApi.createTerroirCorrection>[1] }) =>
+    erpApi.createTerroirCorrection(v.terroirId, v.body),
+  );
+/** Cierre del expediente del lote, con `Idempotency-Key`: fija su huella. */
+export const useCloseDossier = () =>
+  useIdempotentErpMutation(
+    (lotId: string) => ({ lotId, confirm: true }),
+    (lotId, key) => erpApi.closeDossier(lotId, key),
+  );
+/** JSON canónico del expediente: los bytes exactos que se hashean. */
+export const useDossierCanonical = () => useMutation({ mutationFn: (lotId: string) => erpApi.dossierCanonical(lotId) });
+export const useCreateAttachment = () =>
+  useErpMutation((v: { lotId: string; body: Parameters<typeof erpApi.createAttachment>[1] }) =>
+    erpApi.createAttachment(v.lotId, v.body),
+  );
+export const useChangeAttachmentVisibility = () =>
+  useErpMutation(
+    (v: { lotId: string; attachmentId: string; body: Parameters<typeof erpApi.changeAttachmentVisibility>[2] }) =>
+      erpApi.changeAttachmentVisibility(v.lotId, v.attachmentId, v.body),
+  );
+/** CSV del reporte de producción con los mismos filtros de la tabla. */
+export const useProductionReportCsv = () =>
+  useMutation({ mutationFn: (q: ProductionReportQuery) => erpApi.productionReportCsv(q) });
 export const useUpdateWinery = () => useErpMutation(erpApi.updateWinery);
 
 // Equipo: cada cambio deja una entrada en la bitácora, que también se invalida (cuelga de "erp").

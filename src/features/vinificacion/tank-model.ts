@@ -1,24 +1,34 @@
 import {
-  DO_MIN_ALTITUDE_MASL as DO_MIN,
-  DO_VARIETY as DO_VARIETY_NAME,
-  doEligibility as baseDoEligibility,
-} from "@/features/origen/do-eligibility";
-import type {
-  DestinationType,
-  FermentationLog,
-  FermentationTankResponse,
-  HarvestBatchResponse,
-  ProductionBatchResponse,
-  TankStatus,
-  TerroirResponse,
-  WineAgingResponse,
+  CompleteFermentationTankSchema,
+  CreateFermentationTankSchema,
+  type BifurcationDestination,
+  type CompleteFermentationTankDto,
+  type CreateFermentationTankDto,
+  type CreateLotDto,
+  type DestinationType,
+  type FermentationLog,
+  type FermentationTankResponse,
+  type HarvestBatchResponse,
+  type ProductionBatchResponse,
+  type TankStatus,
+  type TerroirResponse,
+  type WineAgingResponse,
 } from "@drinks-on-chain/mocks";
-import { TEMP_ALERT_C } from "@/features/dashboard/build-dashboard";
+import {
+  emptyLotForm,
+  lotFieldErrors,
+  toCreateLotDto,
+  type LotFormErrors,
+  type LotFormValues,
+} from "@/features/lotes/lot-model";
+import { doCheckText, failedChecks, isDoApt, type DoSubject } from "@/features/origen/do-eligibility";
+import { fieldErrorsFrom } from "@/lib/api/field-errors";
+import { omitNulls } from "@/lib/erp/omit-nulls";
 import { isAfter, type FieldErrors } from "./form-utils";
 import { parseDecimal } from "@/lib/format";
 
-// Cálculos puros de vinificación (03 §4, 1C; 09 §3 filas 4.1–4.3): mapa de tanques,
-// bitácora, aptitud para singani y validación de los formularios.
+// Cálculos puros de vinificación (03 §4, 1C; contrato de la Ola 2 §4): mapa de tanques, bitácora,
+// alta con entradas por pesaje, transiciones por acciones y bifurcación al completar.
 
 const DAY = 86_400_000;
 const dayStart = (d: Date | string) => {
@@ -26,7 +36,13 @@ const dayStart = (d: Date | string) => {
   return Date.UTC(x.getUTCFullYear(), x.getUTCMonth(), x.getUTCDate());
 };
 
-export { TEMP_ALERT_C };
+/**
+ * Temperatura de fermentación a partir de la cual el mapa de tanques avisa (°C). La alerta del
+ * panel (> 32 °C o 48 h sin lecturas) la calcula el servidor.
+ */
+export const TEMP_ALERT_C = 26;
+
+import { activeOnly, type Voidable } from "@/lib/erp/voided";
 
 /** Porcentaje de llenado (0–100) a partir de `volumeFilledLiters / capacityLiters`. */
 export function fillPercent(t: Pick<FermentationTankResponse, "capacityLiters" | "volumeFilledLiters">): number {
@@ -41,10 +57,11 @@ export function sortLogsDesc<T extends Pick<FermentationLog, "recordedAt">>(logs
   return [...(logs ?? [])].sort((a, b) => b.recordedAt.localeCompare(a.recordedAt));
 }
 
-export function latestLog<T extends Pick<FermentationLog, "recordedAt">>(
+/** Última lectura que cuenta: las anuladas por una corrección quedan fuera. */
+export function latestLog<T extends Pick<FermentationLog, "recordedAt"> & Voidable>(
   logs: readonly T[] | undefined,
 ): T | undefined {
-  return sortLogsDesc(logs)[0];
+  return sortLogsDesc(activeOnly(logs))[0];
 }
 
 /** Temperatura por encima del umbral del panel (> 26 °C). */
@@ -163,25 +180,17 @@ export function filterTanks<T extends { status: TankStatus; destination: Destina
 
 // ---------- Aptitud D.O. Singani ----------
 
-// La regla vive en features/origen/do-eligibility (≥ 1.600 m, como el backend y 09 §4);
-// aquí solo se traduce a frases para explicar por qué no se ofrece la destilación.
-export { DO_VARIETY, DO_MIN_ALTITUDE_MASL as DO_MIN_ALTITUDE_M } from "@/features/origen/do-eligibility";
-
 export type DoEligibility = { eligible: boolean; reasons: string[] };
 
-export function doEligibility(
-  t: Pick<TerroirResponse, "varietyName" | "altitudeMasl" | "isDoEligible"> | undefined,
-): DoEligibility {
+/**
+ * Aptitud D.O. de la parcela tal como la calcula el servidor (`doEvaluation`), en frases. Solo
+ * orienta: quien decide es el servidor, con la instantánea del lote, al completar la fermentación
+ * y al destilar (422 `TRC_DO_NOT_ELIGIBLE`).
+ */
+export function doEligibility(t: (DoSubject & Pick<TerroirResponse, "parcelName">) | undefined): DoEligibility {
   if (!t) return { eligible: false, reasons: ["No se encontró la parcela de origen del lote."] };
-  const result = baseDoEligibility(t);
-  const reasons = result.reasons.map((r) =>
-    r === "variety"
-      ? `La D.O. Singani exige ${DO_VARIETY_NAME}; este lote es ${t.varietyName}.`
-      : r === "altitude"
-        ? `La parcela está a ${t.altitudeMasl.toLocaleString("es-BO")} m; la D.O. exige al menos ${DO_MIN.toLocaleString("es-BO")} m s. n. m.`
-        : "La parcela no está certificada como apta para la D.O.",
-  );
-  return { eligible: result.eligible, reasons };
+  const reasons = failedChecks(t).map((c) => `${t.parcelName}: ${doCheckText(c)}`);
+  return { eligible: isDoApt(t), reasons };
 }
 
 // ---------- Siguiente paso tras la fermentación ----------
@@ -198,16 +207,16 @@ export type NextStep = {
 };
 
 /**
- * Qué viene después según el destino fijado al llenar el tanque. El backend no documenta cómo
- * pasa un tanque a COMPLETED o TRANSFERRED (09 §8 punto 4): se ofrece continuar desde
- * FERMENTING, COMPLETED o TRANSFERRED sin cambiar el estado del tanque.
+ * Qué viene después según el destino decidido al completar la fermentación (bifurcación, contrato
+ * de la Ola 2 §4.3): crianza del vino o destilación del singani. Solo desde un tanque `COMPLETED`
+ * (o `TRANSFERRED` con volumen aún por destilar); sin destino no hay paso.
  */
 export function nextStep(
   tank: Pick<FermentationTankResponse, "id" | "status" | "destinationType">,
   agings: readonly Pick<WineAgingResponse, "id" | "fermentationTankId" | "containerCode" | "containerType">[],
   productions: readonly Pick<ProductionBatchResponse, "id" | "fermentationTankId" | "equipmentIdentifier">[],
 ): NextStep | null {
-  const available = tank.status === "FERMENTING" || tank.status === "COMPLETED" || tank.status === "TRANSFERRED";
+  const available = tank.status === "COMPLETED" || tank.status === "TRANSFERRED";
   if (tank.destinationType === "WINE_AGING") {
     const existing = agings
       .filter((a) => a.fermentationTankId === tank.id)
@@ -249,45 +258,177 @@ export function suggestTankCode(codes: readonly string[]): string {
   return `TK-${String(next).padStart(2, "0")}`;
 }
 
+/** `auto`: el lote de la uva elegida; `new`: crea el lote desde el tanque; o el id de un lote abierto. */
+export type TankLotChoice = "auto" | "new" | (string & {});
+
 export type NewTankValues = {
-  harvestBatchId: string;
+  /** Kilos que entran de cada pesaje elegido (por su id), tal como se escriben. */
+  inputs: Record<string, string>;
+  lotChoice: TankLotChoice;
   tankCode: string;
   capacityLiters: string;
   material: string;
   volumeFilledLiters: string;
-  status: "FILLING" | "FERMENTING";
+  /** `true`: el tanque nace fermentando; `false`: llenando. */
+  startFermentation: boolean;
   startDate: string;
 };
-export type NewTankField = keyof NewTankValues;
+export type NewTankField = "inputs" | "lotChoice" | "tankCode" | "capacityLiters" | "volumeFilledLiters" | "startDate";
 
-/** Validación del alta de tanque (CreateFermentationTankDto + reglas de la pantalla). */
-export function validateNewTank(
+type TankHarvest = Pick<HarvestBatchResponse, "id" | "lotId" | "harvestYear" | "availableKg" | "netWeightKg">;
+
+type NewTankResult =
+  | { ok: true; dto: CreateFermentationTankDto }
+  | { ok: false; errors: FieldErrors<NewTankField>; inputErrors: Record<string, string>; lotErrors: LotFormErrors };
+
+/** Lote que ya tiene la uva elegida (el primero que aparezca), o `null` si es uva sin lote. */
+export function lotOfInputs(inputs: Record<string, string>, harvests: readonly TankHarvest[]): string | null {
+  return harvests.find((h) => h.id in inputs && h.lotId)?.lotId ?? null;
+}
+
+/**
+ * Valores del formulario → `POST /v1/fermentation-tanks` (contrato de la Ola 2 §4.1). Solo valida
+ * forma y que no falte nada: dictamen, mezcla de lotes, kilos disponibles, capacidad y código en
+ * uso los decide el servidor y los explica `RuleViolationNotice`. El destino no se envía: se
+ * decide al completar la fermentación.
+ */
+export function toCreateTankDto(
   v: NewTankValues,
-  ctx: { approvedHarvestIds: ReadonlySet<string>; activeCodes: readonly string[]; today: Date },
-): FieldErrors<NewTankField> {
-  const e: FieldErrors<NewTankField> = {};
-  if (!v.harvestBatchId) e.harvestBatchId = "Elige el lote de vendimia que entra al tanque.";
-  else if (!ctx.approvedHarvestIds.has(v.harvestBatchId))
-    e.harvestBatchId = "Solo se vinifican lotes con dictamen fitosanitario aprobado.";
+  ctx: { harvests: readonly TankHarvest[]; today: Date; newLot?: LotFormValues },
+): NewTankResult {
+  const errors: FieldErrors<NewTankField> = {};
+  const inputErrors: Record<string, string> = {};
+  let lotErrors: LotFormErrors = {};
+  const chosen = ctx.harvests.filter((h) => h.id in v.inputs);
+
+  if (chosen.length === 0) errors.inputs = "Elige al menos un pesaje: es la uva que entra al tanque.";
+  const inputs = chosen.map((h) => {
+    const raw = v.inputs[h.id] ?? "";
+    const kg = raw.trim() ? parseDecimal(raw) : null;
+    if (raw.trim() && (kg === null || kg <= 0)) inputErrors[h.id] = "Indica los kilos que entran (mayor que cero).";
+    // Sin cifra, entra todo lo disponible del pesaje (lo calcula el servidor).
+    return omitNulls<{ harvestBatchId: string; kg?: number }>({ harvestBatchId: h.id, kg });
+  });
 
   const code = v.tankCode.trim();
-  if (!code) e.tankCode = "Indica el código del tanque.";
-  else if (ctx.activeCodes.some((c) => c.toLowerCase() === code.toLowerCase()))
-    e.tankCode = `${code} está en uso. Vacía el tanque o usa otro código.`;
-
-  const cap = parseDecimal(v.capacityLiters);
-  if (cap === null) e.capacityLiters = "Indica la capacidad en litros.";
-  else if (cap <= 0) e.capacityLiters = "La capacidad debe ser mayor que cero.";
-
+  if (!code) errors.tankCode = "Indica el código del tanque.";
+  const cap = v.capacityLiters.trim() ? parseDecimal(v.capacityLiters) : null;
+  if (v.capacityLiters.trim() && (cap === null || cap <= 0))
+    errors.capacityLiters = "La capacidad debe ser mayor que cero.";
   const vol = parseDecimal(v.volumeFilledLiters);
-  if (vol === null) e.volumeFilledLiters = "Indica los litros de mosto que entran.";
-  else if (vol < 0) e.volumeFilledLiters = "El volumen no puede ser negativo.";
-  else if (cap !== null && cap > 0 && vol > cap) e.volumeFilledLiters = "El volumen supera la capacidad del tanque.";
+  if (vol === null) errors.volumeFilledLiters = "Indica los litros de mosto que entran.";
+  else if (vol < 0) errors.volumeFilledLiters = "El volumen no puede ser negativo.";
+  if (!v.startDate) errors.startDate = "Indica la fecha de inicio.";
+  else if (isAfter(v.startDate, ctx.today)) errors.startDate = "La fecha no puede ser futura.";
 
-  if (!v.startDate) e.startDate = "Indica la fecha de inicio.";
-  else if (isAfter(v.startDate, ctx.today)) e.startDate = "La fecha no puede ser futura.";
-  return e;
+  const existingLot = lotOfInputs(v.inputs, ctx.harvests);
+  let newLot: CreateLotDto | null = null;
+  let lotId: string | null = null;
+  if (!existingLot && chosen.length > 0) {
+    if (v.lotChoice === "new") {
+      // El lote nace con la añada de la uva que entra.
+      const year = String(chosen[0]!.harvestYear);
+      const result = toCreateLotDto({ ...(ctx.newLot ?? emptyLotForm(ctx.today)), harvestYear: year }, ctx.today);
+      if (result.ok) newLot = result.dto;
+      else lotErrors = result.errors;
+    } else if (v.lotChoice === "auto") {
+      errors.lotChoice = "La uva elegida no tiene lote: elige uno o crea uno nuevo.";
+    } else {
+      lotId = v.lotChoice;
+    }
+  }
+
+  const failed =
+    Object.keys(errors).length > 0 || Object.keys(inputErrors).length > 0 || Object.keys(lotErrors).length > 0;
+  if (failed) return { ok: false, errors, inputErrors, lotErrors };
+
+  const dto = omitNulls<CreateFermentationTankDto>({
+    lotId,
+    newLot,
+    inputs,
+    tankCode: code,
+    capacityLiters: cap,
+    material: v.material.trim() || null,
+    volumeFilledLiters: vol!,
+    startFermentation: v.startFermentation,
+    startDate: v.startDate,
+  });
+  const parsed = CreateFermentationTankSchema.safeParse(dto);
+  if (!parsed.success) {
+    for (const issue of parsed.error.issues) {
+      const key = tankField(issue.path.map(String).join("."));
+      if (key) errors[key] ??= issue.message;
+    }
+    return { ok: false, errors, inputErrors, lotErrors };
+  }
+  return { ok: true, dto };
 }
+
+const TANK_FIELDS: readonly NewTankField[] = [
+  "inputs",
+  "lotChoice",
+  "tankCode",
+  "capacityLiters",
+  "volumeFilledLiters",
+  "startDate",
+];
+
+function tankField(field: string): NewTankField | undefined {
+  if (field === "lotId") return "lotChoice";
+  const root = field.split(".")[0]!;
+  // `harvestBatchId` es la entrada única de la ruta legada.
+  if (root === "harvestBatchId") return "inputs";
+  return (TANK_FIELDS as readonly string[]).includes(root) ? (root as NewTankField) : undefined;
+}
+
+/** `details[].field` de un 409/422 → campos del alta de tanque (`inputs.0.kg` marca la uva). */
+export const tankFieldErrors = (error: unknown): FieldErrors<NewTankField> =>
+  fieldErrorsFrom<NewTankField>(error, tankField).fieldErrors;
+
+/** Errores del lote nuevo (`newLot.name`…) de un 422 del alta de tanque. */
+export const tankLotErrors = (error: unknown): LotFormErrors => lotFieldErrors(error, "newLot");
+
+/** Campos que el formulario marca junto al control (lo demás va al aviso). */
+export const TANK_ERROR_FIELDS: readonly string[] = [...TANK_FIELDS, "lotId", "harvestBatchId", "newLot"];
+
+// ---------- Completar la fermentación (bifurcación) ----------
+
+export type CompleteTankValues = { endDate: string; finalVolumeLiters: string };
+export type CompleteTankField = keyof CompleteTankValues;
+
+type CompleteResult =
+  { ok: true; dto: CompleteFermentationTankDto } | { ok: false; errors: FieldErrors<CompleteTankField> };
+
+/** `POST …/complete`: fin de la fermentación, volumen final y destino (vino o singani). */
+export function toCompleteTankDto(
+  v: CompleteTankValues,
+  destination: BifurcationDestination,
+  today: Date,
+): CompleteResult {
+  const errors: FieldErrors<CompleteTankField> = {};
+  const volume = parseDecimal(v.finalVolumeLiters);
+  if (volume === null) errors.finalVolumeLiters = "Indica los litros que quedan en el tanque.";
+  else if (volume < 0) errors.finalVolumeLiters = "El volumen no puede ser negativo.";
+  if (!v.endDate) errors.endDate = "Indica la fecha en que terminó la fermentación.";
+  else if (isAfter(v.endDate, today)) errors.endDate = "La fecha no puede ser futura.";
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+
+  const dto: CompleteFermentationTankDto = { endDate: v.endDate, finalVolumeLiters: volume!, destination };
+  const parsed = CompleteFermentationTankSchema.safeParse(dto);
+  if (!parsed.success) {
+    for (const issue of parsed.error.issues) {
+      const key = String(issue.path[0] ?? "") as CompleteTankField;
+      if (key in v) errors[key] ??= issue.message;
+    }
+    return { ok: false, errors };
+  }
+  return { ok: true, dto };
+}
+
+export const COMPLETE_TANK_FIELDS: readonly CompleteTankField[] = ["endDate", "finalVolumeLiters"];
+
+export const completeTankFieldErrors = (error: unknown): FieldErrors<CompleteTankField> =>
+  fieldErrorsFrom<CompleteTankField>(error, COMPLETE_TANK_FIELDS).fieldErrors;
 
 export type LogValues = {
   temperatureCelsius: string;

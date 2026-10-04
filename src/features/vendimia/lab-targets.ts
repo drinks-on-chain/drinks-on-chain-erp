@@ -50,8 +50,15 @@ export function stateText(state: ReadingState): string {
   }
 }
 
+/** Brix, pH y acidez del último análisis de madurez; `null` si el pesaje aún no tiene análisis. */
+export type HarvestReadings = {
+  brixDegrees: number | null;
+  initialPh: number | null;
+  initialAcidityGl: number | null;
+};
+
 /** Lecturas de un lote de vendimia, en el orden de las tarjetas. */
-export function harvestReadings(h: { brixDegrees: number; initialPh: number; initialAcidityGl: number }) {
+export function harvestReadings(h: HarvestReadings) {
   return [
     { target: LAB_TARGETS.brix, value: h.brixDegrees },
     { target: LAB_TARGETS.ph, value: h.initialPh },
@@ -60,7 +67,7 @@ export function harvestReadings(h: { brixDegrees: number; initialPh: number; ini
 }
 
 /** Número de lecturas fuera de objetivo (para avisar antes de aprobar). */
-export function outOfRangeCount(h: { brixDegrees: number; initialPh: number; initialAcidityGl: number }): number {
+export function outOfRangeCount(h: HarvestReadings): number {
   return harvestReadings(h).filter((r) => {
     const s = readingState(r.value, r.target);
     return s === "low" || s === "high";

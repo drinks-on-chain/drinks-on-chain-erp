@@ -1,65 +1,63 @@
-import { fmtNumber } from "@/lib/format";
+import type { DoCheck, DoEvaluation, DoStatus, EffectiveSetting } from "@drinks-on-chain/mocks";
+import { formatSettingValue } from "@/features/ajustes/effective-settings";
+import { RULE_SETTINGS, formatRuleValue } from "@/lib/erp/rule-violations";
 
-// Aptitud para la D.O. Singani (01-erp §04, 09 §4). El backend la vuelve a comprobar al
-// destilar (422 si la parcela no es apta o está bajo 1.600 m); aquí se anticipa en pantalla.
+// Aptitud para la D.O. Singani de una parcela (contrato de la Ola 2 §3.1). La calcula el servidor
+// con los valores vigentes de la bodega (altitud mínima y cepas exigidas) y la devuelve en
+// `isDoEligible` y `doEvaluation`; el ERP solo la muestra. Lo que se envíe en `isDoEligible` se ignora.
 
-export const DO_VARIETY = "Moscatel de Alejandría";
-/** Altitud mínima de la D.O. El backend rechaza `altitudeMasl < 1600`, así que 1.600 m es apto. */
-export const DO_MIN_ALTITUDE_MASL = 1600;
+export type DoSubject = { isDoEligible: boolean; doEvaluation?: DoEvaluation | null };
 
-export type DoInput = {
-  varietyName: string | null | undefined;
-  altitudeMasl: number | null | undefined;
-  isDoEligible: boolean | null | undefined;
+/** Estado de la evaluación; sin detalle (respuestas anidadas), el booleano calculado. */
+export function doStatus(t: DoSubject): DoStatus {
+  return t.doEvaluation?.status ?? (t.isDoEligible ? "ELIGIBLE" : "NOT_ELIGIBLE");
+}
+
+export const isDoApt = (t: DoSubject): boolean => {
+  const status = doStatus(t);
+  return status === "ELIGIBLE" || status === "ELIGIBLE_BY_EXCEPTION";
 };
 
-export type DoReason = "variety" | "altitude" | "not-declared";
+/** Comprobaciones que la parcela no cumple. */
+export const failedChecks = (t: DoSubject): DoCheck[] => (t.doEvaluation?.checks ?? []).filter((c) => !c.pass);
 
-export type DoEligibility = {
-  /** Cumple las tres condiciones: cepa, altitud y aptitud declarada. */
-  eligible: boolean;
-  /** La cepa no es Moscatel de Alejandría: la D.O. Singani no aplica (parcela de vino). */
-  applicable: boolean;
-  /** Motivos por los que no es apta, en orden de importancia. */
-  reasons: DoReason[];
-};
-
-const normalize = (s: string) =>
-  s
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
-
-export function isDoVariety(varietyName: string | null | undefined): boolean {
-  return !!varietyName && normalize(varietyName).includes(normalize(DO_VARIETY));
+/** "altitud < 1.600 m s. n. m." / "cepa distinta de Moscatel de Alejandría". */
+export function doCheckText(check: DoCheck): string {
+  const unit = RULE_SETTINGS[check.settingKey]?.unit ?? null;
+  return check.rule === "ALTITUDE"
+    ? `altitud < ${formatRuleValue(check.required, unit)}`
+    : `cepa distinta de ${formatRuleValue(check.required)}`;
 }
 
-export function doEligibility({ varietyName, altitudeMasl, isDoEligible }: DoInput): DoEligibility {
-  const reasons: DoReason[] = [];
-  const applicable = isDoVariety(varietyName);
-  if (!applicable) reasons.push("variety");
-  if (altitudeMasl == null || !Number.isFinite(altitudeMasl) || altitudeMasl < DO_MIN_ALTITUDE_MASL) {
-    reasons.push("altitude");
-  }
-  if (!isDoEligible) reasons.push("not-declared");
-  return { eligible: reasons.length === 0, applicable, reasons };
+/**
+ * La parcela es de otra cepa: la D.O. Singani no le aplica (parcela de vino). Si además falla la
+ * altitud, sigue siendo una parcela de vino.
+ */
+export const isWineParcel = (t: DoSubject): boolean => failedChecks(t).some((c) => c.rule === "VARIETY");
+
+/** Texto del badge: "Apto para Singani D.O." o "No apto D.O. · altitud < 1.600 m s. n. m.". */
+export function doBadgeText(t: DoSubject): string {
+  const status = doStatus(t);
+  if (status === "ELIGIBLE") return "Apto para Singani D.O.";
+  if (status === "ELIGIBLE_BY_EXCEPTION") return "Apto D.O. por excepción legal";
+  const failed = failedChecks(t)[0];
+  return failed ? `No apto D.O. · ${doCheckText(failed)}` : "No apto D.O.";
 }
 
-export function doReasonText(reason: DoReason): string {
-  switch (reason) {
-    case "variety":
-      return `cepa distinta de ${DO_VARIETY}`;
-    case "altitude":
-      return `altitud < ${fmtNumber(DO_MIN_ALTITUDE_MASL)} m`;
-    case "not-declared":
-      return "sin aptitud D.O. declarada";
-  }
-}
-
-/** Texto del badge: "Apto para Singani D.O." o "No apto D.O. · altitud < 1.600 m". */
-export function doBadgeText(result: DoEligibility): string {
-  if (result.eligible) return "Apto para Singani D.O.";
-  return `No apto D.O. · ${doReasonText(result.reasons[0]!)}`;
+/**
+ * Reglas vigentes de la D.O. que el servidor aplicará al guardar la parcela (altitud mínima y
+ * cepas), para mostrarlas junto al formulario. Es información: no se evalúa nada en el cliente.
+ */
+export function doRuleHints(settings: readonly EffectiveSetting[]): {
+  altitude: string | null;
+  varieties: string | null;
+} {
+  const value = (key: string) => {
+    const s = settings.find((x) => x.key === key);
+    return s ? formatSettingValue(key, s.value) : null;
+  };
+  return {
+    altitude: value("trazabilidad.singani.altitudMinimaMsnm"),
+    varieties: value("trazabilidad.singani.variedadesExigidas"),
+  };
 }

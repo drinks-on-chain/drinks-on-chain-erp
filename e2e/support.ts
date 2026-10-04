@@ -34,6 +34,22 @@ export async function login(page: Page, email: string) {
   await expect(page.getByText("Tareas pendientes", { exact: true })).toBeVisible();
 }
 
+/** Escenarios de datos de los mocks 0.5 (Ola 2): en qué etapa está el lote de demostración. */
+export type DataScenario = "lote-en-reposo" | "lote-listo" | "lote-con-incidencia" | "laboratorio-no-conforme";
+
+/**
+ * Fija un escenario de datos de los mocks antes de entrar: queda en `localStorage`, así que
+ * sobrevive a las recargas de la prueba (cada prueba tiene su propio contexto de navegador).
+ */
+export async function setDataScenario(page: Page, scenario: DataScenario) {
+  await page.goto("/login");
+  await page.waitForFunction(() => "__docMocks" in window);
+  await page.evaluate(
+    (name) => (window as unknown as { __docMocks: { setScenario: (n: string) => void } }).__docMocks.setScenario(name),
+    scenario,
+  );
+}
+
 /** Espera a que la pantalla termine de cargar: un h1 visible y ningún Skeleton. */
 export async function settled(page: Page) {
   await expect(page.locator("h1").first()).toBeVisible();

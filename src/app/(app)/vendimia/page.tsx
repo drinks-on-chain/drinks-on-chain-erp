@@ -10,7 +10,7 @@ import { HarvestBatchTable } from "@/features/vendimia/components/harvest-batch-
 import { canDecidePhyto, countByStatus, filterHarvests, harvestYears } from "@/features/vendimia/phyto";
 import { errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
-import { useHarvestBatches, useTerroirs } from "@/lib/erp/hooks";
+import { useHarvestBatches, useLots, useTerroirs } from "@/lib/erp/hooks";
 import { PHYTO_STATUS } from "@/lib/erp/labels";
 import { can } from "@/lib/erp/permissions";
 import { fmtNumber } from "@/lib/format";
@@ -19,11 +19,17 @@ const ALL_YEARS = "all";
 // Orden de las pills: lo que requiere acción primero.
 const STATUS_ORDER: PhytosanitaryStatus[] = ["PENDING_INSPECTION", "QUARANTINE", "APPROVED", "REJECTED"];
 
-// Vendimia y laboratorio: lotes de vendimia (pesajes) con su análisis y dictamen.
+/** `lotId=none`: uva recibida que aún no pertenece a un lote (contrato de la Ola 2 §2.5). */
+const UNASSIGNED = { lotId: "none" } as const;
+const ALL = {} as const;
+
+// Vendimia y laboratorio: pesajes con su análisis de madurez, su dictamen y su lote.
 export default function HarvestListPage() {
   const me = useMe();
-  const harvests = useHarvestBatches();
+  const [unassigned, setUnassigned] = useState(false);
+  const harvests = useHarvestBatches(unassigned ? UNASSIGNED : ALL);
   const terroirs = useTerroirs();
+  const lots = useLots();
   const [status, setStatus] = useState<PhytosanitaryStatus | null>(null);
   const [year, setYear] = useState<string>(ALL_YEARS);
 
@@ -32,6 +38,7 @@ export default function HarvestListPage() {
     () => new Map((terroirs.data?.items ?? []).map((t) => [t.id, t.parcelName])),
     [terroirs.data],
   );
+  const lotNames = useMemo(() => new Map((lots.data?.items ?? []).map((l) => [l.id, l.name])), [lots.data]);
   const counts = useMemo(() => countByStatus(items), [items]);
   const years = useMemo(() => harvestYears(items), [items]);
   const visible = useMemo(
@@ -47,7 +54,7 @@ export default function HarvestListPage() {
       <Link href="/vendimia/pesaje">Registrar ingreso</Link>
     </Button>
   ) : undefined;
-  const filtered = status !== null || year !== ALL_YEARS;
+  const filtered = status !== null || year !== ALL_YEARS || unassigned;
   const totalNet = visible.reduce((sum, h) => sum + h.netWeightKg, 0);
 
   return (
@@ -58,7 +65,7 @@ export default function HarvestListPage() {
         <h1 className="font-display text-3xl">Vendimia y laboratorio</h1>
         {harvests.data && (
           <p className="text-sm text-fg-muted">
-            {fmtNumber(visible.length)} {visible.length === 1 ? "lote" : "lotes"} · {fmtNumber(totalNet)} kg netos
+            {fmtNumber(visible.length)} {visible.length === 1 ? "pesaje" : "pesajes"} · {fmtNumber(totalNet)} kg netos
             {counts.PENDING_INSPECTION > 0 && ` · ${counts.PENDING_INSPECTION} por dictaminar`}
           </p>
         )}
@@ -86,6 +93,9 @@ export default function HarvestListPage() {
                   {harvests.data ? ` · ${counts[s]}` : ""}
                 </Pill>
               ))}
+              <Pill pressed={unassigned} onPressedChange={setUnassigned}>
+                Uva sin lote
+              </Pill>
             </PillGroup>
             <Select
               aria-label="Año de cosecha"
@@ -105,6 +115,7 @@ export default function HarvestListPage() {
               data={visible}
               loading={!harvests.data}
               parcelNames={parcelNames}
+              lotNames={lotNames}
               rowActions={(h) =>
                 canPhyto && canDecidePhyto(h.phytosanitaryStatus) ? (
                   <Button asChild size="sm" variant="secondary">
@@ -117,7 +128,7 @@ export default function HarvestListPage() {
                 )
               }
               empty={
-                items.length === 0 ? (
+                items.length === 0 && !unassigned ? (
                   <EmptyState
                     bare
                     title="Aún no hay ingresos de uva"
@@ -127,8 +138,12 @@ export default function HarvestListPage() {
                 ) : (
                   <EmptyState
                     bare
-                    title="Ningún lote coincide"
-                    description="Cambia el estado o el año de cosecha."
+                    title={unassigned && items.length === 0 ? "No hay uva sin lote" : "Ningún pesaje coincide"}
+                    description={
+                      unassigned && items.length === 0
+                        ? "Todos los pesajes pertenecen a un lote."
+                        : "Cambia el estado, el año de cosecha o el filtro de uva sin lote."
+                    }
                     action={
                       filtered ? (
                         <Button
@@ -136,6 +151,7 @@ export default function HarvestListPage() {
                           onClick={() => {
                             setStatus(null);
                             setYear(ALL_YEARS);
+                            setUnassigned(false);
                           }}
                         >
                           Quitar filtros

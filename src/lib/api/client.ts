@@ -27,6 +27,12 @@ export type RequestOptions<T> = {
   /** false en rutas públicas (login, trazabilidad pública). */
   auth?: boolean;
   signal?: AbortSignal;
+  /**
+   * `Idempotency-Key` (UUID; contrato de la Ola 0 §3): la misma clave con el mismo cuerpo devuelve
+   * la respuesta ya guardada. El ERP la envía en pesajes, lecturas, embotellado y cierre del
+   * expediente (reintentos desde tabletas, contrato de la Ola 2 §0).
+   */
+  idempotencyKey?: string;
 };
 
 /** Códigos con los que el backend da la sesión por terminada (contrato de la Ola 0 §5). */
@@ -67,6 +73,7 @@ async function send(path: string, opts: RequestOptions<unknown>, token: string |
     body = JSON.stringify(opts.body);
   }
   if (token) headers.Authorization = `Bearer ${token}`;
+  if (opts.idempotencyKey) headers["Idempotency-Key"] = opts.idempotencyKey;
   try {
     return await fetch(buildUrl(path, opts.query), {
       method: opts.method ?? "GET",
@@ -231,15 +238,15 @@ export async function logoutSession(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 /**
- * Llama al backend y devuelve `data` ya validado.
- * Lanza ApiError (respuesta de error), NetworkError (sin conexión) o ContractError (forma inesperada).
+ * Envía la petición con la sesión (renueva el acceso si hace falta y reintenta una vez tras un
+ * 401) y devuelve la respuesta correcta. Lanza ApiError o NetworkError.
  */
-export async function api<T = unknown>(path: string, opts: RequestOptions<T> = {}): Promise<T> {
+async function request(path: string, opts: RequestOptions<unknown>): Promise<Response> {
   const useAuth = opts.auth ?? true;
   if (useAuth) await ensureFreshAccess();
 
   const sentToken = useAuth ? getAccessToken() : null;
-  let res = await send(path, opts as RequestOptions<unknown>, sentToken);
+  let res = await send(path, opts, sentToken);
 
   if (res.status === 401 && useAuth && sentToken) {
     const error = await parseError(res.clone(), path);
@@ -260,7 +267,7 @@ export async function api<T = unknown>(path: string, opts: RequestOptions<T> = {
         throw outcome.error instanceof ApiError ? outcome.error : error;
       }
     }
-    res = await send(path, opts as RequestOptions<unknown>, getAccessToken());
+    res = await send(path, opts, getAccessToken());
     if (res.status === 401) {
       const again = await parseError(res.clone(), path);
       endSession(SESSION_ENDED_CODES.includes(again.code) ? "revoked" : "expired");
@@ -268,6 +275,24 @@ export async function api<T = unknown>(path: string, opts: RequestOptions<T> = {
   }
 
   if (!res.ok) throw await parseError(res, path);
+  return res;
+}
+
+/** Ruta sin identificadores (`/v1/lots/:id/timeline`), para el diagnóstico de contrato. */
+const contractPath = (path: string) => path.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f-]{22,}/gi, ":id");
+
+/** "pendingPhyto.0.intakeDate: Invalid ISO datetime; …" (hasta 6 campos). */
+function contractSummary(issues: readonly { path: PropertyKey[]; message: string }[]): string {
+  const lines = issues.slice(0, 6).map((i) => `${i.path.map(String).join(".") || "(raíz)"}: ${i.message}`);
+  return lines.join("; ") + (issues.length > 6 ? `; … y ${issues.length - 6} más` : "");
+}
+
+/**
+ * Llama al backend y devuelve `data` ya validado.
+ * Lanza ApiError (respuesta de error), NetworkError (sin conexión) o ContractError (forma inesperada).
+ */
+export async function api<T = unknown>(path: string, opts: RequestOptions<T> = {}): Promise<T> {
+  const res = await request(path, opts as RequestOptions<unknown>);
   if (res.status === 204) return undefined as T;
 
   const envelope = successEnvelope.safeParse(await res.json());
@@ -276,8 +301,50 @@ export async function api<T = unknown>(path: string, opts: RequestOptions<T> = {
 
   const data = opts.schema.safeParse(envelope.data.data);
   if (!data.success) {
-    if (process.env.NODE_ENV !== "production") console.error(`[api] ${path}`, data.error.issues);
+    // Qué campo no cumple el contrato (solo la ruta del campo y el motivo, nunca sus valores): es
+    // lo que hace falta para diagnosticar un "datos inesperados" contra el backend real.
+    console.error(`[api] contrato ${contractPath(path)}: ${contractSummary(data.error.issues)}`);
     throw new ContractError(path, data.error.issues);
   }
   return data.data;
+}
+
+/** Archivo que el backend devuelve sin envoltorio (`text/csv`, JSON canónico del expediente). */
+export type ApiFile = {
+  blob: Blob;
+  /** Nombre de `Content-Disposition`, si llega. */
+  filename: string | null;
+  contentType: string;
+  /** Filas de la exportación (`X-Export-Rows`), si llega. */
+  rows: number | null;
+};
+
+/** `filename="…"` (o `filename*=UTF-8''…`) de una cabecera `Content-Disposition`. */
+export function filenameFromDisposition(header: string | null): string | null {
+  if (!header) return null;
+  const encoded = /filename\*\s*=\s*(?:UTF-8'')?([^;]+)/i.exec(header)?.[1];
+  if (encoded) {
+    try {
+      return decodeURIComponent(encoded.trim().replace(/^"|"$/g, ""));
+    } catch {
+      // Nombre mal codificado: se prueba con el simple.
+    }
+  }
+  const plain = /filename\s*=\s*("([^"]*)"|[^;]+)/i.exec(header);
+  return plain ? (plain[2] ?? plain[1]!).trim() : null;
+}
+
+/**
+ * Descarga un archivo del backend con la sesión de la app (los CSV de códigos de botella y de
+ * reportes, los bytes canónicos del expediente). Los errores llegan con el envoltorio habitual.
+ */
+export async function apiFile(path: string, opts: Omit<RequestOptions<never>, "schema"> = {}): Promise<ApiFile> {
+  const res = await request(path, opts as RequestOptions<unknown>);
+  const rows = Number(res.headers.get("X-Export-Rows"));
+  return {
+    blob: await res.blob(),
+    filename: filenameFromDisposition(res.headers.get("Content-Disposition")),
+    contentType: res.headers.get("Content-Type") ?? "application/octet-stream",
+    rows: res.headers.has("X-Export-Rows") && Number.isFinite(rows) ? rows : null,
+  };
 }

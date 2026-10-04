@@ -3,7 +3,9 @@ import { isAfter, type FieldErrors } from "@/features/vinificacion/form-utils";
 import { parseDecimal } from "@/lib/format";
 import { lotName, terroirOfHarvest, type LotLookup } from "@/features/vinificacion/tank-model";
 
-// Cálculos puros de crianza (03 §4, 1D; 09 §3 fila 5.1A): candado hasta `lockUntilDate`.
+// Crianza del vino (contrato de la Ola 2 §5.1): el candado (fecha de liberación, días que faltan
+// y regla aplicada) lo evalúa el servidor con la instantánea del lote y su reloj (`lock`). Aquí
+// solo se arma su vista; el cálculo local queda para las respuestas que no traen `lock`.
 
 const DAY = 86_400_000;
 const dayStart = (d: Date | string) => {
@@ -27,7 +29,7 @@ export function addMonths(iso: string, months: number): Date {
 export const computeUnlockDate = (startDate: string, plannedMonths: number) => addMonths(startDate, plannedMonths);
 
 export type LockProgress = {
-  /** Inicio del candado (derivado: la respuesta no trae `startDate`). */
+  /** Inicio del candado. */
   startDate: string;
   unlockAt: string;
   totalDays: number;
@@ -37,22 +39,26 @@ export type LockProgress = {
   released: boolean;
 };
 
-/** Progreso del candado de una crianza a partir de `lockUntilDate` y `plannedMonths`. */
-export function agingLock(
-  a: Pick<WineAgingResponse, "lockUntilDate" | "plannedMonths" | "agingStatus">,
-  today: Date,
-): LockProgress {
-  const start = addMonths(a.lockUntilDate, -a.plannedMonths);
-  const end = dayStart(a.lockUntilDate);
+type AgingLockInput = Pick<WineAgingResponse, "lockUntilDate" | "plannedMonths" | "agingStatus"> &
+  Partial<Pick<WineAgingResponse, "lock" | "startDate">>;
+
+/**
+ * Candado de una crianza. Con `lock` (rutas de crianza), los días que faltan y si está liberado
+ * son los del servidor; sin él (respuestas anidadas), se estiman con `lockUntilDate` y `today`.
+ */
+export function agingLock(a: AgingLockInput, today: Date): LockProgress {
+  const unlockAt = a.lock ? `${a.lock.unlockDate}T00:00:00Z` : a.lockUntilDate;
+  const start = a.startDate ? new Date(`${a.startDate.slice(0, 10)}T00:00:00Z`) : addMonths(unlockAt, -a.plannedMonths);
+  const end = dayStart(unlockAt);
   const totalDays = Math.max(1, Math.round((end - start.getTime()) / DAY));
-  const daysRemaining = Math.max(0, Math.ceil((end - dayStart(today)) / DAY));
-  const released = daysRemaining === 0 || a.agingStatus !== "AGING";
-  const progress = released ? 100 : Math.round(((totalDays - daysRemaining) / totalDays) * 100);
+  const remaining = a.lock ? a.lock.daysRemaining : Math.max(0, Math.ceil((end - dayStart(today)) / DAY));
+  const released = (a.lock ? a.lock.released : remaining === 0) || a.agingStatus !== "AGING";
+  const progress = released ? 100 : Math.round(((totalDays - remaining) / totalDays) * 100);
   return {
     startDate: start.toISOString(),
-    unlockAt: a.lockUntilDate,
+    unlockAt,
     totalDays,
-    daysRemaining: a.agingStatus === "AGING" ? daysRemaining : 0,
+    daysRemaining: a.agingStatus === "AGING" ? remaining : 0,
     progress: Math.max(0, Math.min(100, progress)),
     released,
   };
@@ -104,13 +110,16 @@ export function buildBarrelRows(input: {
     );
 }
 
-/** Tanques que pueden iniciar crianza: destino vino, no vacíos y sin crianza previa. */
+/**
+ * Tanques que pueden iniciar crianza: fermentación completada con destino vino y sin crianza
+ * previa (una por tanque).
+ */
 export function agingCandidates(
   tanks: readonly FermentationTankResponse[],
   agings: readonly Pick<WineAgingResponse, "fermentationTankId">[],
 ): FermentationTankResponse[] {
   const aged = new Set(agings.map((a) => a.fermentationTankId));
-  return tanks.filter((t) => t.destinationType === "WINE_AGING" && t.status !== "CLEANED" && !aged.has(t.id));
+  return tanks.filter((t) => t.destinationType === "WINE_AGING" && t.status === "COMPLETED" && !aged.has(t.id));
 }
 
 /** Variedad del tanque para el título ("Tannat"). */
@@ -123,6 +132,7 @@ export type AgingValues = {
   containerMaterial: string;
   containerCode: string;
   barrelUseCycle: string;
+  containerCount: string;
   volumeLiters: string;
   plannedMonths: string;
   startDate: string;
@@ -130,31 +140,32 @@ export type AgingValues = {
 };
 export type AgingField = keyof AgingValues;
 
-/** Validación del alta de crianza (CreateWineAgingBatchDto + reglas de la pantalla). */
-export function validateAging(
-  v: AgingValues,
-  ctx: { candidateIds: ReadonlySet<string>; tankVolume: number | null; today: Date },
-): FieldErrors<AgingField> {
+/**
+ * Validación de forma del alta de crianza (`CreateWineAgingBatchDto`). El estado y el destino del
+ * tanque, el mínimo de meses de la instantánea del lote y el volumen disponible los comprueba el
+ * servidor (`TRC_TANK_NOT_COMPLETED`, `TRC_DESTINATION_MISMATCH`, `TRC_AGING_BELOW_MINIMUM`,
+ * `TRC_VOLUME_EXCEEDS_AVAILABLE`).
+ */
+export function validateAging(v: AgingValues, ctx: { today: Date }): FieldErrors<AgingField> {
   const e: FieldErrors<AgingField> = {};
   if (!v.fermentationTankId) e.fermentationTankId = "Elige el tanque de vino que pasa a crianza.";
-  else if (!ctx.candidateIds.has(v.fermentationTankId))
-    e.fermentationTankId = "Este tanque no tiene destino crianza o ya inició su crianza.";
   if (!v.containerType.trim()) e.containerType = "Indica el tipo de recipiente.";
 
   if (v.barrelUseCycle.trim()) {
     const c = parseDecimal(v.barrelUseCycle);
     if (c === null || !Number.isInteger(c) || c < 1) e.barrelUseCycle = "El ciclo de uso es un entero desde 1.";
   }
-  if (v.volumeLiters.trim()) {
-    const vol = parseDecimal(v.volumeLiters);
-    if (vol === null || vol <= 0) e.volumeLiters = "El volumen debe ser mayor que cero.";
-    else if (ctx.tankVolume !== null && vol > ctx.tankVolume)
-      e.volumeLiters = `Supera el volumen del tanque (${ctx.tankVolume.toLocaleString("es-BO")} L).`;
+  if (v.containerCount.trim()) {
+    const n = parseDecimal(v.containerCount);
+    if (n === null || !Number.isInteger(n) || n < 1)
+      e.containerCount = "El número de recipientes es un entero desde 1.";
   }
+  const vol = parseDecimal(v.volumeLiters);
+  if (vol === null) e.volumeLiters = "Indica los litros que pasan a crianza.";
+  else if (vol <= 0) e.volumeLiters = "El volumen debe ser mayor que cero.";
   const months = parseDecimal(v.plannedMonths);
   if (months === null) e.plannedMonths = "Indica los meses de crianza.";
-  else if (!Number.isInteger(months) || months < 1 || months > 120)
-    e.plannedMonths = "Los meses van de 1 a 120, sin decimales.";
+  else if (!Number.isInteger(months) || months < 0) e.plannedMonths = "Los meses son un número entero, sin decimales.";
 
   if (v.startDate && isAfter(v.startDate, ctx.today)) e.startDate = "La fecha de inicio no puede ser futura.";
   return e;

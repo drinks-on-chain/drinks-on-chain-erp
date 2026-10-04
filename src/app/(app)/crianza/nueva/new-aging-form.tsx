@@ -27,14 +27,14 @@ import {
   type AgingField,
   type AgingValues,
 } from "@/features/crianza/aging-model";
-import { FormErrorAlert } from "@/features/vinificacion/components/form-error";
+import { RuleViolationNotice } from "@/components/rule-violation-notice";
 import { hasErrors, toDateInput } from "@/features/vinificacion/form-utils";
 import { parseDecimal, fmtDate, fmtDaysLeft, fmtLiters } from "@/lib/format";
 import { lotLookup, lotName } from "@/features/vinificacion/tank-model";
 import { fieldErrorsFrom } from "@/lib/api/field-errors";
 import { errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
-import { useAgings, useCreateAging, useHarvestBatches, useTanks, useTerroirs } from "@/lib/erp/hooks";
+import { useAgings, useCreateAging, useHarvestBatches, useLot, useTanks, useTerroirs } from "@/lib/erp/hooks";
 import { TANK_STATUS } from "@/lib/erp/labels";
 import { can } from "@/lib/erp/permissions";
 import { today } from "@/lib/erp/today";
@@ -47,6 +47,7 @@ const SERVER_FIELDS: readonly AgingField[] = [
   "fermentationTankId",
   "containerType",
   "barrelUseCycle",
+  "containerCount",
   "volumeLiters",
   "plannedMonths",
   "startDate",
@@ -70,6 +71,7 @@ export function NewAgingForm() {
     containerMaterial: "Roble francés",
     containerCode: "",
     barrelUseCycle: "1",
+    containerCount: "",
     volumeLiters: "",
     plannedMonths: "12",
     startDate: toDateInput(today()),
@@ -87,9 +89,16 @@ export function NewAgingForm() {
   const preselectedInvalid =
     !!preselected && !!tanks.data && !!agings.data && !candidates.some((t) => t.id === preselected);
 
+  // Reglas del lote del tanque: el mínimo de meses es el de su instantánea (lo aplica el servidor).
+  const lot = useLot(tank?.lotId ?? "", !!tank?.lotId);
+  const minMonths = lot.data?.rules.wine.minAgingMonths ?? null;
+  const tankLiters = tank?.availableLiters ?? tank?.finalVolumeLiters ?? tank?.volumeFilledLiters ?? null;
+  // Sin cifra escrita, pasa a crianza lo que quedó en el tanque al completar la fermentación.
+  const volumeLiters = values.volumeLiters.trim() || (tankLiters != null ? String(tankLiters) : "");
+
   const months = parseDecimal(values.plannedMonths);
   const unlock =
-    months !== null && Number.isInteger(months) && months >= 1 && months <= 120
+    months !== null && Number.isInteger(months) && months >= 0 && months <= 600
       ? computeUnlockDate(values.startDate || toDateInput(today()), months)
       : null;
   const unlockDays = unlock ? Math.ceil((unlock.getTime() - today().getTime()) / 86_400_000) : null;
@@ -101,21 +110,21 @@ export function NewAgingForm() {
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    const found = validateAging(values, {
-      candidateIds: new Set(candidates.map((t) => t.id)),
-      tankVolume: tank?.volumeFilledLiters ?? null,
-      today: today(),
-    });
+    // Mientras las listas se actualizan se confía en el tanque del enlace; si no admite crianza,
+    // lo rechaza el servidor con su regla.
+    const fermentationTankId = tank || tanks.isFetching || agings.isFetching ? values.fermentationTankId : "";
+    const found = validateAging({ ...values, fermentationTankId, volumeLiters }, { today: today() });
     setErrors(found);
     if (hasErrors(found)) return;
     createAging.mutate(
       {
-        fermentationTankId: values.fermentationTankId,
+        fermentationTankId,
         containerType: values.containerType.trim(),
         containerMaterial: values.containerMaterial.trim() || null,
         containerCode: values.containerCode.trim() || null,
         barrelUseCycle: parseDecimal(values.barrelUseCycle),
-        volumeLiters: parseDecimal(values.volumeLiters) ?? tank?.volumeFilledLiters ?? null,
+        containerCount: parseDecimal(values.containerCount),
+        volumeLiters: parseDecimal(volumeLiters)!,
         plannedMonths: months!,
         startDate: values.startDate || null,
         notes: values.notes.trim() || null,
@@ -190,7 +199,7 @@ export function NewAgingForm() {
     return shell(
       <EmptyState
         title="No hay tanques de vino por criar"
-        description="Solo pasan a crianza los tanques llenados con destino crianza (vino) que aún no la iniciaron."
+        description="Pasan a crianza los tanques con la fermentación completada y destino vino que aún no la iniciaron."
         action={
           <Button asChild variant="secondary">
             <Link href="/vinificacion">Ir al mapa de tanques</Link>
@@ -202,8 +211,17 @@ export function NewAgingForm() {
   return shell(
     <>
       {preselectedInvalid && (
-        <Alert tone="warning" title="Ese tanque no puede pasar a crianza">
-          No tiene destino crianza (vino) o ya inició su crianza. Elige otro tanque.
+        <Alert
+          tone="warning"
+          title="Ese tanque no puede pasar a crianza"
+          action={
+            <Button asChild size="sm" variant="tertiary">
+              <Link href={`/vinificacion/${preselected}`}>Ir al tanque</Link>
+            </Button>
+          }
+        >
+          La crianza solo parte de un tanque con la fermentación completada y destino vino, y una sola vez. Si aún
+          fermenta, complétala en su ficha (ahí se decide el destino); si no, elige otro tanque.
         </Alert>
       )}
 
@@ -214,11 +232,13 @@ export function NewAgingForm() {
               label="Tanque"
               required
               error={errors.fermentationTankId ?? server.fermentationTankId}
-              help="Tanques con destino crianza que aún no la iniciaron."
+              help="Tanques con la fermentación completada y destino vino."
             >
               <Select
                 size="lg"
                 placeholder="Elige el tanque"
+                // Con `key`: el tanque de la URL puede llegar después de la primera carga de la lista.
+                key={tank ? "elegido" : "sin-elegir"}
                 value={tank ? values.fermentationTankId : undefined}
                 onValueChange={(v) => set("fermentationTankId", v)}
                 options={candidates.map((t) => ({
@@ -227,9 +247,6 @@ export function NewAgingForm() {
                 }))}
               />
             </Field>
-            {tank?.status === "FERMENTING" && (
-              <Alert tone="info">La fermentación de {tank.tankCode} sigue en curso: confirma que ha concluido.</Alert>
-            )}
           </FormSection>
 
           <FormSection title="Recipiente" columns={2}>
@@ -264,12 +281,25 @@ export function NewAgingForm() {
               />
             </Field>
             <Field
+              label="Recipientes"
+              error={errors.containerCount ?? server.containerCount}
+              help="Opcional. Barricas o depósitos que agrupa esta crianza."
+            >
+              <Input
+                size="lg"
+                numeric
+                value={values.containerCount}
+                onChange={(e) => set("containerCount", e.target.value)}
+              />
+            </Field>
+            <Field
               label="Volumen"
+              required
               error={errors.volumeLiters ?? server.volumeLiters}
               help={
-                tank?.volumeFilledLiters
-                  ? `Por defecto, el del tanque: ${fmtLiters(tank.volumeFilledLiters)}.`
-                  : undefined
+                tankLiters != null
+                  ? `Por defecto, lo que quedó en el tanque: ${fmtLiters(tankLiters)}. La diferencia es merma de trasiego.`
+                  : "Litros que pasan a crianza."
               }
             >
               <Input
@@ -277,14 +307,23 @@ export function NewAgingForm() {
                 numeric
                 suffix="L"
                 value={values.volumeLiters}
-                placeholder={tank?.volumeFilledLiters ? String(tank.volumeFilledLiters) : undefined}
+                placeholder={tankLiters != null ? String(tankLiters) : undefined}
                 onChange={(e) => set("volumeLiters", e.target.value)}
               />
             </Field>
           </FormSection>
 
           <FormSection title="Tiempo de crianza" columns={2}>
-            <Field label="Meses previstos" required error={errors.plannedMonths ?? server.plannedMonths}>
+            <Field
+              label="Meses previstos"
+              required
+              error={errors.plannedMonths ?? server.plannedMonths}
+              help={
+                minMonths != null && minMonths > 0
+                  ? `Mínimo de las reglas del lote: ${minMonths} ${minMonths === 1 ? "mes" : "meses"}.`
+                  : undefined
+              }
+            >
               <Input
                 size="lg"
                 numeric
@@ -306,7 +345,7 @@ export function NewAgingForm() {
           <Field label="Notas">
             <Textarea value={values.notes} onChange={(e) => set("notes", e.target.value)} rows={2} />
           </Field>
-          <FormErrorAlert error={createAging.error} fields={SERVER_FIELDS} />
+          <RuleViolationNotice error={createAging.error} fields={SERVER_FIELDS} />
         </Card>
 
         <aside className="grid content-start gap-4">

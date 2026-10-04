@@ -4,10 +4,11 @@ import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Alert, Button, Checkbox, Field, FormSection, Input, Textarea, toast } from "@drinks-on-chain/ui";
+import { RuleViolationNotice } from "@/components/rule-violation-notice";
 import { ApiError, errorMessage } from "@/lib/api/errors";
-import { useCreateTerroir, useTerroirs, useUpdateTerroir } from "@/lib/erp/hooks";
-import { fmtNumber, parseDecimal } from "@/lib/format";
-import { DO_MIN_ALTITUDE_MASL, DO_VARIETY, doEligibility, doReasonText } from "../do-eligibility";
+import { isRuleError } from "@/lib/api/rule-violations";
+import { useCreateTerroir, useEffectiveSettings, useTerroirs, useUpdateTerroir } from "@/lib/erp/hooks";
+import { doRuleHints } from "../do-eligibility";
 import {
   parsePolygon,
   terroirFieldErrors,
@@ -16,7 +17,6 @@ import {
   type TerroirFormErrors,
   type TerroirFormValues,
 } from "../terroir-form-values";
-import { DoBadge } from "./do-badge";
 import { ParcelMap } from "./parcel-map";
 import { UploadField } from "./upload-field";
 
@@ -29,12 +29,19 @@ type Props =
   | { mode: "create"; initial: TerroirFormValues; terroirId?: undefined }
   | { mode: "edit"; initial: TerroirFormValues; terroirId: string };
 
-/** Alta y edición de terroir (09 §3): vista previa del badge D.O. mientras se escribe. */
+/**
+ * Alta y edición de terroir (09 §3). La aptitud D.O. no se declara: la calcula el servidor al
+ * guardar con las reglas vigentes de la bodega (contrato de la Ola 2 §3.1). En una parcela con
+ * pesajes, altitud, cepa y materia prima solo cambian con una corrección (409 `TRC_TERROIR_IN_USE`).
+ */
 export function TerroirForm({ mode, initial, terroirId }: Props) {
   const router = useRouter();
   const create = useCreateTerroir();
   const update = useUpdateTerroir();
   const terroirs = useTerroirs();
+  const settings = useEffectiveSettings();
+  const rules = useMemo(() => doRuleHints(settings.data ?? []), [settings.data]);
+  const [ruleError, setRuleError] = useState<unknown>(null);
   const [values, setValues] = useState(initial);
   const [errors, setErrors] = useState<TerroirFormErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -55,18 +62,10 @@ export function TerroirForm({ mode, initial, terroirId }: Props) {
     onChange: (e: { target: { value: string } }) => set(key, e.target.value),
   });
 
-  // Vista previa D.O. con lo escrito (la regla también la valida el backend).
-  const preview = {
-    varietyName: values.varietyName,
-    altitudeMasl: parseDecimal(values.altitudeMasl),
-    isDoEligible: values.isDoEligible,
-  };
-  const eligibility = doEligibility(preview);
-  const declaredButFails = values.isDoEligible && !eligibility.eligible;
   const polygon = parsePolygon(values.polygon);
 
   const varieties = useMemo(() => {
-    const names = new Set([DO_VARIETY, ...(terroirs.data?.items ?? []).map((t) => t.varietyName)]);
+    const names = new Set((terroirs.data?.items ?? []).map((t) => t.varietyName));
     return [...names].sort((a, b) => a.localeCompare(b, "es"));
   }, [terroirs.data]);
 
@@ -75,6 +74,7 @@ export function TerroirForm({ mode, initial, terroirId }: Props) {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setFormError(null);
+    setRuleError(null);
     const result = toTerroirDto(values);
     if (!result.ok) {
       setErrors(result.errors);
@@ -93,7 +93,11 @@ export function TerroirForm({ mode, initial, terroirId }: Props) {
       });
       router.push(`/origen/${saved.id}`);
     } catch (err) {
-      if (err instanceof ApiError && err.isValidation) {
+      if (isRuleError(err)) {
+        // Regla de la trazabilidad (p. ej. parcela con pesajes): se explica con su aviso.
+        setErrors(terroirFieldErrors(err));
+        setRuleError(err);
+      } else if (err instanceof ApiError && err.isValidation) {
         setErrors(terroirFieldErrors(err));
         setFormError(err.message);
       } else {
@@ -123,7 +127,7 @@ export function TerroirForm({ mode, initial, terroirId }: Props) {
           label="Altitud"
           required
           error={errors.altitudeMasl}
-          help={`La D.O. Singani exige al menos ${fmtNumber(DO_MIN_ALTITUDE_MASL)} m.`}
+          help={rules.altitude ? `La D.O. Singani exige al menos ${rules.altitude}.` : undefined}
         >
           <Input {...text("altitudeMasl")} numeric suffix="m s. n. m." />
         </Field>
@@ -183,24 +187,13 @@ export function TerroirForm({ mode, initial, terroirId }: Props) {
       </FormSection>
 
       <FormSection title="Denominación de origen" columns={2}>
-        <div className="grid content-start gap-3 md:col-span-2">
-          <Checkbox
-            checked={values.isDoEligible}
-            onCheckedChange={(c) => set("isDoEligible", c === true)}
-            label="Parcela apta para D.O."
-            description={`Singani D.O.: ${DO_VARIETY} y altitud de ${fmtNumber(DO_MIN_ALTITUDE_MASL)} m o más.`}
-          />
-          <div className="flex flex-wrap items-center gap-2" aria-live="polite">
-            <span className="text-sm text-fg-muted">Vista previa:</span>
-            <DoBadge {...preview} explain />
-          </div>
-          {declaredButFails && (
-            <Alert tone="warning" title="La parcela no cumple la regla de la D.O. Singani">
-              Falla por: {eligibility.reasons.map(doReasonText).join(", ")}. Puedes guardarla así, pero el backend
-              rechazará la destilación D.O. de sus lotes.
-            </Alert>
-          )}
-        </div>
+        <Alert tone="info" title="La aptitud D.O. Singani la calcula el servidor" className="md:col-span-2">
+          No se declara: al guardar, el servidor la calcula con la altitud y la cepa de la parcela
+          {rules.altitude && rules.varieties
+            ? ` (reglas vigentes de la bodega: al menos ${rules.altitude} y cepa ${rules.varieties})`
+            : ""}
+          . Cada lote de singani la vuelve a comprobar con sus propias reglas.
+        </Alert>
         <Field label="Tipo de D.O." error={errors.doType} help="P. ej. D.O. Singani o Valles Altos de Bolivia.">
           <Input {...text("doType")} autoComplete="off" />
         </Field>
@@ -219,6 +212,7 @@ export function TerroirForm({ mode, initial, terroirId }: Props) {
           {formError}
         </Alert>
       )}
+      <RuleViolationNotice error={ruleError} />
 
       <div className="flex flex-wrap justify-end gap-3 border-t border-border pt-5">
         <Button asChild variant="secondary" size="lg">

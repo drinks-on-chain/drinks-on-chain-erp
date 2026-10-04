@@ -23,7 +23,7 @@ const SLOW = { timeout: 20_000 };
 
 const LISTS: { path: string; nav: string; empty: string[]; content: RegExp }[] = [
   { path: "/", nav: "Panel", empty: ["Todo al día", "Sin candados"], content: /Tareas pendientes/ },
-  { path: "/lotes", nav: "Lotes", empty: ["Aún no hay lotes"], content: /HARV-2026-/ },
+  { path: "/lotes", nav: "Lotes", empty: ["Aún no hay lotes"], content: /CVJ-L2026-/ },
   { path: "/origen", nav: "Origen y terroirs", empty: ["Aún no hay terroirs"], content: /Moscatel/ },
   {
     path: "/vendimia",
@@ -35,6 +35,7 @@ const LISTS: { path: string; nav: string; empty: string[]; content: RegExp }[] =
   { path: "/crianza", nav: "Crianza", empty: ["Ninguna crianza todavía"], content: /BAR-/ },
   { path: "/destilacion", nav: "Destilación y reposo", empty: ["Ninguna destilación todavía"], content: /Alambique/ },
   { path: "/envasado", nav: "Envasado y QR", empty: ["Aún no hay embotellados"], content: /CVJ-2026-/ },
+  { path: "/reportes", nav: "Reportes", empty: ["Aún no hay lotes"], content: /Singani/ },
   { path: "/cuenta", nav: "Cuenta Stellar", empty: ["Aún no hay lotes embotellados"], content: /CVJ-2026-/ },
   { path: "/equipo", nav: "Equipo", empty: ["Sin miembros"], content: /cintiviejo\.test/ },
 ];
@@ -53,7 +54,7 @@ async function openList(page: Page, nav: string, scenario: Scenario) {
 
 // Cada listado de la bodega vacía ofrece salir del vacío: su acción principal dentro del EmptyState.
 const EMPTY_ACTIONS: Record<string, string> = {
-  "/lotes": "Registrar ingreso",
+  "/lotes": "Nuevo lote",
   "/origen": "Nuevo terroir",
   "/vendimia": "Registrar ingreso",
   "/vinificacion": "Llenar tanque",
@@ -64,8 +65,8 @@ const EMPTY_ACTIONS: Record<string, string> = {
 };
 
 // Fichas: se abren desde su listado ya cargado, con el escenario "error" activado después.
-// La ficha de lote no aparece: se deriva de los mismos listados que /lotes (ya cubierto).
 const DETAILS: { list: string; detail: string }[] = [
+  { list: "/lotes", detail: "/lotes/4af50d09-875b-5d1d-b026-62d60ae13b35" },
   { list: "/origen", detail: "/origen/e26c2890-b4e4-5973-aec2-0f092355ad3b" },
   { list: "/vendimia", detail: "/vendimia/2a643ce2-9f17-5017-9d6a-b4eb661d4648" },
   { list: "/vinificacion", detail: "/vinificacion/d78d6307-f96b-533b-8f6e-710f6533bb42" },

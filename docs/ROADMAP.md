@@ -93,3 +93,65 @@ Contrato: `plan/contratos/o1-backoffice-y-bodegas.md` §11 y `o0-sesiones-y-esta
 - [x] Aviso "Tu sesión se cerró por seguridad" en el login también al recargar con una sesión revocada (E2E de humo) · 2026-09-27
 - [x] Enlace "Perfil" del menú de usuario con `linkComponent`: el fallo estaba en `@drinks-on-chain/ui` (`SidebarShell` no pasaba `linkComponent` al `Menu` del bloque de usuario); corregido en `@drinks-on-chain/ui` 0.3.1-rc.1, que llega con la plantilla, y cubierto por el e2e de humo (navega sin recargar) · 2026-09-27
 - [x] `@drinks-on-chain/mocks` 0.4.0-rc.2 (retirada de H1 en los mocks) con la plantilla: esquemas de sesión y `me` reexportados salvo `tokens.refreshToken` (obsoleto hasta 0.5), panel `/__mocks` con `DemoUser.role` y pruebas sin campos de 0.1 · 2026-09-27
+
+## Ola 2 · O2-ERP-1 (sub-etapa 1J) · ERP confiable sobre el lote del servidor
+
+Contrato: `plan/contratos/o2-erp-confiable.md` del plan maestro (§2–§14, §16.3, §17 fila «ERP», §18) y `docs/CONTRATO.md` §10 de los mocks 0.5 (donde difieren, manda el OpenAPI). Se construye y se prueba contra mocks: el backend responde 501 en buena parte de las rutas nuevas. Sin bandera `NEXT_PUBLIC_ERP_LOTS_V2`: `dev` trabaja con el lote nuevo; producción sigue en `main` hasta el cierre de la ola.
+
+### Fase 1 · Base y lote
+
+- [x] `@drinks-on-chain/mocks` 0.5.0-rc.1 y escenarios de datos en `/__mocks` (`lote-en-reposo`, `lote-listo`, `lote-con-incidencia`, `laboratorio-no-conforme`) · 2026-10-02
+- [x] Cliente: `Idempotency-Key` (pesajes, lecturas, embotellado y cierre del expediente; la clave se repite solo si el envío quedó sin respuesta), `apiFile()` para CSV y JSON canónico, lectura de los `details` ampliados (`code`, `rule`, `expected`, `actual`, `meta`) · 2026-10-02
+- [x] `src/lib/erp`: un acceso por operación de `/v1/lots*` y de las acciones nuevas (análisis de madurez, dictámenes, transiciones de tanque, descartes, cierre de destilación, panel, reportes), hooks, etiquetas y permisos del contrato §14 · 2026-10-02
+- [x] `RuleViolationNotice` (local, pendiente de mover a `@drinks-on-chain/ui`): explica los 46 códigos `TRC_…` con la regla de la instantánea, lo exigido, lo registrado y qué hacer; sustituye a `FormErrorAlert` en los formularios · 2026-10-02
+- [x] Lista de lotes con filtros y paginación del servidor (etapa, tipo, búsqueda, incidencias), etapas de §16.3, candado (`nextLock`), laboratorio, botellas e incidencias · 2026-10-02
+- [x] Ficha del lote `/lotes/{lotId}`: candados con motivo y fecha, D.O. calculada, instantánea de reglas, registros del lote (grafo), línea de tiempo e incidencias de migración; los enlaces antiguos `/lotes/{harvestBatchId}` redirigen por `GET /v1/harvest-batches/{id}` → `lotId` · 2026-10-02
+- [x] «Nuevo lote» en origen (`/lotes/nuevo`) y desde el pesaje (`newLot`), con las reglas vigentes que se fijarán a la vista; pesaje con lote, lote nuevo o uva sin lote, con el análisis opcional y sin dictamen en el alta · 2026-10-02
+- [x] Retirados la lista y la ficha derivadas de `LotView` (`lots.ts`, `LotStatusBadge`); `useLotViews` queda solo para el panel y el embotellado hasta las fases 3 y 4 · 2026-10-02
+- [x] Pruebas: unitarias de reglas, lote, idempotencia, descargas y pesaje; e2e `lotes.spec.ts` (lista, ficha, redirección, alta con D.O. rechazada, incidencia de migración, operario) y el resto adaptado a los fixtures de la Ola 2 · 2026-10-02
+
+### Fase 2 · Origen, vendimia y vinificación
+
+- [x] Parcelas: aptitud D.O. calculada por el servidor (`isDoEligible` y `doEvaluation` con las reglas vigentes de la bodega): badge, filtro y ficha con cada comprobación y el mínimo legal; fuera la casilla «apta para D.O.» y la evaluación en el cliente; una parcela con pesajes no cambia altitud, cepa ni materia prima por edición (409 `TRC_TERROIR_IN_USE`, explicado) · 2026-10-02
+- [x] Vendimia: pesaje sin análisis y uva sin lote (filtro `lotId=none`, columna «Lote»); ficha del pesaje con la parcela tal como era al pesar, kilos disponibles, registro tardío y D.O. con las reglas del lote · 2026-10-02
+- [x] Análisis de madurez aparte (`POST …/maturity-analyses`): historial, vigente y alta en un diálogo; solo inserción · 2026-10-02
+- [x] Dictamen fitosanitario (`POST …/phyto-decisions`): historial con autor y rol, motivo obligatorio al rechazar o poner en cuarentena, informe por `key` · 2026-10-02
+- [x] Tanques: alta con entradas por pesaje (`inputs` con kilos), lote de la uva, lote existente o «Nuevo lote» desde el tanque (`newLot`), sin destino al llenar; acciones `start`, `complete` (bifurcación con confirmación explícita, volumen final y D.O. comprobada) y `clean`; capacidad, código en uso y dictamen los decide el servidor · 2026-10-02
+- [x] Pruebas: unitarias de D.O., análisis, dictámenes y alta/cierre de tanque; e2e de origen, vendimia, vinificación y `elusion.spec.ts` (`TRC_PHYTO_IN_CREATE`, `TRC_PHYTO_NOT_APPROVED`, `TRC_DO_TERROIR_NOT_ELIGIBLE`, `TRC_DO_NOT_ELIGIBLE`, `TRC_DESTINATION_MISMATCH`, `TRC_TANK_CAPACITY_EXCEEDED`, `TRC_TERROIR_IN_USE`); axe en los diálogos nuevos · 2026-10-02
+
+### Fase 3 · Crianza, destilación y embotellado
+
+- [x] Crianza: candado evaluado por el servidor (`lock`: días, fecha de liberación y regla aplicada de la instantánea), número de recipientes, descarte con motivo; el estado del tanque, el volumen disponible y el mínimo de meses los comprueba el servidor (`TRC_VOLUME_EXCEEDS_AVAILABLE`, `TRC_AGING_BELOW_MINIMUM`) · 2026-10-02
+- [x] Destilación: se abre con el vino base y se cierra con sus cortes y el grado del corazón (`POST …/close`), con el balance de masa del servidor (`TRC_MASS_BALANCE_EXCEEDED`); el reposo cuenta desde el cierre con los días de la instantánea; descarte con motivo · 2026-10-02
+- [x] Embotellado del lote en `/lotes/{id}/embotellar`: fuentes con su candado, vista previa del servidor (`POST …/bottling/preview`) con volumen, merma tolerada y alcohol puro, y registro con `Idempotency-Key` solo cuando la vista previa es válida; `/envasado/nuevo` elige el lote o redirige los enlaces antiguos (`?lote=`, `?crianza=`, `?destilacion=`) · 2026-10-02
+- [x] `LotBalanceChart` (local, pendiente de mover a `@drinks-on-chain/ui`): conciliación kilos → litros → botellas con la merma de cada etapa y medidores del embotellado; pestaña «Balance» de la ficha del lote y ficha del embotellado · 2026-10-02
+- [x] `BottleCodeExport` (local, pendiente de mover a `@drinks-on-chain/ui`): tabla paginada por el servidor con filtros de estado y rango de series, CSV, ZIP con los QR para la imprenta con seguimiento de la exportación, y anulación con motivo y sustitución; pestaña «Códigos» de la ficha del lote · 2026-10-02
+- [x] Retirados el formulario de embotellado por fuente, el cálculo local de rendimiento y merma y la exportación de QR generada en el navegador (`fflate` fuera de las dependencias) · 2026-10-02
+- [x] Pruebas: unitarias de crianza, destilación, balance, embotellado y códigos; e2e `embotellado.spec.ts` (candado sin cumplir, `TRC_BOTTLING_EXCEEDS_VOLUME`, `TRC_ALCOHOL_BALANCE_EXCEEDED`, embotellado válido, CSV, ZIP, anulación con sustituto, `TRC_LOT_ALREADY_BOTTLED`, operario) y los flujos de crianza y destilación (`TRC_VOLUME_EXCEEDS_AVAILABLE`, `TRC_MASS_BALANCE_EXCEEDED`) · 2026-10-02
+
+### Fase 4 · Calidad y cierre
+
+- [x] Laboratorio del lote (`/v1/lots/{id}/lab-analyses`): conformidad calculada por el servidor con los límites de la instantánea (cada parámetro con lo medido, su límite y el resultado), avisos, cifras con su unidad (`units`), metanol en mg/100 mL de alcohol anhidro o mg/L de producto, informe por `key` y reanálisis que sustituye al anterior · 2026-10-02
+- [x] Correcciones compensatorias: diálogo con motivo (10–500 caracteres) sobre los registros del lote (pesaje, tanque, crianza, destilación, embotellado, laboratorio y parcela), solo con los campos corregibles del contrato; lista con valor anterior → nuevo, motivo y autor; nada se edita ni se borra · 2026-10-02
+- [x] `DossierChecklist` (local, pendiente de mover a `@drinks-on-chain/ui`): requisitos del expediente evaluados por el servidor, cierre con `Idempotency-Key` y confirmación, huella SHA-256, raíz Merkle de los códigos y descarga del JSON canónico · 2026-10-02
+- [x] Línea de tiempo con registros tardíos y corregidos, y grafo real del lote (`/graph`) por etapas, con cantidades entre etapas y «No registrado» donde falta el dato · 2026-10-02
+- [x] Panel desde `GET /v1/traceability/dashboard`: lotes por etapa, candados por vencer, alertas de fermentación, dictámenes pendientes, lotes sin laboratorio, expedientes listos para cerrar, incidencias y uva sin lote; el operario (sin lectura del panel) ve sus accesos directos · 2026-10-02
+- [x] Reportes de producción (`/reportes`): totales por tipo, tabla por lote con mermas y rendimientos, filtros del servidor y CSV · 2026-10-02
+- [x] Archivos del lote: lista con huella y autor, alta por tipo (privados salvo la etiqueta) y cambio de visibilidad con confirmación · 2026-10-02
+- [x] Descartar el lote con motivo; retirados `useLotViews`/`deriveLotViews`, el panel calculado en el cliente, el certificado por embotellado y el grafo legado (`/v1/traceability/dag`) · 2026-10-02
+- [x] Pruebas: unitarias de laboratorio, correcciones, expediente, grafo, archivos, panel y reportes; e2e `recorrido-h2.spec.ts` (recorrido §18 completo con enóloga, operario, agrónomo: del lote nuevo al expediente cerrado, con `TRC_DOSSIER_NOT_READY` y `TRC_DOSSIER_CLOSED` explicados) y axe de las pantallas y diálogos nuevos · 2026-10-02
+
+### Fase 5 · Mocks 0.5.0-rc.2 y backend real
+
+- [x] `@drinks-on-chain/mocks` 0.5.0-rc.2: registros anulados marcados (`voided`, `voidedAt`) a la vista, tachados y fuera de la última lectura, el análisis vigente y las gráficas; exportaciones con `format` y rango; autores anulables; CSV `codigos-{lote}-{desde}-{hasta}.csv`; mensajes nuevos del expediente; adjuntos propios para agronomía y operación · 2026-10-02
+- [x] Correcciones de análisis de madurez, dictámenes, lecturas y tratamientos desde la ficha del pesaje y del tanque (`CorrectRecordButton`); una corrección que incumple una regla de un embotellado ya hecho se registra y se explica como incidencia abierta · 2026-10-02
+- [x] Los límites de laboratorio de la instantánea de reglas se leen por el nombre del parámetro (`acidezVolatil` → «Acidez volátil») · 2026-10-02
+- [x] Destilación: parte del volumen disponible del tanque (`availableLiters`) y puede cerrarlo (`closeTank`) · 2026-10-02
+- [x] Backend real (Etapa 2 completa): `e2e/backend-real.spec.ts` recorre §18 por la interfaz hasta el expediente cerrado, con siete avisos de elusión; el panel admite `pendingPhyto[].intakeDate` como fecha de calendario (`src/lib/erp/schemas.ts`); los errores de contrato dejan en consola el campo que no cumple · 2026-10-02
+
+### Fase 6 · Mocks 0.5.0-rc.3 (cierre H2)
+
+- [x] `@drinks-on-chain/mocks` 0.5.0-rc.3, sin rutas legadas ni `LotView`: el ERP no envía ningún campo retirado (los cuerpos salen de los DTO del contrato final) ni llama a rutas retiradas · 2026-10-02
+- [x] Crianza y destilación solo desde un tanque `COMPLETED`: los formularios ofrecen solo esos tanques, llevan a la ficha del tanque para completarlo y explican el 409 `TRC_TANK_NOT_COMPLETED` · 2026-10-02
+- [x] El panel vuelve al esquema de los mocks (`pendingPhyto[].intakeDate` como fecha) y se retira `src/lib/erp/schemas.ts`; fuera la regla `TRC_PRODUCT_TYPE_MISMATCH` y los alias `laboratoryReportPdfUrl`/`labelDesignUrl` · 2026-10-02
+- [x] Pruebas: elusiones `TRC_AGING_BELOW_MINIMUM` (Altos exige 6 meses) y `TRC_TANK_NOT_COMPLETED` desde la interfaz; estados vacíos del panel y del reporte con el escenario `empty` · 2026-10-02

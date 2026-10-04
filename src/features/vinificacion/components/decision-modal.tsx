@@ -27,6 +27,8 @@ export type DecisionModalProps<V extends string> = {
   confirming?: boolean;
   /** Error del backend al confirmar (ya maquetado, p. ej. un Alert). */
   error?: ReactNode;
+  /** Campos que acompañan a la decisión (fecha, volumen…), sobre las opciones. */
+  children?: ReactNode;
 };
 
 /**
@@ -44,6 +46,7 @@ export function DecisionModal<V extends string>({
   onConfirm,
   confirming = false,
   error,
+  children,
 }: DecisionModalProps<V>) {
   const [value, setValue] = useState<V | null>(null);
   useReturnFocus(open);
@@ -83,6 +86,7 @@ export function DecisionModal<V extends string>({
       }
     >
       <div className="grid grid-cols-1 gap-4">
+        {children}
         <div role="group" aria-label="Opciones" className="grid gap-3 sm:grid-cols-2">
           {options.map((o) => {
             const selected = o.value === value;

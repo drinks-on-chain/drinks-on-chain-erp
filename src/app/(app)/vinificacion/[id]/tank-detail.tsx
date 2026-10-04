@@ -17,8 +17,16 @@ import {
   Skeleton,
 } from "@drinks-on-chain/ui";
 import { PageChrome } from "@/components/page-chrome";
+import { VoidedBadge, VoidedText } from "@/components/voided";
+import { CorrectRecordButton } from "@/features/lotes/components/correction-dialog";
+import { activeOnly, isVoided } from "@/lib/erp/voided";
 import { ScreenTitle } from "@/components/screen-title";
 import { LogForm } from "@/features/vinificacion/components/log-form";
+import {
+  CleanTankButton,
+  CompleteFermentationButton,
+  StartFermentationButton,
+} from "@/features/vinificacion/components/tank-actions";
 import { TreatmentForm } from "@/features/vinificacion/components/treatment-form";
 import { TrendSparkline } from "@/features/vinificacion/components/trend-sparkline";
 import {
@@ -33,11 +41,11 @@ import {
 } from "@/features/vinificacion/tank-model";
 import { ApiError, errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
-import { useAgings, useHarvestBatches, useProductions, useTank, useTerroirs } from "@/lib/erp/hooks";
+import { useAgings, useHarvestBatches, useLot, useProductions, useTank, useTerroirs } from "@/lib/erp/hooks";
 import { DESTINATION, TANK_STATUS, TREATMENT_TYPE } from "@/lib/erp/labels";
 import { can } from "@/lib/erp/permissions";
 import { today } from "@/lib/erp/today";
-import { fmtDate, fmtDateTime, fmtLiters, fmtNumber } from "@/lib/format";
+import { fmtDate, fmtDateTime, fmtKg, fmtLiters, fmtNumber } from "@/lib/format";
 
 const orDash = (n: number | null | undefined, digits = 0, suffix = "") =>
   n === null || n === undefined ? "—" : `${fmtNumber(n, digits)}${suffix}`;
@@ -47,8 +55,10 @@ export function TankDetail({ id }: { id: string }) {
   const tank = useTank(id);
   const harvest = useHarvestBatches();
   const terroirs = useTerroirs();
-  const agings = useAgings();
-  const productions = useProductions();
+  // Crianza y destilación solo las leen dirección, enología y contabilidad.
+  const agings = useAgings(can(me.data, "aging.read"));
+  const productions = useProductions({}, can(me.data, "distillation.read"));
+  const lot = useLot(tank.data?.lotId ?? "", !!tank.data?.lotId);
   const [logOpen, setLogOpen] = useState(false);
   const [treatmentOpen, setTreatmentOpen] = useState(false);
 
@@ -102,7 +112,11 @@ export function TankDetail({ id }: { id: string }) {
   const terroir = terroirOfHarvest(lookup, t.harvestBatchId);
   const logs = sortLogsDesc(t.logs);
   const treatments = [...(t.treatments ?? [])].sort((a, b) => b.appliedAt.localeCompare(a.appliedAt));
-  const last = logs[0];
+  // Las lecturas anuladas siguen en la bitácora (tachadas), pero no cuentan para la última
+  // lectura, la alerta de temperatura ni las gráficas.
+  const activeLogs = activeOnly(logs);
+  const last = activeLogs[0];
+  const lotLabel = lot.data ? `${lot.data.name} · ${lot.data.reference}` : `Tanque ${t.tankCode}`;
   const hot = t.status === "FERMENTING" && isHot(last);
   const day = fermentationDay(t, today());
   const status = TANK_STATUS[t.status];
@@ -111,6 +125,9 @@ export function TankDetail({ id }: { id: string }) {
     step?.available && can(me.data, step.kind === "crianza" ? "aging.create" : "distillation.create") ? step : null;
   const canLog = can(me.data, "tank.log") && (t.status === "FILLING" || t.status === "FERMENTING");
   const canTreat = can(me.data, "tank.treatment") && t.status !== "CLEANED" && t.status !== "TRANSFERRED";
+  // Las transiciones del tanque (iniciar, completar, limpiar) son de enología y dirección.
+  const canTransition = can(me.data, "tank.create");
+  const inputs = t.inputs ?? [];
 
   // Una sola acción principal: la bitácora mientras fermenta; si no, el siguiente paso.
   const primary = canLog ? (
@@ -161,36 +178,88 @@ export function TankDetail({ id }: { id: string }) {
             items={[
               {
                 term: "Lote",
-                value: h ? (
-                  <Link className="text-accent-text hover:underline" href={`/vendimia/${h.id}`}>
-                    {h.harvestBatchCode}
+                value: t.lotId ? (
+                  <Link className="text-accent-text hover:underline" href={`/lotes/${t.lotId}`}>
+                    {lot.data ? `${lot.data.name} · ${lot.data.reference}` : "Ver lote"}
                   </Link>
                 ) : (
                   "—"
                 ),
               },
+              {
+                term: inputs.length > 1 ? "Pesajes" : "Pesaje",
+                value:
+                  inputs.length > 0 ? (
+                    <span className="grid gap-0.5">
+                      {inputs.map((i) => {
+                        const code = lookup.harvestById.get(i.harvestBatchId)?.harvestBatchCode ?? "Pesaje";
+                        return (
+                          <span key={i.harvestBatchId}>
+                            <Link className="text-accent-text hover:underline" href={`/vendimia/${i.harvestBatchId}`}>
+                              {code}
+                            </Link>{" "}
+                            · {fmtKg(i.kg)}
+                          </span>
+                        );
+                      })}
+                    </span>
+                  ) : h ? (
+                    <Link className="text-accent-text hover:underline" href={`/vendimia/${h.id}`}>
+                      {h.harvestBatchCode}
+                    </Link>
+                  ) : (
+                    "—"
+                  ),
+              },
               { term: "Parcela", value: terroir ? `${terroir.parcelName} · ${terroir.varietyName}` : "—" },
               { term: "Material", value: t.material ?? "—" },
               { term: "Inicio", value: fmtDate(t.startDate) },
               ...(t.endDate ? [{ term: "Fin", value: fmtDate(t.endDate) }] : []),
+              ...(t.finalVolumeLiters != null
+                ? [{ term: "Volumen final", value: fmtLiters(t.finalVolumeLiters) }]
+                : []),
               ...(day !== null ? [{ term: "Fermentación", value: `Día ${fmtNumber(day)}` }] : []),
-              { term: "Destino", value: t.destinationType ? DESTINATION[t.destinationType] : "Sin destino" },
+              {
+                term: "Destino",
+                value: t.destinationType ? DESTINATION[t.destinationType] : "Se decide al completar la fermentación",
+              },
             ]}
           />
         </Card>
 
         <Card className="grid content-start gap-3 p-5">
           <CardHeader title="Siguiente paso" />
-          {!step ? (
+          {t.status === "FILLING" && (
+            <>
+              <p className="m-0 text-sm text-fg-muted">
+                El mosto aún está entrando. Al iniciar la fermentación empieza la bitácora diaria.
+              </p>
+              {canTransition && <StartFermentationButton tank={t} />}
+            </>
+          )}
+          {t.status === "FERMENTING" && (
+            <>
+              <p className="m-0 text-sm text-fg-muted">
+                Cuando la fermentación termine (densidad estable), complétala: ahí se registra el volumen final y se
+                decide el destino, vino o singani.
+              </p>
+              {canTransition && <CompleteFermentationButton tank={t} />}
+            </>
+          )}
+          {t.status === "CLEANED" && (
+            <p className="m-0 text-sm text-fg-muted">Tanque limpio: su código está libre para otro llenado.</p>
+          )}
+          {(t.status === "COMPLETED" || t.status === "TRANSFERRED") && !step && (
             <p className="m-0 text-sm text-fg-muted">
-              Este tanque no va a crianza ni a destilación: no tiene etapa siguiente en el ERP.
+              Este tanque se cerró sin un destino de vino o singani: no tiene etapa siguiente en el ERP.
             </p>
-          ) : (
+          )}
+          {(t.status === "COMPLETED" || t.status === "TRANSFERRED") && step && (
             <>
               <p className="m-0 text-sm text-fg-muted">
                 {step.kind === "crianza"
-                  ? "El destino fijado al llenar es crianza (vino): la ruta de destilación está bloqueada."
-                  : "El destino fijado al llenar es destilación (singani): la ruta de crianza está bloqueada."}
+                  ? "El destino decidido es crianza (vino): la ruta de destilación está bloqueada."
+                  : "El destino decidido es destilación (singani): la ruta de crianza está bloqueada."}
               </p>
               {step.existing.length > 0 && (
                 <ul className="m-0 grid gap-1 p-0">
@@ -203,41 +272,26 @@ export function TankDetail({ id }: { id: string }) {
                   ))}
                 </ul>
               )}
-              {t.status === "FILLING" && (
-                <p className="m-0 text-sm text-fg-muted">Podrás continuar cuando el tanque esté fermentando.</p>
-              )}
-              {t.status === "FERMENTING" && step.available && (
-                <p className="m-0 text-sm text-fg-muted">
-                  Continúa cuando la fermentación haya concluido (densidad estable).
-                </p>
-              )}
-              {stepAction && canLog && (
-                <Button asChild variant="secondary" iconEnd={<ArrowRight aria-hidden size={16} />}>
-                  <Link href={stepAction.href}>{stepAction.label}</Link>
-                </Button>
-              )}
-              <p className="m-0 text-xs text-fg-subtle">
-                El ERP aún no puede marcar la fermentación como terminada: el backend no expone ese cambio de estado.
-              </p>
+              {t.status === "TRANSFERRED" && canTransition && <CleanTankButton tank={t} />}
             </>
           )}
         </Card>
       </div>
 
-      {logs.length > 0 && (
+      {activeLogs.length > 0 && (
         <Card className="grid gap-6 p-5 md:grid-cols-2">
           <TrendSparkline
             label="Temperatura"
             unit="°C"
             threshold={TEMP_ALERT_C}
             alert={hot}
-            points={logs.map((l) => ({ at: l.recordedAt, value: l.temperatureCelsius }))}
+            points={activeLogs.map((l) => ({ at: l.recordedAt, value: l.temperatureCelsius }))}
           />
           <TrendSparkline
             label="Densidad"
             unit=""
             digits={3}
-            points={logs.flatMap((l) =>
+            points={activeLogs.flatMap((l) =>
               l.specificGravity != null ? [{ at: l.recordedAt, value: l.specificGravity }] : [],
             )}
           />
@@ -247,7 +301,11 @@ export function TankDetail({ id }: { id: string }) {
       <Card>
         <CardHeader
           title="Bitácora"
-          description={`${fmtNumber(logs.length)} ${logs.length === 1 ? "lectura" : "lecturas"}, la más reciente primero`}
+          description={`${fmtNumber(activeLogs.length)} ${activeLogs.length === 1 ? "lectura" : "lecturas"}, la más reciente primero${
+            logs.length > activeLogs.length
+              ? ` · ${fmtNumber(logs.length - activeLogs.length)} ${logs.length - activeLogs.length === 1 ? "anulada" : "anuladas"}`
+              : ""
+          }`}
           divided
           className="px-5 pt-5"
         />
@@ -257,19 +315,42 @@ export function TankDetail({ id }: { id: string }) {
           caption={`Bitácora de ${t.tankCode}`}
           captionHidden
           columns={[
-            { id: "at", header: "Fecha", cell: (l) => fmtDateTime(l.recordedAt) },
+            {
+              id: "at",
+              header: "Fecha",
+              cell: (l) => (
+                <span className="flex flex-wrap items-center gap-2">
+                  <VoidedText voided={isVoided(l)}>{fmtDateTime(l.recordedAt)}</VoidedText>
+                  {isVoided(l) && <VoidedBadge at={l.voidedAt} feminine />}
+                  {!isVoided(l) && (l.correctedFields?.length ?? 0) > 0 && <Badge tone="info">Corregida</Badge>}
+                </span>
+              ),
+            },
             {
               id: "temp",
               header: "Temp. °C",
               numeric: true,
               cell: (l) => (
-                <span className={isHot(l) ? "font-medium text-warning-text" : undefined}>
-                  {fmtNumber(l.temperatureCelsius, 1)}
-                </span>
+                <VoidedText voided={isVoided(l)}>
+                  <span className={!isVoided(l) && isHot(l) ? "font-medium text-warning-text" : undefined}>
+                    {fmtNumber(l.temperatureCelsius, 1)}
+                  </span>
+                </VoidedText>
               ),
             },
-            { id: "sg", header: "Densidad", numeric: true, cell: (l) => orDash(l.specificGravity, 3) },
-            { id: "ph", header: "pH", numeric: true, hideBelow: "md", cell: (l) => orDash(l.phValue, 2) },
+            {
+              id: "sg",
+              header: "Densidad",
+              numeric: true,
+              cell: (l) => <VoidedText voided={isVoided(l)}>{orDash(l.specificGravity, 3)}</VoidedText>,
+            },
+            {
+              id: "ph",
+              header: "pH",
+              numeric: true,
+              hideBelow: "md",
+              cell: (l) => <VoidedText voided={isVoided(l)}>{orDash(l.phValue, 2)}</VoidedText>,
+            },
             {
               id: "co2",
               header: "CO₂ y notas",
@@ -277,6 +358,14 @@ export function TankDetail({ id }: { id: string }) {
               cell: (l) => [l.co2Observations, l.notes].filter(Boolean).join(" · ") || "—",
             },
           ]}
+          rowActions={(l) => (
+            <CorrectRecordButton
+              lotId={t.lotId}
+              lotLabel={lotLabel}
+              voided={isVoided(l)}
+              record={{ id: l.id, type: "FERMENTATION_LOG", label: `Lectura del ${fmtDateTime(l.recordedAt)}` }}
+            />
+          )}
           empty={
             <EmptyState
               bare
@@ -314,10 +403,34 @@ export function TankDetail({ id }: { id: string }) {
           caption={`Tratamientos de ${t.tankCode}`}
           captionHidden
           columns={[
-            { id: "at", header: "Fecha", cell: (x) => fmtDate(x.appliedAt) },
-            { id: "type", header: "Tipo", cell: (x) => TREATMENT_TYPE[x.treatmentType] },
-            { id: "additive", header: "Aditivo", hideBelow: "md", cell: (x) => x.additiveName },
-            { id: "dose", header: "Dosis g/hL", numeric: true, cell: (x) => fmtNumber(x.dosageAppliedGPerHl, 1) },
+            {
+              id: "at",
+              header: "Fecha",
+              cell: (x) => (
+                <span className="flex flex-wrap items-center gap-2">
+                  <VoidedText voided={isVoided(x)}>{fmtDate(x.appliedAt)}</VoidedText>
+                  {isVoided(x) && <VoidedBadge at={x.voidedAt} />}
+                  {!isVoided(x) && (x.correctedFields?.length ?? 0) > 0 && <Badge tone="info">Corregido</Badge>}
+                </span>
+              ),
+            },
+            {
+              id: "type",
+              header: "Tipo",
+              cell: (x) => <VoidedText voided={isVoided(x)}>{TREATMENT_TYPE[x.treatmentType]}</VoidedText>,
+            },
+            {
+              id: "additive",
+              header: "Aditivo",
+              hideBelow: "md",
+              cell: (x) => <VoidedText voided={isVoided(x)}>{x.additiveName}</VoidedText>,
+            },
+            {
+              id: "dose",
+              header: "Dosis g/hL",
+              numeric: true,
+              cell: (x) => <VoidedText voided={isVoided(x)}>{fmtNumber(x.dosageAppliedGPerHl, 1)}</VoidedText>,
+            },
             { id: "total", header: "Total g", numeric: true, hideBelow: "lg", cell: (x) => orDash(x.totalAppliedG, 0) },
             {
               id: "code",
@@ -326,6 +439,14 @@ export function TankDetail({ id }: { id: string }) {
               cell: (x) => <span className="font-mono text-xs">{x.regulatoryAuthCode}</span>,
             },
           ]}
+          rowActions={(x) => (
+            <CorrectRecordButton
+              lotId={t.lotId}
+              lotLabel={lotLabel}
+              voided={isVoided(x)}
+              record={{ id: x.id, type: "TREATMENT", label: `${x.additiveName} del ${fmtDate(x.appliedAt)}` }}
+            />
+          )}
           empty={<EmptyState bare title="Sin tratamientos" description="No se aplicaron aditivos en este tanque." />}
         />
       </Card>

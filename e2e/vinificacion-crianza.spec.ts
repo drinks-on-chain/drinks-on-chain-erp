@@ -81,7 +81,7 @@ test("enóloga de Altos: la crianza en barrica muestra su cuenta regresiva", asy
 
   await page.goto("/crianza");
   await expect(page.getByRole("heading", { name: "Barricas y crianza" })).toBeVisible();
-  const row = page.getByRole("row").filter({ hasText: "Cuartel 1 · La Angostura · Tannat" });
+  const row = page.getByRole("row").filter({ hasText: "BAR-FR-2024-01" });
   await expect(row).toContainText("39 d");
   await row.getByRole("link", { name: "Cuartel 1 · La Angostura · Tannat" }).click();
 
@@ -92,40 +92,171 @@ test("enóloga de Altos: la crianza en barrica muestra su cuenta regresiva", asy
   expect(errors).toEqual([]);
 });
 
-test("enóloga de Altos: llenar un tanque fija el destino con confirmación explícita", async ({ page }) => {
-  const errors = trackErrors(page);
+test("enóloga de Altos: llenar un tanque exige uva aprobada y la bifurcación se decide al completar", async ({
+  page,
+}) => {
+  // Los 422 del dictamen pendiente y de la capacidad son parte del recorrido.
+  const errors = trackErrors(page, [/^422 \/api\/v1\/fermentation-tanks$/]);
   await login(page, "enologa@altos.test");
-  await page.goto("/vinificacion");
+  await page.getByRole("link", { name: "Vinificación", exact: true }).first().click();
   await page.getByRole("link", { name: "Llenar tanque" }).click();
   await expect(page.getByRole("heading", { name: "Llenar tanque" })).toBeVisible();
+  // Solo se ofrece la uva con kilos disponibles; la ya vinificada no aparece.
+  await expect(page.getByRole("checkbox", { name: "HARV-2025-ANGOSTURA-06" })).toHaveCount(0);
 
-  // Un Tannat no puede ir a destilación.
-  await page.getByRole("combobox", { name: "Lote" }).click();
-  await page.getByRole("option", { name: /HARV-2025-ANGOSTURA-06/ }).click();
-  await expect(page.getByText(/La D.O. Singani exige Moscatel de Alejandría/).first()).toBeVisible();
+  // Uva pendiente de dictamen: el servidor la rechaza y el aviso explica la regla del lote.
+  await page.getByRole("checkbox", { name: "HARV-2026-SAUCES-12" }).click();
+  await expect(page.getByLabel("Código del tanque")).toHaveValue("TK-33");
+  await page.getByLabel("Volumen llenado").fill("4.000");
+  await page.getByRole("button", { name: "Llenar tanque" }).first().click();
+  const notice = page.getByTestId("rule-violation-notice");
+  await expect(notice).toContainText("Uva sin dictamen fitosanitario aprobado");
+  await expect(notice).toContainText("Dictamen fitosanitario aprobado para fermentar");
+  await expect(notice).toContainText("Pendiente de inspección");
+  await expect(notice).toContainText("TRC_PHYTO_NOT_APPROVED");
 
-  await page.getByRole("combobox", { name: "Lote" }).click();
-  await page.getByRole("option", { name: /HARV-2026-SAUCES-07/ }).click();
-  await expect(page.getByText("Apto para Singani D.O.")).toBeVisible();
-  await expect(page.getByLabel("Código del tanque")).toHaveValue("TK-11");
+  // Se aprueba el pesaje y se vuelve a llenar el tanque, ya con la uva elegida.
+  await page.getByRole("link", { name: "Vendimia y laboratorio", exact: true }).first().click();
+  await page.getByRole("link", { name: "HARV-2026-SAUCES-12", exact: true }).click();
+  await page.getByRole("button", { name: "Aprobar lote" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Sí, aprobar" }).click();
+  await expect(page.getByText("Lote aprobado").first()).toBeVisible();
+  await page.getByRole("link", { name: "Llenar tanque" }).first().click();
+  await expect(page.getByRole("checkbox", { name: "HARV-2026-SAUCES-12" })).toBeChecked();
+
+  // La capacidad la comprueba el servidor.
   await page.getByLabel("Capacidad").fill("8000");
   await page.getByLabel("Volumen llenado").fill("9000");
-  await page.getByRole("button", { name: "Llenar tanque" }).click();
-  await expect(page.getByText("El volumen supera la capacidad del tanque.")).toBeVisible();
+  await page.getByRole("button", { name: "Llenar tanque" }).first().click();
+  await expect(notice).toContainText("El llenado supera la capacidad");
+  await expect(notice).toContainText("TRC_TANK_CAPACITY_EXCEEDED");
   await page.getByLabel("Volumen llenado").fill("6.500");
-  await page.getByRole("button", { name: "Llenar tanque" }).click();
+  await page.getByRole("button", { name: "Llenar tanque" }).first().click();
 
-  const modal = page.getByRole("dialog", { name: "Destino técnico de este lote" });
+  await expect(page.getByRole("heading", { name: "TK-33" })).toBeVisible();
+  await expect(page.getByText("Se decide al completar la fermentación", { exact: true })).toBeVisible();
+  // Mientras fermenta no hay paso siguiente: antes hay que completar la fermentación.
+  await expect(page.getByRole("link", { name: "Pasar a destilación" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Completar fermentación" }).click();
+  const modal = page.getByRole("dialog", { name: "Completar la fermentación de TK-33" });
   await expect(modal).toBeVisible();
-  const confirm = modal.getByRole("button", { name: "Confirmar destino y llenar" });
+  const confirm = modal.getByRole("button", { name: "Confirmar destino y completar" });
   await expect(confirm).toBeDisabled();
   await modal.getByRole("button", { name: /A destilación/ }).click();
   await expect(confirm).toBeDisabled();
   await modal.getByRole("checkbox").click();
+  await modal.getByLabel("Volumen final").fill("6.300");
   await confirm.click();
 
-  await expect(page.getByRole("heading", { name: "TK-11" })).toBeVisible();
+  await expect(modal).toBeHidden();
   await expect(page.getByText("Destino: Destilación (singani)", { exact: true })).toBeVisible();
+  await expect(page.getByText("Fermentación terminada").first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Pasar a destilación" })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("enóloga de Altos: el destino debe coincidir con el tipo del lote", async ({ page }) => {
+  const errors = trackErrors(page, [/^422 \/api\/v1\/fermentation-tanks\/[\w-]+\/complete$/]);
+  await login(page, "enologa@altos.test");
+  await page.getByRole("link", { name: "Vinificación", exact: true }).first().click();
+  // TK-10 fermenta uva de un lote que ya es de vino.
+  await page.getByTestId("tank-card").filter({ hasText: "TK-10" }).click();
+  await expect(page.getByRole("heading", { name: "TK-10" })).toBeVisible();
+  await page.getByRole("button", { name: "Completar fermentación" }).click();
+  const modal = page.getByRole("dialog", { name: "Completar la fermentación de TK-10" });
+  await modal.getByRole("button", { name: /A destilación/ }).click();
+  await modal.getByRole("checkbox").click();
+  await modal.getByRole("button", { name: "Confirmar destino y completar" }).click();
+  const notice = modal.getByTestId("rule-violation-notice");
+  await expect(notice).toContainText("El destino no coincide con el tipo del lote");
+  await expect(notice).toContainText("Crianza (vino)");
+  await expect(notice).toContainText("TRC_DESTINATION_MISMATCH");
+
+  // Con el destino del lote, la fermentación se completa.
+  await modal.getByRole("button", { name: /A crianza/ }).click();
+  await modal.getByRole("button", { name: "Confirmar destino y completar" }).click();
+  await expect(modal).toBeHidden();
+  await expect(page.getByText("Destino: Crianza (vino)", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Pasar a crianza" })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("enóloga de Altos: la crianza respeta el mínimo de meses y el volumen del tanque, y queda con su candado", async ({
+  page,
+}) => {
+  const errors = trackErrors(page, [/^422 \/api\/v1\/wine-aging$/]);
+  await login(page, "enologa@altos.test");
+  await page.getByRole("link", { name: "Vinificación", exact: true }).first().click();
+  await page.getByTestId("tank-card").filter({ hasText: "TK-10" }).click();
+  await page.getByRole("button", { name: "Completar fermentación" }).click();
+  const modal = page.getByRole("dialog", { name: "Completar la fermentación de TK-10" });
+  await modal.getByRole("button", { name: /A crianza/ }).click();
+  await modal.getByRole("checkbox").click();
+  await modal.getByLabel("Volumen final").fill("3.800");
+  await modal.getByRole("button", { name: "Confirmar destino y completar" }).click();
+  await expect(modal).toBeHidden();
+
+  await page.getByRole("link", { name: "Pasar a crianza" }).click();
+  await expect(page.getByRole("heading", { name: "Iniciar crianza" })).toBeVisible();
+  // El volumen parte del vino que dejó la fermentación.
+  await expect(page.getByLabel("Volumen")).toHaveAttribute("placeholder", "3800");
+  await page.getByLabel("Código").fill("BAR-FR-2026-11");
+  const notice = page.getByTestId("rule-violation-notice");
+
+  // Altos fija 6 meses de crianza mínima en las reglas del lote: menos, lo rechaza el servidor.
+  await expect(page.getByText("Mínimo de las reglas del lote: 6 meses.", { exact: false })).toBeVisible();
+  await page.getByLabel("Meses previstos").fill("3");
+  await page.getByRole("button", { name: "Iniciar crianza" }).first().click();
+  await expect(notice).toContainText("TRC_AGING_BELOW_MINIMUM");
+  await expect(notice).toContainText("Crianza por debajo del mínimo");
+  await expect(notice).toContainText("6 meses");
+  await expect(notice).toContainText("3 meses");
+  await page.getByLabel("Meses previstos").fill("6");
+
+  // Más litros de los que quedan en el tanque: lo rechaza el servidor.
+  await page.getByLabel("Volumen").fill("9.000");
+  await page.getByRole("button", { name: "Iniciar crianza" }).first().click();
+  await expect(notice).toContainText("TRC_VOLUME_EXCEEDS_AVAILABLE");
+  await expect(notice).toContainText("3.800 L");
+  await expect(notice).toContainText("9.000 L");
+
+  await page.getByLabel("Volumen").fill("3.700");
+  await page.getByRole("button", { name: "Iniciar crianza" }).first().click();
+  await expect(page.getByText("Crianza iniciada", { exact: true })).toBeVisible();
+  await expect(page.getByText("Vino en crianza")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Pasar a embotellado" })).toBeDisabled();
+  await expect(page.getByText(/Crianza de 6 meses fijada para el lote/)).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("enóloga de Cinti Viejo: cerrar la destilación comprueba el balance de masa y abre el reposo", async ({
+  page,
+}) => {
+  const errors = trackErrors(page, [/^422 \/api\/v1\/production-batches\/[\w-]+\/close$/]);
+  await login(page, "enologa@cintiviejo.test");
+  await page.getByRole("link", { name: "Destilación y reposo", exact: true }).first().click();
+  const open = page.getByRole("row").filter({ hasText: "TK-12" });
+  await expect(open).toContainText("Abierta");
+  await open.getByRole("link").first().click();
+
+  const form = page.getByRole("form", { name: "Cerrar destilación" });
+  await expect(page.getByText(/El reposo obligatorio empieza al cerrar la destilación: 180 días/)).toBeVisible();
+  // Cortes que suman más que el vino base que entró: balance de masa imposible.
+  await form.getByLabel("Cabezas").fill("100");
+  await form.getByRole("textbox", { name: "Corazón", exact: true }).fill("90.000");
+  await form.getByLabel("Colas").fill("200");
+  await form.getByLabel("Grado del corazón").fill("62");
+  await form.getByRole("button", { name: "Cerrar destilación" }).click();
+  const notice = form.getByTestId("rule-violation-notice");
+  await expect(notice).toContainText("TRC_MASS_BALANCE_EXCEEDED");
+
+  await form.getByRole("textbox", { name: "Corazón", exact: true }).fill("1.000");
+  await form.getByRole("button", { name: "Cerrar destilación" }).click();
+  await expect(page.getByText("Destilación cerrada", { exact: true })).toBeVisible();
+  await expect(page.getByText("Lote inmovilizado por normativa")).toBeVisible();
+  await expect(page.getByTestId("countdown-days")).toHaveText(/^180\s*días$/);
+  await expect(page.getByRole("button", { name: "Pasar a embotellado" })).toBeDisabled();
+  await expect(page.getByText("1.000 L").first()).toBeVisible();
   expect(errors).toEqual([]);
 });

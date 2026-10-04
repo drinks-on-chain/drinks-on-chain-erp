@@ -1,15 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { Badge, Button, Card, CardHeader, EmptyState, ErrorState, KeyValueList, Skeleton } from "@drinks-on-chain/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  CardHeader,
+  EmptyState,
+  ErrorState,
+  KeyValueList,
+  Skeleton,
+  toast,
+} from "@drinks-on-chain/ui";
 import { PageChrome } from "@/components/page-chrome";
+import { ReasonAction } from "@/components/reason-action";
 import { ScreenTitle } from "@/components/screen-title";
 import { agingLock } from "@/features/crianza/aging-model";
 import { CountdownLock } from "@/features/crianza/components/countdown-lock";
+import { lockRuleText } from "@/features/lotes/lot-model";
 import { lotLookup, lotName } from "@/features/vinificacion/tank-model";
 import { ApiError, errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
-import { useAging, useHarvestBatches, useTanks, useTerroirs } from "@/lib/erp/hooks";
+import { useAging, useDiscardAging, useHarvestBatches, useLot, useTanks, useTerroirs } from "@/lib/erp/hooks";
 import { AGING_STATUS } from "@/lib/erp/labels";
 import { can } from "@/lib/erp/permissions";
 import { today } from "@/lib/erp/today";
@@ -21,6 +33,8 @@ export function AgingDetail({ id }: { id: string }) {
   const tanks = useTanks();
   const harvest = useHarvestBatches();
   const terroirs = useTerroirs();
+  const discard = useDiscardAging();
+  const lot = useLot(aging.data?.lotId ?? "", !!aging.data?.lotId);
 
   const a = aging.data;
   const tank = a ? tanks.data?.items.find((t) => t.id === a.fermentationTankId) : undefined;
@@ -69,8 +83,11 @@ export function AgingDetail({ id }: { id: string }) {
     );
   }
 
+  // Días que faltan y liberación: los del servidor (`lock`), con la instantánea del lote y su reloj.
   const lock = agingLock(a, today());
   const released = a.agingStatus === "AGING" && lock.released;
+  const open = a.agingStatus === "AGING" || a.agingStatus === "READY";
+  const canDiscard = open && can(me.data, "aging.create");
   const status = released ? AGING_STATUS.READY : AGING_STATUS[a.agingStatus];
   const h = tank ? lookup.harvestById.get(tank.harvestBatchId) : undefined;
   const closed =
@@ -97,10 +114,24 @@ export function AgingDetail({ id }: { id: string }) {
               { term: "Madera o material", value: a.containerMaterial ?? "—" },
               { term: "Código", value: a.containerCode ?? "—" },
               { term: "Ciclo de uso", value: a.barrelUseCycle ? `Uso ${fmtNumber(a.barrelUseCycle)}` : "—" },
+              ...(a.containerCount ? [{ term: "Recipientes", value: fmtNumber(a.containerCount) }] : []),
               { term: "Volumen", value: a.volumeLiters != null ? fmtLiters(a.volumeLiters) : "—" },
+              ...(a.availableLiters != null && open
+                ? [{ term: "Disponible para embotellar", value: fmtLiters(a.availableLiters) }]
+                : []),
               { term: "Meses previstos", value: fmtNumber(a.plannedMonths) },
               { term: "Inicio", value: fmtDate(lock.startDate) },
-              { term: "Liberación", value: fmtDate(a.lockUntilDate) },
+              { term: "Liberación", value: fmtDate(lock.unlockAt) },
+              {
+                term: "Lote",
+                value: a.lotId ? (
+                  <Link className="text-accent-text hover:underline" href={`/lotes/${a.lotId}`}>
+                    {lot.data ? `${lot.data.name} · ${lot.data.reference}` : "Ver lote"}
+                  </Link>
+                ) : (
+                  "—"
+                ),
+              },
               {
                 term: "Tanque de origen",
                 value: tank ? (
@@ -126,18 +157,41 @@ export function AgingDetail({ id }: { id: string }) {
           />
         </Card>
 
-        <CountdownLock
-          daysRemaining={lock.daysRemaining}
-          progress={lock.progress}
-          title="Vino en crianza"
-          reason={`Crianza de ${fmtNumber(a.plannedMonths)} ${a.plannedMonths === 1 ? "mes" : "meses"} en ${a.containerType.toLowerCase()}${a.containerMaterial ? ` de ${a.containerMaterial.toLowerCase()}` : ""}.`}
-          releaseDate={a.lockUntilDate}
-          startDate={lock.startDate}
-          startLabel="inicio de la crianza"
-          action={{ label: "Pasar a embotellado", href: `/envasado/nuevo?crianza=${a.id}` }}
-          hideAction={!can(me.data, "bottling.create")}
-          closedNote={closed}
-        />
+        <div className="grid content-start gap-4">
+          <CountdownLock
+            daysRemaining={lock.daysRemaining}
+            progress={lock.progress}
+            title="Vino en crianza"
+            reason={
+              a.lock
+                ? `${lockRuleText(a.lock)}.`
+                : `Crianza de ${fmtNumber(a.plannedMonths)} ${a.plannedMonths === 1 ? "mes" : "meses"} en ${a.containerType.toLowerCase()}.`
+            }
+            releaseDate={lock.unlockAt}
+            startDate={lock.startDate}
+            startLabel="inicio de la crianza"
+            action={{
+              label: "Pasar a embotellado",
+              href: a.lotId ? `/lotes/${a.lotId}/embotellar` : `/envasado/nuevo?crianza=${a.id}`,
+            }}
+            hideAction={!can(me.data, "bottling.create")}
+            closedNote={closed}
+          />
+          {canDiscard && (
+            <ReasonAction
+              label="Descartar crianza"
+              title={`¿Descartar la crianza ${a.containerCode ?? a.containerType}?`}
+              description="El vino de esta crianza deja de contar para el embotellado del lote. No se puede deshacer; el motivo queda en la línea de tiempo."
+              confirmLabel="Sí, descartar"
+              destructive
+              variant="tertiary"
+              onConfirm={async (reason) => {
+                await discard.mutateAsync({ id: a.id, body: { reason } });
+                toast({ title: "Crianza descartada", tone: "success" });
+              }}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { api, bootstrapSession, logoutSession, setSessionEndedHandler } from "./client";
+import {
+  api,
+  apiFile,
+  bootstrapSession,
+  filenameFromDisposition,
+  logoutSession,
+  setSessionEndedHandler,
+} from "./client";
 import { ApiError, ContractError, NetworkError, errorMessage } from "./errors";
 import { pageSchema, toPage } from "./envelope";
 import { fetchAllPages } from "./pagination";
@@ -372,5 +379,71 @@ describe("fetchAllPages", () => {
     const empty = vi.fn(async () => ({ items: [], total: 50, limit: 100, offset: 0 }));
     await expect(fetchAllPages(empty)).resolves.toMatchObject({ items: [] });
     expect(empty).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("idempotencia y archivos", () => {
+  const fetchMock = vi.fn<typeof fetch>();
+  const headersOf = () => fetchMock.mock.calls[0]![1]!.headers as Record<string, string>;
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", fetchMock);
+    resetSessionForTests();
+    clearSession();
+  });
+  afterEach(() => {
+    fetchMock.mockReset();
+    vi.unstubAllGlobals();
+  });
+
+  it("envía Idempotency-Key solo cuando se pide", async () => {
+    fetchMock.mockResolvedValueOnce(ok({ id: "1" }, 201));
+    await api("/v1/harvest-batches", {
+      method: "POST",
+      body: { kg: 1 },
+      idempotencyKey: "0b3f8c1e-0000-4000-8000-000000000001",
+    });
+    expect(headersOf()["Idempotency-Key"]).toBe("0b3f8c1e-0000-4000-8000-000000000001");
+
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(ok({ id: "1" }, 201));
+    await api("/v1/terroirs", { method: "POST", body: {} });
+    expect(headersOf()).not.toHaveProperty("Idempotency-Key");
+  });
+
+  it("apiFile devuelve el archivo sin envoltorio, con su nombre y sus filas", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response("serial,code\r\n1,K7M2Q9XM\r\n", {
+        status: 200,
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": 'attachment; filename="codigos-CVJ-2026-SINGANI-004.csv"',
+          "X-Export-Rows": "1",
+        },
+      }),
+    );
+    const file = await apiFile("/v1/lots/l1/bottle-codes/export", { query: { format: "csv", fromSerial: 1 } });
+    expect(String(fetchMock.mock.calls[0]![0])).toBe("/api/v1/lots/l1/bottle-codes/export?format=csv&fromSerial=1");
+    expect(file.filename).toBe("codigos-CVJ-2026-SINGANI-004.csv");
+    expect(file.contentType).toContain("text/csv");
+    expect(file.rows).toBe(1);
+    expect(await file.blob.text()).toBe("serial,code\r\n1,K7M2Q9XM\r\n");
+  });
+
+  it("apiFile lanza el error del envoltorio (p. ej. el lote sin embotellar)", async () => {
+    fetchMock.mockResolvedValueOnce(fail(409, "TRC_LOT_NOT_BOTTLED", "El lote aún no está embotellado"));
+    await expect(apiFile("/v1/lots/l1/bottle-codes/export")).rejects.toMatchObject({
+      status: 409,
+      code: "TRC_LOT_NOT_BOTTLED",
+    });
+  });
+
+  it("lee el nombre de Content-Disposition en sus dos formas", () => {
+    expect(filenameFromDisposition('attachment; filename="reporte-de-produccion.csv"')).toBe(
+      "reporte-de-produccion.csv",
+    );
+    expect(filenameFromDisposition("attachment; filename*=UTF-8''c%C3%B3digos.csv")).toBe("códigos.csv");
+    expect(filenameFromDisposition("attachment")).toBeNull();
+    expect(filenameFromDisposition(null)).toBeNull();
   });
 });
