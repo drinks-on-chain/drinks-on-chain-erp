@@ -36,9 +36,12 @@ const LISTS: { path: string; nav: string; empty: string[]; content: RegExp }[] =
   { path: "/destilacion", nav: "Destilación y reposo", empty: ["Ninguna destilación todavía"], content: /Alambique/ },
   { path: "/envasado", nav: "Envasado y QR", empty: ["Aún no hay embotellados"], content: /CVJ-2026-/ },
   { path: "/reportes", nav: "Reportes", empty: ["Aún no hay lotes"], content: /Singani/ },
-  // La cuenta de la bodega no es una lista: el escenario `empty` de los mocks no la vacía. Sus
-  // estados vacíos se prueban en cuenta-bodega.spec.ts (identidad preparándose, sin NFT).
-  { path: "/cuenta", nav: "Cuenta de la bodega", empty: [], content: /Identidad en la red/ },
+  {
+    path: "/cuenta",
+    nav: "Cuenta de la bodega",
+    empty: ["Aún no hay NFT emitidos", "Ningún expediente anclado todavía", "Sin transacciones todavía"],
+    content: /Identidad en la red/,
+  },
   { path: "/equipo", nav: "Equipo", empty: ["Sin miembros"], content: /cintiviejo\.test/ },
 ];
 

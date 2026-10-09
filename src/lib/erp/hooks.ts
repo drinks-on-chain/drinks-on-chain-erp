@@ -7,13 +7,7 @@ import type { Page } from "@/lib/api/envelope";
 import { ApiError } from "@/lib/api/errors";
 import { createIdempotencyKeys, withIdempotency } from "@/lib/api/idempotency";
 import { useMe } from "@/lib/auth/hooks";
-import {
-  CHAIN_POLL_MS,
-  anchorInProgress,
-  chainAccountInProgress,
-  collectionInProgress,
-  lotTokenizationInProgress,
-} from "./chain";
+import { CHAIN_POLL_MS, anchorInProgress, chainAccountInProgress, collectionInProgress, isRouteMissing } from "./chain";
 import { erpKeys } from "./keys";
 import { can } from "./permissions";
 import {
@@ -236,17 +230,26 @@ export const useAudit = (q: AuditQuery, enabled = true) =>
 // Cadena y tokenización (contrato de la Ola 3). Las consultas con transacciones incrustadas se
 // repiten cada 5 s mientras alguna siga en curso, y solo entonces (§2.4).
 
-/** Cuenta de la bodega en la red (1F): identidad, NFT por lote, anclajes y últimas transacciones. */
+/**
+ * Cuenta de la bodega en la red (1F): identidad, NFT por lote, anclajes y últimas transacciones.
+ * `null` si el backend aún no tiene la ruta (404 o 501, antes de desplegar la Ola 3): la pantalla
+ * lo dice sin error y no se reintenta.
+ */
 export const useChainAccount = (enabled = true) =>
   useQuery({
     queryKey: erpKeys.chainAccount(),
-    queryFn: ({ signal }) => erpApi.chainAccount(signal),
+    queryFn: ({ signal }) =>
+      erpApi.chainAccount(signal).catch((error: unknown) => {
+        if (isRouteMissing(error)) return null;
+        throw error;
+      }),
     enabled,
     refetchInterval: (query) => (query.state.data && chainAccountInProgress(query.state.data) ? CHAIN_POLL_MS : false),
   });
 /**
  * Estado de tokenización del lote: límite, bloqueos, solicitud abierta, colección e historial. La
- * solicitud la decide otra persona (el back office): se vuelve a pedir cada vez que se abre.
+ * solicitud la decide otra persona (el back office): se vuelve a pedir cada vez que se abre. Las
+ * transacciones las sigue la colección (`useCollection`), que refresca el resto al terminar.
  */
 export const useLotTokenization = (lotId: string, enabled = true) =>
   useQuery({
@@ -254,8 +257,6 @@ export const useLotTokenization = (lotId: string, enabled = true) =>
     queryFn: ({ signal }) => erpApi.lotTokenization(lotId, signal),
     enabled,
     staleTime: 0,
-    refetchInterval: (query) =>
-      query.state.data && lotTokenizationInProgress(query.state.data) ? CHAIN_POLL_MS : false,
   });
 /** Solicitudes de tokenización de la bodega, paginadas en el servidor. */
 export const useTokenizationRequests = (q: TokenizationRequestQuery, enabled = true) =>

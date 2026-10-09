@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { axe, login, logout, setDataScenario, settleChain, settled, trackErrors } from "./support";
+import { advanceChain, axe, login, logout, setDataScenario, settleChain, settled, trackErrors } from "./support";
 
 // 1K · «Autorizar tokenización» (contrato de la Ola 3 §5, §6 y §14) contra los mocks 0.6. El back
 // office no es del ERP: sus pasos (tomar, pedir cambios, aprobar) se hacen por la API de los mocks
@@ -449,6 +449,44 @@ test("solicitudes de la bodega, su ficha y el bloque del panel", async ({ page }
   await expect(requestPanel(page)).toHaveAttribute("data-status", "WITHDRAWN");
   await expect(requestPanel(page)).toContainText("Solicitud retirada por la bodega");
   await expect(requestPanel(page).getByRole("list", { name: "Pasos de la solicitud" })).toContainText("Retirada");
+  await settled(page);
+  expect(await axe(page)).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test("emisión en espera: aprobada pero sin emitir todavía, explicado sin alarmar", async ({ page }) => {
+  test.setTimeout(60_000);
+  const errors = trackErrors(page);
+  await login(page, "admin@cintiviejo.test", { manualChain: true });
+  // La plataforma aún no tiene habilitada la emisión (ADR-011) cuando operaciones aprueba.
+  await page.evaluate(() =>
+    (
+      window as unknown as { __docMocks: { chain: { setMintEnabled: (on: boolean) => void } } }
+    ).__docMocks.chain.setMintEnabled(false),
+  );
+  const ops = await apiSession(page, "operaciones@drinksonchain.test");
+  const request = await openRequestOf(ops, "Singani El Molino 2026");
+  expect(request.status).toBe("IN_REVIEW");
+  const approved = await ops({
+    method: "POST",
+    path: `/platform/tokenization-requests/${request.id}/approve`,
+    body: {},
+    idempotent: true,
+  });
+  expect(approved.status).toBe(201);
+  await advanceChain(page, 3);
+
+  await nav(page, "Lotes");
+  await page.getByRole("link", { name: "Singani El Molino 2026", exact: true }).click();
+  await page.getByRole("tab", { name: "Tokenización" }).click();
+
+  const collection = collectionPanel(page);
+  const hold = collection.getByTestId("mint-hold");
+  await expect(hold).toContainText("Emisión en espera");
+  await expect(hold).toContainText("no tienes que hacer nada");
+  await expect(collection.locator("[data-mint]").first()).toContainText("En espera");
+  await expect(collection).not.toContainText("falló");
+  await expect(collection.getByRole("alert")).toHaveCount(0);
   await settled(page);
   expect(await axe(page)).toEqual([]);
   expect(errors).toEqual([]);

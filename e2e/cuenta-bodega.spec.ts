@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { login, setDataScenario, settleChain, trackErrors } from "./support";
+import { axe, login, setDataScenario, settleChain, settled, trackErrors } from "./support";
 
 // 1F · Cuenta de la bodega (contrato de la Ola 3 §3.4) contra los mocks 0.6: identidad en la red,
 // NFT por lote, anclajes y últimas transacciones, con los enlaces al explorador que da el servidor.
@@ -56,7 +56,7 @@ test("Cuenta de la bodega: identidad, NFT por lote, anclajes y transacciones", a
   const txs = page.getByRole("table", { name: "Últimas transacciones de la bodega" });
   await expect(txs.getByRole("row", { name: /Emisión de NFT/ }).first()).toContainText("Confirmada");
   await expect(txs.getByRole("row", { name: /Creación de la cuenta/ })).toContainText("Confirmada");
-  await expect(page.getByText(/Las comisiones de la red las paga Drinks on Chain: 0,36093 XLM/)).toBeVisible();
+  await expect(page.getByText(/Las comisiones de la red las paga Drinks on Chain: [\d.,]+ XLM desde el/)).toBeVisible();
 
   // Del lote de la cuenta al anclaje en su expediente.
   await anchored.getByRole("link", { name: "Singani Gran Reserva 2026" }).click();
@@ -119,5 +119,31 @@ test("anclaje pendiente: el expediente lo muestra en cola y pasa a anclado cuand
   await expect(anchor).toHaveAttribute("data-anchor", "ANCHORED", { timeout: 15_000 });
   await expect(anchor).toContainText("Confirmada");
   await expect(page.getByRole("heading", { level: 1 }).locator("..")).toContainText("Anclado en la red");
+  expect(errors).toEqual([]);
+});
+
+test("bodega activa sin cuenta en la red: se dice con honestidad, sin enlaces ni datos inventados", async ({
+  page,
+}) => {
+  const errors = trackErrors(page);
+  await setDataScenario(page, "identidad-sin-aprovisionar");
+  await login(page, "admin@altos.test", { manualChain: true });
+  await nav(page, "Cuenta de la bodega");
+
+  const identity = page.getByRole("group", { name: "Identidad en la red" });
+  await expect(identity).toHaveAttribute("data-identity", "NOT_PROVISIONED");
+  await expect(identity).toContainText("Sin cuenta en la red");
+  await expect(identity).toContainText("Tu bodega aún no tiene cuenta en la red");
+  await expect(identity.getByRole("link")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Aún no hay NFT emitidos" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sin transacciones todavía" })).toBeVisible();
+  await settled(page);
+  expect(await axe(page)).toEqual([]);
+
+  // En la ficha de un lote, la tokenización avisa de que sin cuenta no se puede aprobar ni emitir.
+  await nav(page, "Lotes");
+  await page.getByRole("link", { name: "Singani El Portillo 2025", exact: true }).click();
+  await page.getByRole("tab", { name: "Tokenización" }).click();
+  await expect(page.getByText("Cuenta de la bodega en la red: sin cuenta en la red")).toBeVisible();
   expect(errors).toEqual([]);
 });

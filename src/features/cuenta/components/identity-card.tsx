@@ -146,3 +146,18 @@ export function IdentityCard({ identity }: { identity: WineryChainIdentity }) {
     </Card>
   );
 }
+
+/**
+ * El backend todavía no sirve la cuenta de la bodega (aún no desplegó la Ola 3): no hay cuenta que
+ * mostrar, y se dice así en lugar de un error con reintento.
+ */
+export function ChainAccountUnavailable() {
+  return (
+    <div className="max-w-4xl" data-testid="chain-account-unavailable">
+      <Alert tone="neutral" title="Tu bodega todavía no tiene cuenta en la red">
+        Drinks on Chain aún no ha activado la cuenta de las bodegas en la red Stellar. Cuando lo haga, aquí verás la
+        cuenta de tu bodega, su contrato de NFT y sus transacciones. No tienes que hacer nada.
+      </Alert>
+    </div>
+  );
+}

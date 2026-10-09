@@ -179,4 +179,6 @@ Contrato: `plan/contratos/o3-tokenizacion.md` del plan maestro (§0, §2.3–§2
 - [x] «Editar estimación» en la ficha del lote (`PATCH /v1/lots/{id}` con motivo), con el aviso de `TOK_ESTIMATE_BELOW_MINTED` · 2026-10-09
 - [x] Permisos del contrato §10: dirección autoriza; enología y contabilidad leen; agronomía y operación solo ven la marca · 2026-10-09
 - [x] Pruebas: unitarias del modelo (`tokenization-model.ts`), de los `TOK_…`, de la bandera y del panel; e2e `tokenizacion.spec.ts` (autorizar 100 → cambios pedidos → reenviar → aprobada y emitida con el reloj de la red → ampliar a 150 → cuenta de la bodega; cuota mayor que la estimación, enóloga sin botón, segunda solicitud abierta, emisión fallida, estimación bajo lo emitido, faltante) con axe · 2026-10-09
+- [x] `@drinks-on-chain/mocks` 0.6.0-rc.2: vacío de `/cuenta` con el escenario `empty`, bodega activa sin cuenta (`identidad-sin-aprovisionar`), emisión en espera (`CHN_MINT_DISABLED`, `CHN_WINERY_NOT_ACTIVE`) explicada sin alarmar y sin consulta cada 5 s · 2026-10-09
+- [x] `/cuenta` degrada sin error cuando el backend aún no tiene `chain-account` (404 o 501): «Tu bodega todavía no tiene cuenta en la red», sin reintentos · 2026-10-09
 - [ ] Contra el backend real (O3-ERP-2): cuando el backend despliegue la apertura de la Ola 3; al cierre (H3) se retira la bandera

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { chainFixtures } from "@drinks-on-chain/mocks/fixtures";
 import type { WineryChainIdentity } from "@drinks-on-chain/mocks";
-import { IdentityCard } from "./identity-card";
+import { ChainAccountUnavailable, IdentityCard } from "./identity-card";
 
 afterEach(cleanup);
 
@@ -77,5 +77,12 @@ describe("IdentityCard (1F, contrato de la Ola 3 §3.4)", () => {
     expect(screen.getByText("CHN_INSUFFICIENT_BALANCE")).toBeInTheDocument();
     rerender(<IdentityCard identity={{ ...active, status: "PAUSED" }} />);
     expect(screen.getByText("El contrato de la bodega está pausado en la red")).toBeInTheDocument();
+  });
+
+  it("backend sin la ruta todavía: se dice sin error ni botón de reintento", () => {
+    render(<ChainAccountUnavailable />);
+    expect(screen.getByText("Tu bodega todavía no tiene cuenta en la red")).toBeInTheDocument();
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { chainFixtures } from "@drinks-on-chain/mocks/fixtures";
+import { ApiError } from "@/lib/api/errors";
 import type { ChainTxRef, TokenCounts, WineryChainAccountView } from "@drinks-on-chain/mocks";
 import {
   anchorInProgress,
@@ -7,7 +8,8 @@ import {
   chainAccountInProgress,
   collectionInProgress,
   fmtXlm,
-  lotTokenizationInProgress,
+  isRouteMissing,
+  mintHoldOf,
   soldCount,
   txKindLabel,
 } from "./chain";
@@ -102,14 +104,27 @@ describe("transacciones en curso (refresco cada 5 s, contrato de la Ola 3 §2.4)
     expect(collectionInProgress({ ...base, closure: { items: [{ burnTx: null }] } as never })).toBe(false);
   });
 
-  it("el estado del lote: solo con la emisión en cola o en curso", () => {
-    const withMint = (mintStatus: string | null) =>
-      ({ collection: mintStatus ? { mintStatus } : null }) as Parameters<typeof lotTokenizationInProgress>[0];
-    expect(lotTokenizationInProgress(withMint(null))).toBe(false);
-    expect(lotTokenizationInProgress(withMint("PENDING"))).toBe(true);
-    expect(lotTokenizationInProgress(withMint("IN_PROGRESS"))).toBe(true);
-    expect(lotTokenizationInProgress(withMint("CONFIRMED"))).toBe(false);
-    expect(lotTokenizationInProgress(withMint("FAILED"))).toBe(false);
+  it("una emisión en espera (CHN_MINT_DISABLED, CHN_WINERY_NOT_ACTIVE) no se consulta cada 5 s y se explica", () => {
+    const held = (code: string) => ({ ...tx("PENDING"), lastError: { code, message: "En espera", retryable: true } });
+    expect(anyTxInProgress([held("CHN_MINT_DISABLED")])).toBe(false);
+    expect(anyTxInProgress([held("CHN_WINERY_NOT_ACTIVE")])).toBe(false);
+    // Un error transitorio en PENDING sí sigue en curso.
+    expect(anyTxInProgress([held("CHN_RPC_UNAVAILABLE")])).toBe(true);
+    expect(mintHoldOf({ mints: [{ transactions: [tx("CONFIRMED")] }] })).toBeNull();
+    expect(mintHoldOf({ mints: [{ transactions: [held("CHN_MINT_DISABLED")] }] })?.text).toContain(
+      "aún no tiene habilitada la emisión",
+    );
+    expect(mintHoldOf({ mints: [{ transactions: [held("CHN_WINERY_NOT_ACTIVE")] }] })?.text).toContain(
+      "vuelva a estar activa",
+    );
+  });
+
+  it("ruta que el backend aún no tiene: 404 o 501, no otros errores", () => {
+    expect(isRouteMissing(new ApiError({ status: 404, code: "NOT_FOUND", message: "x" }))).toBe(true);
+    expect(isRouteMissing(new ApiError({ status: 501, code: "NOT_IMPLEMENTED", message: "x" }))).toBe(true);
+    expect(isRouteMissing(new ApiError({ status: 500, code: "INTERNAL", message: "x" }))).toBe(false);
+    expect(isRouteMissing(new ApiError({ status: 403, code: "ORG_NOT_ACTIVE", message: "x" }))).toBe(false);
+    expect(isRouteMissing(new Error("red"))).toBe(false);
   });
 });
 

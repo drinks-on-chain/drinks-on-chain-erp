@@ -13,7 +13,7 @@ import { useChainAccount } from "@/lib/erp/hooks";
 import { LOT_STAGE_CODE } from "@/lib/erp/labels";
 import { isPlatform } from "@/lib/erp/permissions";
 import { fmtDate, fmtDateTime, fmtNumber } from "@/lib/format";
-import { IdentityCard, TxBadge } from "./components/identity-card";
+import { ChainAccountUnavailable, IdentityCard, TxBadge } from "./components/identity-card";
 
 const TITLE = "Cuenta de la bodega";
 const CRUMBS = [{ label: TITLE }];
@@ -262,6 +262,8 @@ export function ChainAccountPage() {
           onRetry={() => account.refetch()}
           retrying={account.isFetching}
         />
+      ) : account.data === null ? (
+        <ChainAccountUnavailable />
       ) : !account.data ? (
         <>
           <Skeleton className="h-64 max-w-4xl" />

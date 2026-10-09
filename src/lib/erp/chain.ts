@@ -6,7 +6,6 @@ import type {
   Collection,
   CollectionStatus,
   DossierAnchor,
-  LotTokenizationStatus,
   MintStatus,
   TokenCounts,
   WineryChainAccountView,
@@ -77,10 +76,53 @@ export const ANCHOR_STATUS: Record<DossierAnchor["status"], Label> = {
   FAILED: { label: "Anclaje fallido", tone: "danger" },
 };
 
-type TxLike = Pick<ChainTxRef, "status">;
+type TxLike = Pick<ChainTxRef, "status"> & Partial<Pick<ChainTxRef, "lastError">>;
 
-/** Alguna transacción sigue de `PENDING` a `RETRYING`. */
-export const anyTxInProgress = (txs: readonly TxLike[]): boolean => txs.some((t) => isTxInProgress(t.status));
+/**
+ * Motivos por los que una emisión espera en `PENDING` sin fallar (mocks `CONTRATO.md` §14.2): la
+ * emisión aún no está habilitada en la plataforma (ADR-011) o la bodega no está activa. Continúa
+ * sola cuando desaparece la causa.
+ */
+export const MINT_HOLD: Record<string, { title: string; text: string }> = {
+  CHN_MINT_DISABLED: {
+    title: "Emisión en espera",
+    text: "La solicitud está aprobada, pero Drinks on Chain aún no tiene habilitada la emisión en la red. Los NFT se emitirán solos en cuanto la habilite; no tienes que hacer nada.",
+  },
+  CHN_WINERY_NOT_ACTIVE: {
+    title: "Emisión en espera",
+    text: "La solicitud está aprobada, pero la emisión espera a que la bodega vuelva a estar activa. Continuará sola en cuanto Drinks on Chain la reactive.",
+  },
+};
+
+/** La transacción está en cola a la espera de una causa externa (no avanza ni ha fallado). */
+export const txOnHold = (tx: TxLike): boolean =>
+  tx.status === "PENDING" && !!tx.lastError && tx.lastError.code in MINT_HOLD;
+
+/** Motivo de espera de la emisión de una colección, o `null`. */
+export function mintHoldOf(c: { mints: readonly { transactions: readonly TxLike[] }[] }) {
+  for (const mint of c.mints) {
+    const held = mint.transactions.find(txOnHold);
+    if (held?.lastError) return MINT_HOLD[held.lastError.code] ?? null;
+  }
+  return null;
+}
+
+/**
+ * Alguna transacción sigue de `PENDING` a `RETRYING` y avanzando. Una emisión en espera no cuenta:
+ * puede tardar días, así que no se consulta cada 5 s (la persona usa «Actualizar»).
+ */
+export const anyTxInProgress = (txs: readonly TxLike[]): boolean =>
+  txs.some((t) => isTxInProgress(t.status) && !txOnHold(t));
+
+/**
+ * El backend aún no tiene la ruta (404) o la declara sin implementar (501): pasa mientras no
+ * despliegue la Ola 3. No es un error de la persona ni se arregla reintentando.
+ */
+export const isRouteMissing = (error: unknown): boolean =>
+  typeof error === "object" &&
+  error !== null &&
+  "status" in error &&
+  ((error as { status: unknown }).status === 404 || (error as { status: unknown }).status === 501);
 
 /** El anclaje aún no terminó (ni confirmado ni fallido). */
 export const anchorInProgress = (anchor: Pick<DossierAnchor, "transaction"> | null | undefined): boolean =>
@@ -104,10 +146,6 @@ export function collectionInProgress(c: Pick<Collection, "mints" | "anchor" | "c
     (c.closure?.items ?? []).some((i) => i.burnTx != null && isTxInProgress(i.burnTx.status))
   );
 }
-
-/** El resumen de tokenización del lote dice que hay una emisión sin terminar. */
-export const lotTokenizationInProgress = (s: Pick<LotTokenizationStatus, "collection">): boolean =>
-  s.collection?.mintStatus === "PENDING" || s.collection?.mintStatus === "IN_PROGRESS";
 
 /**
  * NFT que ya salieron de la bodega: vendidos y los estados que les siguen (canjeable, con pase,

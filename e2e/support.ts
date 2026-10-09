@@ -48,6 +48,8 @@ export type DataScenario =
   | "laboratorio-no-conforme"
   // Ola 3 (mocks 0.6): red simulada y tokenización.
   | "identidad-preparandose"
+  | "identidad-sin-aprovisionar"
+  | "cadena-sin-configurar"
   | "emision-en-curso"
   | "emision-fallida"
   | "anclaje-pendiente"

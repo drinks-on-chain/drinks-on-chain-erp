@@ -2,10 +2,20 @@
 
 import { useEffect, useRef } from "react";
 import type { Collection, Mint } from "@drinks-on-chain/mocks";
-import { Alert, Badge, Card, CardHeader, ChainAddress, ErrorState, KeyValueList, Skeleton } from "@drinks-on-chain/ui";
+import {
+  Alert,
+  Badge,
+  Card,
+  CardHeader,
+  ChainAddress,
+  ErrorState,
+  KeyValueList,
+  Skeleton,
+  TxStatusBadge,
+} from "@drinks-on-chain/ui";
 import { TxBadge } from "@/features/cuenta/components/identity-card";
 import { errorMessage } from "@/lib/api/errors";
-import { COLLECTION_STATUS, MINT_STATUS, soldCount } from "@/lib/erp/chain";
+import { COLLECTION_STATUS, MINT_STATUS, mintHoldOf, soldCount, txOnHold } from "@/lib/erp/chain";
 import { useCollection, useCollectionClosure, useRefreshErp } from "@/lib/erp/hooks";
 import { fmtDateTime, fmtNumber } from "@/lib/format";
 import { CLOSURE_OUTCOME, CLOSURE_STATUS, closureSummary } from "../tokenization-model";
@@ -44,7 +54,12 @@ function Mints({ mints }: { mints: Mint[] }) {
               <ul aria-label={`Transacciones de la emisión ${mint.sequence}`} className="m-0 grid list-none gap-1 p-0">
                 {mint.transactions.map((tx) => (
                   <li key={tx.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                    <TxBadge tx={tx} />
+                    {txOnHold(tx) ? (
+                      // En espera, no fallida: sin el texto de error de la transacción.
+                      <TxStatusBadge status={tx.status} label="En espera" />
+                    ) : (
+                      <TxBadge tx={tx} />
+                    )}
                     <span className="text-fg-muted">{fmtDateTime(tx.confirmedAt ?? tx.updatedAt)}</span>
                   </li>
                 ))}
@@ -115,6 +130,7 @@ function CollectionCard({ c }: { c: Collection }) {
     c.status === "MINTING" && c.mintStatus === "FAILED"
       ? { label: "Emisión fallida", tone: "danger" as const }
       : COLLECTION_STATUS[c.status];
+  const hold = mintHoldOf(c);
   const minting = c.pendingMintQuantity > 0 || c.mintStatus === "PENDING" || c.mintStatus === "IN_PROGRESS";
   return (
     <Card className="grid grid-cols-1 gap-4" role="group" aria-label="Colección y emisión" data-collection={c.status}>
@@ -127,6 +143,10 @@ function CollectionCard({ c }: { c: Collection }) {
         <Alert tone="danger" title="La emisión falló en la red">
           No se emitió ningún NFT de esta tanda. Drinks on Chain tiene que reintentarla; la solicitud sigue aprobada y
           no tienes que volver a enviarla.
+        </Alert>
+      ) : hold ? (
+        <Alert tone="info" title={hold.title} data-testid="mint-hold">
+          {hold.text}
         </Alert>
       ) : minting ? (
         <Alert tone="info" title="Emisión en curso">
