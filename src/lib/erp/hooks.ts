@@ -1,12 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TerroirResponse } from "@drinks-on-chain/mocks";
 import type { Page } from "@/lib/api/envelope";
 import { ApiError } from "@/lib/api/errors";
 import { createIdempotencyKeys, withIdempotency } from "@/lib/api/idempotency";
 import { useMe } from "@/lib/auth/hooks";
+import {
+  CHAIN_POLL_MS,
+  anchorInProgress,
+  chainAccountInProgress,
+  collectionInProgress,
+  lotTokenizationInProgress,
+} from "./chain";
 import { erpKeys } from "./keys";
 import { can } from "./permissions";
 import {
@@ -19,6 +26,7 @@ import {
   type ProductionReportQuery,
   type TankQuery,
   type TerroirQuery,
+  type TokenizationRequestQuery,
 } from "./resources";
 
 // Hooks de datos del ERP. Las pantallas solo importan de aquí.
@@ -97,8 +105,14 @@ export const useDossierPreview = (lotId: string, enabled = true) =>
     queryFn: ({ signal }) => erpApi.dossierPreview(lotId, signal),
     enabled,
   });
+/** Expediente del lote; mientras su anclaje esté en vuelo se vuelve a consultar cada 5 s (Ola 3 §2.4). */
 export const useDossier = (lotId: string, enabled = true) =>
-  useQuery({ queryKey: erpKeys.dossier(lotId), queryFn: ({ signal }) => erpApi.dossier(lotId, signal), enabled });
+  useQuery({
+    queryKey: erpKeys.dossier(lotId),
+    queryFn: ({ signal }) => erpApi.dossier(lotId, signal),
+    enabled,
+    refetchInterval: (query) => (anchorInProgress(query.state.data?.anchor) ? CHAIN_POLL_MS : false),
+  });
 /** Archivos del lote (§11.5), con su URL firmada de 15 minutos: se renuevan pasados 10. */
 export const useAttachments = (lotId: string, enabled = true) =>
   useQuery({
@@ -218,6 +232,72 @@ export const useAudit = (q: AuditQuery, enabled = true) =>
     enabled,
     placeholderData: keepPreviousData,
   });
+
+// Cadena y tokenización (contrato de la Ola 3). Las consultas con transacciones incrustadas se
+// repiten cada 5 s mientras alguna siga en curso, y solo entonces (§2.4).
+
+/** Cuenta de la bodega en la red (1F): identidad, NFT por lote, anclajes y últimas transacciones. */
+export const useChainAccount = (enabled = true) =>
+  useQuery({
+    queryKey: erpKeys.chainAccount(),
+    queryFn: ({ signal }) => erpApi.chainAccount(signal),
+    enabled,
+    refetchInterval: (query) => (query.state.data && chainAccountInProgress(query.state.data) ? CHAIN_POLL_MS : false),
+  });
+/**
+ * Estado de tokenización del lote: límite, bloqueos, solicitud abierta, colección e historial. La
+ * solicitud la decide otra persona (el back office): se vuelve a pedir cada vez que se abre.
+ */
+export const useLotTokenization = (lotId: string, enabled = true) =>
+  useQuery({
+    queryKey: erpKeys.lotTokenization(lotId),
+    queryFn: ({ signal }) => erpApi.lotTokenization(lotId, signal),
+    enabled,
+    staleTime: 0,
+    refetchInterval: (query) =>
+      query.state.data && lotTokenizationInProgress(query.state.data) ? CHAIN_POLL_MS : false,
+  });
+/** Solicitudes de tokenización de la bodega, paginadas en el servidor. */
+export const useTokenizationRequests = (q: TokenizationRequestQuery, enabled = true) =>
+  useQuery({
+    queryKey: erpKeys.tokenizationRequests(q),
+    queryFn: ({ signal }) => erpApi.tokenizationRequests(q, signal),
+    enabled,
+    placeholderData: keepPreviousData,
+    staleTime: 0,
+  });
+export const useTokenizationRequest = (id: string | null, enabled = true) =>
+  useQuery({
+    queryKey: erpKeys.tokenizationRequest(id ?? ""),
+    queryFn: ({ signal }) => erpApi.tokenizationRequest(id!, signal),
+    enabled: enabled && !!id,
+    staleTime: 0,
+  });
+/** Colección del lote con sus emisiones (`ChainTxRef` incrustados). */
+export const useCollection = (id: string | null, enabled = true) =>
+  useQuery({
+    queryKey: erpKeys.collection(id ?? ""),
+    queryFn: ({ signal }) => erpApi.collection(id!, signal),
+    enabled: enabled && !!id,
+    refetchInterval: (query) => (query.state.data && collectionInProgress(query.state.data) ? CHAIN_POLL_MS : false),
+  });
+/**
+ * Cierre del lote con faltante (solo lectura; dirección y contabilidad). Sin embotellar ni descartar
+ * el servidor responde 409 `TOK_CLOSURE_NOT_APPLICABLE`: se pide solo cuando aplica y no se reintenta.
+ */
+export const useCollectionClosure = (id: string | null, enabled = true) =>
+  useQuery({
+    queryKey: erpKeys.collectionClosure(id ?? ""),
+    queryFn: ({ signal }) => erpApi.collectionClosure(id!, signal),
+    enabled: enabled && !!id,
+    retry: false,
+  });
+
+/** Vuelve a pedir todo el ERP (p. ej. cuando una transacción en la red termina y cambia el lote). */
+export function useRefreshErp() {
+  const client = useQueryClient();
+  return useCallback(() => client.invalidateQueries({ queryKey: erpKeys.all }), [client]);
+}
 
 /** Como useHarvestBatches, pero solo consulta si `enabled` (p. ej. cuando el detalle del terroir no trae sus lotes). */
 export const useHarvestBatchesIf = (q: HarvestQuery, enabled: boolean) =>
@@ -356,6 +436,26 @@ export const useCloseDossier = () =>
     (lotId: string) => ({ lotId, confirm: true }),
     (lotId, key) => erpApi.closeDossier(lotId, key),
   );
+/** Autorizar tokenización o ampliar la cuota de un lote (solo el dueño), con `Idempotency-Key`. */
+export const useCreateTokenizationRequest = () =>
+  useIdempotentErpMutation(
+    (v: { lotId: string; body: Parameters<typeof erpApi.createTokenizationRequest>[1] }) => v,
+    (v, key) => erpApi.createTokenizationRequest(v.lotId, v.body, key),
+  );
+/** Editar una solicitud con cambios pedidos (o enviada y aún sin tomar). */
+export const useUpdateTokenizationRequest = () =>
+  useErpMutation((v: { id: string; body: Parameters<typeof erpApi.updateTokenizationRequest>[1] }) =>
+    erpApi.updateTokenizationRequest(v.id, v.body),
+  );
+/** Reenviar una solicitud con cambios pedidos, con `Idempotency-Key`. */
+export const useResubmitTokenizationRequest = () =>
+  useIdempotentErpMutation(
+    (v: { id: string; message?: string }) => v,
+    (v, key) => erpApi.resubmitTokenizationRequest(v.id, v.message ? { message: v.message } : {}, key),
+  );
+/** Retirar una solicitud abierta, con motivo. */
+export const useWithdrawTokenizationRequest = () =>
+  useErpMutation((v: { id: string; reason: string }) => erpApi.withdrawTokenizationRequest(v.id, v.reason));
 /** JSON canónico del expediente: los bytes exactos que se hashean. */
 export const useDossierCanonical = () => useMutation({ mutationFn: (lotId: string) => erpApi.dossierCanonical(lotId) });
 export const useCreateAttachment = () =>

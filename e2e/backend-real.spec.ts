@@ -152,8 +152,9 @@ test("dueña de Cinti Viejo: sesión por cookie, módulos, alta de parcela, 422 
       await expect(page.getByText(/datos inesperados/), `pestaña ${tab}: contrato`).toHaveCount(0);
     }
     await openModule(page, "Reportes", "Reportes de producción");
-    await openModule(page, "Cuenta Stellar", "Cuenta Stellar");
-    await expect(page.getByRole("link", { name: /Ver en stellar.expert/ })).toBeVisible();
+    // 1F con la cuenta real (Ola 3): la identidad la entrega `chain-account`.
+    await openModule(page, "Cuenta de la bodega", "Cuenta de la bodega");
+    await expect(page.getByRole("group", { name: "Identidad en la red" })).toBeVisible();
     await openModule(page, "Ajustes", "Ajustes de la bodega");
   });
 
@@ -271,7 +272,7 @@ test("operario de Cinti Viejo: lee parcelas y pesa; no crea parcelas ni ve crian
   await expect(shellUser(page)).toContainText("Destilería Cinti Viejo");
   await settled(page);
   const nav = page.getByRole("navigation").first();
-  for (const hidden of ["Crianza", "Destilación y reposo", "Envasado y QR", "Cuenta Stellar"]) {
+  for (const hidden of ["Crianza", "Destilación y reposo", "Envasado y QR"]) {
     await expect(nav.getByRole("link", { name: hidden, exact: true })).toHaveCount(0);
   }
 

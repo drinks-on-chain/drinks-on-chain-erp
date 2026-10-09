@@ -112,7 +112,8 @@ export const LOT_STAGE_CODE: Record<LotStageCode, Label> = {
   RESTING: { label: "Reposo", tone: "warning" },
   BOTTLED: { label: "Embotellado", tone: "success" },
   CERTIFIED: { label: "Expediente cerrado", tone: "success" },
-  ANCHORED: { label: "Anclado", tone: "success" },
+  // Etapa final (Ola 3 §7.2): el expediente cerrado pasa solo a anclado cuando la red lo confirma.
+  ANCHORED: { label: "Anclado en la red", tone: "success" },
   REJECTED: { label: "Rechazado", tone: "danger" },
   DISCARDED: { label: "Descartado", tone: "neutral" },
 };
@@ -169,6 +170,13 @@ export const LOT_EVENT: Record<LotEventType, string> = {
   DOSSIER_CLOSED: "Expediente cerrado",
   LOT_REJECTED: "Lote rechazado",
   LOT_DISCARDED: "Lote descartado",
+  // Ola 3 (contrato de tokenización §11)
+  TOKENIZATION_AUTHORIZED: "Tokenización autorizada",
+  NFT_MINTED: "NFT emitidos",
+  COLLECTION_PUBLISHED: "Colección publicada",
+  DOSSIER_ANCHORED: "Expediente anclado",
+  TOKENS_REDEEMABLE: "NFT canjeables",
+  SHORTFALL_DETECTED: "Faltante de botellas",
 };
 
 /** Parámetros de los límites de laboratorio de la instantánea de reglas (`rules.lab.limits`). */

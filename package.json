@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --port 3002",
-    "dev:mocks": "cross-env NEXT_PUBLIC_MOCKS=1 next dev --port 3002",
+    "dev:mocks": "cross-env NEXT_PUBLIC_MOCKS=1 NEXT_PUBLIC_ERP_TOKENIZATION=1 next dev --port 3002",
     "build": "next build",
     "start": "next start --port 3002",
     "lint": "eslint",
@@ -16,8 +16,8 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
-    "@drinks-on-chain/mocks": "https://github.com/drinks-on-chain/drinks-on-chain-mocks/releases/download/v0.5.0/drinks-on-chain-mocks-0.5.0.tgz",
-    "@drinks-on-chain/ui": "https://github.com/drinks-on-chain/drinks-on-chain-design-system/releases/download/v0.3.1/drinks-on-chain-ui-0.3.1.tgz",
+    "@drinks-on-chain/mocks": "https://github.com/drinks-on-chain/drinks-on-chain-mocks/releases/download/v0.6.0-rc.1/drinks-on-chain-mocks-0.6.0-rc.1.tgz",
+    "@drinks-on-chain/ui": "https://github.com/drinks-on-chain/drinks-on-chain-design-system/releases/download/v0.4.0-rc.1/drinks-on-chain-ui-0.4.0-rc.1.tgz",
     "@tanstack/react-query": "^5.103.2",
     "lucide-react": "^1.48.0",
     "msw": "^2.15.0",

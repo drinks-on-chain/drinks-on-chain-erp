@@ -77,6 +77,10 @@ const ADMIN_ROUTES = [
   `/envasado/${CINTI.bottling}`,
   "/reportes",
   "/cuenta",
+  // 1K (Ola 3): solicitudes, pestaña del lote de la preventa y formulario de ampliación.
+  "/tokenizacion",
+  "/lotes/aa3d8614-2fc6-5f53-94f9-e8cdb76f6986?pestana=tokenizacion",
+  "/lotes/aa3d8614-2fc6-5f53-94f9-e8cdb76f6986/tokenizar",
   "/perfil",
   "/ajustes",
   "/equipo",

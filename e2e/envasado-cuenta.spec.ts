@@ -1,9 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { trackErrors } from "./support";
 
-// 1E Envasado (lista y ficha del embotellado), 1F Cuenta Stellar y el resto de 1A (perfil y
+// 1E Envasado (lista y ficha del embotellado), y el resto de 1A (perfil y
 // ajustes) contra los mocks. El embotellado del lote y sus códigos están en embotellado.spec.ts;
-// la lista y la ficha del lote, en lotes.spec.ts.
+// la lista y la ficha del lote, en lotes.spec.ts; la cuenta de la bodega (1F), en cuenta-bodega.spec.ts.
 // La base de datos de MSW vive en la página: tras una escritura se navega con enlaces (sin recargar).
 
 async function login(page: Page, email: string) {
@@ -33,21 +33,6 @@ test("Altos: la ficha de un embotellado muestra su balance y lleva a los código
   await page.getByRole("link", { name: "Ver y exportar los códigos" }).click();
   await expect(page).toHaveURL(/\/lotes\/[\w-]+\?pestana=codigos$/);
   await expect(page.getByRole("table", { name: "Códigos de botella de ALT-2026-WINE-001" })).toBeVisible();
-  expect(errors).toEqual([]);
-});
-
-test("Cuenta Stellar: dirección institucional y anclaje de los lotes", async ({ page }) => {
-  const errors = trackErrors(page, []);
-  await login(page, "enologa@cintiviejo.test");
-  await nav(page, "Cuenta Stellar");
-  await expect(page.getByText("GIV5C3L3OJBINOKVC6SMLGDVQAQ5OKCXUHTQKC5WKD2WDEP53V7BFZMM")).toBeVisible();
-  await expect(page.getByRole("link", { name: /Ver en stellar.expert/ })).toHaveAttribute(
-    "href",
-    "https://stellar.expert/explorer/testnet/account/GIV5C3L3OJBINOKVC6SMLGDVQAQ5OKCXUHTQKC5WKD2WDEP53V7BFZMM",
-  );
-  await expect(page.getByText("PROD_BO_2087654031")).toBeVisible();
-  await expect(page.getByText("Disponible cuando el backend exponga los activos").first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "CVJ-2026-WINE-003", exact: true })).toBeVisible();
   expect(errors).toEqual([]);
 });
 

@@ -1,25 +1,28 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { CircleCheck, CircleDashed, Download, Lock } from "lucide-react";
-import type { Lot } from "@drinks-on-chain/mocks";
+import type { DossierAnchor, Lot } from "@drinks-on-chain/mocks";
 import {
   Alert,
   Badge,
   Button,
   Card,
   CardHeader,
+  ChainAddress,
   ConfirmDialog,
   ErrorState,
   KeyValueList,
   Skeleton,
+  TxStatusBadge,
   toast,
 } from "@drinks-on-chain/ui";
 import { RuleViolationNotice } from "@/components/rule-violation-notice";
-import { HashText } from "@/features/cuenta/stellar";
 import { errorMessage } from "@/lib/api/errors";
 import { isRuleError } from "@/lib/api/rule-violations";
-import { useCloseDossier, useDossier, useDossierCanonical, useDossierPreview } from "@/lib/erp/hooks";
+import { ANCHOR_STATUS, CHAIN_NETWORK } from "@/lib/erp/chain";
+import { useCloseDossier, useDossier, useDossierCanonical, useDossierPreview, useRefreshErp } from "@/lib/erp/hooks";
 import { saveBlob } from "@/lib/download";
 import { fmtDateTime, fmtNumber } from "@/lib/format";
 import { canonicalFilename, progressText, requirementViews } from "../dossier-model";
@@ -34,6 +37,77 @@ type Props = {
 };
 
 /**
+ * Anclaje del expediente en la red (contrato de la Ola 3 §7): estado, transacción con su enlace al
+ * explorador (el que da el backend) y la huella publicada. Mientras la transacción está en vuelo la
+ * consulta se repite sola; al confirmarse, el lote pasa a «Anclado en la red».
+ */
+function DossierAnchorPanel({ anchor }: { anchor: DossierAnchor | null }) {
+  if (!anchor) {
+    return (
+      <section aria-label="Anclaje en la red" className="grid gap-2 border-t border-border pt-4">
+        <h3 className="m-0 text-base font-medium">Anclaje en la red</h3>
+        <p className="m-0 text-sm text-fg-muted">
+          Todavía no se ha registrado. Drinks on Chain publica la huella en la red Stellar después del cierre.
+        </p>
+      </section>
+    );
+  }
+  const status = ANCHOR_STATUS[anchor.status];
+  return (
+    <section
+      aria-label="Anclaje en la red"
+      className="grid gap-3 border-t border-border pt-4"
+      data-anchor={anchor.status}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="m-0 text-base font-medium">Anclaje en la red</h3>
+        <Badge tone={status.tone}>{status.label}</Badge>
+      </div>
+      {anchor.status === "ANCHORED" ? (
+        <p className="m-0 text-sm text-fg-muted">
+          La huella del expediente está publicada en la red: cualquiera puede comprobarla en el explorador.
+        </p>
+      ) : anchor.status === "FAILED" ? (
+        <Alert tone="danger" title="El anclaje no se pudo completar">
+          Drinks on Chain tiene que reintentarlo. El expediente sigue cerrado y su huella no cambia.
+        </Alert>
+      ) : (
+        <p className="m-0 text-sm text-fg-muted">
+          Drinks on Chain está publicando la huella en la red. Suele tardar menos de un minuto; se actualiza solo.
+        </p>
+      )}
+      <KeyValueList
+        layout="stacked"
+        items={[
+          {
+            term: "Transacción",
+            value: (
+              <TxStatusBadge
+                status={anchor.transaction.status}
+                explorerUrl={anchor.explorerUrl ?? anchor.transaction.explorerUrl}
+                lastError={anchor.transaction.lastError}
+                attempts={anchor.transaction.attempts}
+              />
+            ),
+          },
+          ...(anchor.txHash
+            ? [
+                {
+                  term: "Hash de la transacción",
+                  value: <ChainAddress value={anchor.txHash} label="Transacción de anclaje" />,
+                },
+              ]
+            : []),
+          { term: "Red", value: CHAIN_NETWORK[anchor.network] },
+          ...(anchor.anchoredAt ? [{ term: "Anclado", value: fmtDateTime(anchor.anchoredAt) }] : []),
+          { term: "Cuenta de anclaje", value: <ChainAddress value={anchor.account} label="Cuenta de anclaje" /> },
+        ]}
+      />
+    </section>
+  );
+}
+
+/**
  * DossierChecklist (contrato de la Ola 2 §10): requisitos del expediente del lote tal como los
  * evalúa el servidor, cierre con confirmación explícita (fija la huella SHA-256 del JSON canónico;
  * después el lote ya no admite cambios) y descarga de los bytes exactos que se hashean.
@@ -43,6 +117,18 @@ export function DossierChecklist({ lot, canClose }: Props) {
   const dossier = useDossier(lot.id);
   const close = useCloseDossier();
   const canonical = useDossierCanonical();
+  const refresh = useRefreshErp();
+
+  // Al confirmarse (o fallar) el anclaje cambia la etapa del lote: se vuelve a pedir todo una vez.
+  const anchorStatus = dossier.data?.anchor?.status ?? null;
+  const seenAnchor = useRef(anchorStatus);
+  useEffect(() => {
+    const before = seenAnchor.current;
+    seenAnchor.current = anchorStatus;
+    if (before !== null && before !== anchorStatus && (anchorStatus === "ANCHORED" || anchorStatus === "FAILED")) {
+      void refresh();
+    }
+  }, [anchorStatus, refresh]);
 
   if (preview.isError || dossier.isError) {
     const failed = preview.isError ? preview : dossier;
@@ -167,7 +253,11 @@ export function DossierChecklist({ lot, canClose }: Props) {
             items={[
               {
                 term: "Huella (SHA-256)",
-                value: dossier.data.hash ? <HashText value={dossier.data.hash} full label="Copiar huella" /> : "—",
+                value: dossier.data.hash ? (
+                  <ChainAddress value={dossier.data.hash} truncate={false} data-testid="dossier-hash" />
+                ) : (
+                  "—"
+                ),
               },
               { term: "Algoritmo", value: <code className="font-mono text-sm">{dossier.data.algorithm}</code> },
               {
@@ -180,11 +270,10 @@ export function DossierChecklist({ lot, canClose }: Props) {
                 ? [
                     {
                       term: `Raíz Merkle de los ${fmtNumber(dossier.data.bottleCodes.count)} códigos de botella`,
-                      value: <HashText value={dossier.data.bottleCodes.merkleRoot} full label="Copiar raíz Merkle" />,
+                      value: <ChainAddress value={dossier.data.bottleCodes.merkleRoot} truncate={false} />,
                     },
                   ]
                 : []),
-              { term: "Anclaje en Stellar", value: "Pendiente: llega con la Ola 3." },
             ]}
           />
         ) : (
@@ -195,7 +284,11 @@ export function DossierChecklist({ lot, canClose }: Props) {
                 {
                   term: "Huella si se cerrara ahora",
                   value: preview.data.hashPreview ? (
-                    <HashText value={preview.data.hashPreview} full label="Copiar huella provisional" />
+                    <ChainAddress
+                      value={preview.data.hashPreview}
+                      truncate={false}
+                      data-testid="dossier-hash-preview"
+                    />
                   ) : (
                     <span className="text-fg-muted">Se calcula cuando el lote está embotellado.</span>
                   ),
@@ -209,6 +302,7 @@ export function DossierChecklist({ lot, canClose }: Props) {
             </Alert>
           </>
         )}
+        {closed && <DossierAnchorPanel anchor={dossier.data.anchor} />}
         <Button
           variant="secondary"
           className="justify-self-start"

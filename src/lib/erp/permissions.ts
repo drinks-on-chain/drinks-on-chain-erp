@@ -38,7 +38,11 @@ export type ErpAction =
   | "bottling.create"
   | "lab.read"
   | "lab.create"
-  | "winery.manage";
+  | "winery.manage"
+  | "chainAccount.read"
+  | "tokenization.read"
+  | "tokenization.manage"
+  | "tokenization.closure.read";
 
 const ALL: WineryRole[] = ["OWNER", "ENOLOGIST", "AGRONOMIST", "OPERATOR", "ACCOUNTANT"];
 
@@ -81,6 +85,13 @@ const MATRIX: Record<ErpAction, readonly WineryRole[]> = {
   "lab.read": ["OWNER", "ENOLOGIST", "AGRONOMIST", "ACCOUNTANT"],
   "lab.create": ["OWNER", "ENOLOGIST"],
   "winery.manage": ["OWNER"],
+  // Cadena y tokenización (contrato de la Ola 3 §10 y mocks `CONTRATO.md` §13.2): la cuenta de la
+  // bodega la leen todos; solicitudes y colecciones, dirección, enología y contabilidad (agronomía y
+  // operación solo ven la marca en la lista de lotes); autoriza, edita, reenvía y retira solo el dueño.
+  "chainAccount.read": ALL,
+  "tokenization.read": ["OWNER", "ENOLOGIST", "ACCOUNTANT"],
+  "tokenization.manage": ["OWNER"],
+  "tokenization.closure.read": ["OWNER", "ACCOUNTANT"],
 };
 
 const isRead = (action: ErpAction) => action.endsWith(".read");

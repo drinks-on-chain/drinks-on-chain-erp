@@ -27,12 +27,15 @@ import { ApiError, errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
 import { useDiscardLot, useLegacyLotId, useLot, useLotBalance, useTerroirs } from "@/lib/erp/hooks";
 import { LOT_LAB_STATUS, LOT_PRODUCT } from "@/lib/erp/labels";
+import { env } from "@/lib/env";
 import { can } from "@/lib/erp/permissions";
 import { fmtDate, fmtDateTime, fmtNumber } from "@/lib/format";
+import { LotTokenization } from "@/features/tokenizacion/lot-tokenization";
 import { BottleCodeExport } from "./components/bottle-code-export";
 import { ComplianceIssues } from "./components/compliance-issues";
 import { DoEvaluationView } from "./components/do-evaluation";
 import { DossierChecklist } from "./components/dossier-checklist";
+import { EstimateEditor } from "./components/estimate-editor";
 import { LotAttachments } from "./components/lot-attachments";
 import { LotCorrections } from "./components/lot-corrections";
 import { LotGraphView } from "./components/lot-graph";
@@ -136,7 +139,9 @@ function LotSheet({ lot, initialTab }: { lot: Lot; initialTab?: LotTab }) {
   // Cada rol ve las secciones que el servidor le deja leer (balance: sin operario; códigos:
   // el total es de todos, la lista solo de dirección y enología).
   const canBalance = can(me.data, "lot.balance.read");
-  const tabs = LOT_TABS.filter((t) => t !== "balance" || canBalance);
+  // Tokenización (1K): detrás de la bandera; la leen dirección, enología y contabilidad.
+  const canTokenization = env.tokenization && can(me.data, "tokenization.read");
+  const tabs = LOT_TABS.filter((t) => (t !== "balance" || canBalance) && (t !== "tokenizacion" || canTokenization));
 
   const changeTab = (value: string) => {
     if (!isLotTab(value)) return;
@@ -218,6 +223,11 @@ function LotSheet({ lot, initialTab }: { lot: Lot; initialTab?: LotTab }) {
         <TabsContent value="expediente">
           <DossierChecklist lot={lot} canClose={can(me.data, "dossier.close")} />
         </TabsContent>
+        {canTokenization && (
+          <TabsContent value="tokenizacion">
+            <LotTokenization lot={lot} />
+          </TabsContent>
+        )}
         <TabsContent value="linea-de-tiempo">
           <Card className="grid grid-cols-1 gap-4">
             <CardHeader
@@ -344,7 +354,12 @@ function LotSummaryTab({ lot, note, canWrite }: { lot: Lot; note: string | null;
               { term: "Tipo", value: lot.productType ? LOT_PRODUCT[lot.productType] : "Se decide en la bifurcación" },
               {
                 term: "Botellas estimadas",
-                value: lot.estimatedBottles != null ? fmtNumber(lot.estimatedBottles) : "Sin estimación",
+                value: (
+                  <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    {lot.estimatedBottles != null ? fmtNumber(lot.estimatedBottles) : "Sin estimación"}
+                    {canWrite && !isTerminalStage(lot.stage) && <EstimateEditor lot={lot} />}
+                  </span>
+                ),
               },
               { term: "Botellas", value: bottles },
               {
