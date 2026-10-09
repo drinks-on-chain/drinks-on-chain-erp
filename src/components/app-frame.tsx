@@ -5,9 +5,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ChartColumn,
+  Coins,
   Cylinder,
   FlaskConical,
   Grape,
+  Landmark,
   Layers,
   LayoutGrid,
   Mountain,
@@ -16,7 +18,6 @@ import {
   Settings,
   ShieldAlert,
   Users,
-  Wallet,
   Wine,
 } from "lucide-react";
 import type { MeResponse } from "@/lib/auth/schemas";
@@ -25,6 +26,7 @@ import { errorMessage } from "@/lib/api/errors";
 import { useIsAuthenticated, useLogout, useMe, useOrgInactiveFlag } from "@/lib/auth/hooks";
 import { canReadAuditWhileInactive, inactiveOrganization, type InactiveOrganization } from "@/lib/auth/org-status";
 import { activeMembership } from "@/lib/auth/organization";
+import { env } from "@/lib/env";
 import { useWinery } from "@/lib/erp/hooks";
 import { can, canUseErp, isPlatform, roleLabel, type ErpAction } from "@/lib/erp/permissions";
 import { es } from "@/lib/i18n/es";
@@ -48,12 +50,17 @@ function navigationFor(me: MeResponse | undefined): NavGroup[] {
       show("aging.read") && { label: "Crianza", href: "/crianza", icon: icon(Wine) },
       show("distillation.read") && { label: "Destilación y reposo", href: "/destilacion", icon: icon(FlaskConical) },
       show("bottling.read") && { label: "Envasado y QR", href: "/envasado", icon: icon(QrCode) },
+      // 1K, detrás de la bandera: solicitudes de la bodega (la plataforma las ve en el Backoffice).
+      env.tokenization &&
+        !isPlatform(me) &&
+        show("tokenization.read") && { label: "Tokenización", href: "/tokenizacion", icon: icon(Coins) },
       show("reports.read") && { label: "Reportes", href: "/reportes", icon: icon(ChartColumn) },
     ] as (NavItem | false)[]
   ).filter((item): item is NavItem => Boolean(item));
   const winery = (
     [
-      show("bottling.read") && { label: "Cuenta Stellar", href: "/cuenta", icon: icon(Wallet) },
+      // La cuenta de la bodega en la red la leen todos los miembros (Ola 3 §10).
+      show("chainAccount.read") && { label: "Cuenta de la bodega", href: "/cuenta", icon: icon(Landmark) },
       { label: "Equipo", href: "/equipo", icon: icon(Users) },
       { label: "Ajustes", href: "/ajustes", exact: true, icon: icon(Settings) },
       show("winery.manage") && { label: "Bitácora", href: "/ajustes/bitacora", icon: icon(ScrollText) },

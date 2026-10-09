@@ -187,6 +187,54 @@ describe("explicación de cada regla", () => {
     expect(kg.facts.map((f) => f.value)).toEqual(["18.400 kg", "20.000 kg"]);
   });
 
+  it("tokenización (Ola 3 §9): la cuota frente a su límite, la estimación frente a lo emitido", () => {
+    const quota = explainViolation(
+      violation({
+        code: "TOK_QUOTA_EXCEEDS_ESTIMATE",
+        field: "quantity",
+        expected: 3000,
+        actual: 3100,
+        meta: { maxQuantity: 2900, basis: "ESTIMATE" },
+      }),
+    );
+    expect(quota.title).toBe("La cuota supera la estimación del lote");
+    expect(quota.facts).toEqual([
+      { label: "Estimación del lote", value: "3.000 botellas" },
+      { label: "Cuota que resultaría", value: "3.100 botellas" },
+      { label: "Puedes autorizar hasta", value: "2.900 botellas" },
+    ]);
+    const bottles = explainViolation(
+      violation({ code: "TOK_QUOTA_EXCEEDS_BOTTLES", expected: 1040, actual: 1041, meta: { maxQuantity: 1 } }),
+    );
+    expect(bottles.facts.at(-1)).toEqual({ label: "Puedes autorizar hasta", value: "1 botella" });
+    const estimate = explainViolation(violation({ code: "TOK_ESTIMATE_BELOW_MINTED", expected: 100, actual: 80 }));
+    expect(estimate.title).toBe("La estimación no puede bajar de los NFT ya emitidos");
+    expect(estimate.facts).toEqual([
+      { label: "NFT emitidos", value: "100 botellas" },
+      { label: "Estimación indicada", value: "80 botellas" },
+    ]);
+    expect(explainViolation(violation({ code: "TOK_LOT_NOT_TOKENIZABLE", meta: { stage: "ANCHORED" } })).facts).toEqual(
+      [{ label: "Etapa del lote", value: "Anclado" }],
+    );
+    expect(
+      explainViolation(violation({ code: "TOK_REQUEST_INVALID_TRANSITION", meta: { from: "IN_REVIEW", to: "X" } }))
+        .facts,
+    ).toEqual([{ label: "Estado de la solicitud", value: "En revisión" }]);
+    // Los `TOK_…` son errores de regla: se explican con el mismo aviso que los `TRC_…`.
+    const open = new ApiError({ status: 409, code: "TOK_REQUEST_ALREADY_OPEN", message: "Ya hay una abierta" });
+    expect(isRuleError(open)).toBe(true);
+    for (const code of [
+      "TOK_LOT_PRODUCT_UNDEFINED",
+      "TOK_LOT_ESTIMATE_MISSING",
+      "TOK_QUOTA_INVALID",
+      "TOK_REQUEST_ALREADY_OPEN",
+      "TOK_WINERY_CHAIN_NOT_READY",
+      "TOK_CLOSURE_NOT_APPLICABLE",
+    ]) {
+      expect(ruleTitle(code), code).not.toBe("Regla del lote incumplida");
+    }
+  });
+
   it("un código desconocido se explica con lo exigido y lo registrado", () => {
     const e = explainViolation(violation({ code: "TRC_FUTURO", message: "Regla nueva", expected: 3, actual: 5 }));
     expect(e.title).toBe("Regla del lote incumplida");

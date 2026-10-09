@@ -9,6 +9,7 @@ import {
   type LotRules,
   type LotStageCode,
   type LotSummary,
+  type UpdateLotDto,
 } from "@drinks-on-chain/mocks";
 import type { Tone } from "@drinks-on-chain/ui";
 import { formatSettingValue } from "@/features/ajustes/effective-settings";
@@ -35,6 +36,7 @@ export const LOT_TABS = [
   "codigos",
   "laboratorio",
   "expediente",
+  "tokenizacion",
   "linea-de-tiempo",
   "trazabilidad",
   "correcciones",
@@ -48,6 +50,7 @@ export const LOT_TAB_LABEL: Record<LotTab, string> = {
   codigos: "Códigos",
   laboratorio: "Laboratorio",
   expediente: "Expediente",
+  tokenizacion: "Tokenización",
   "linea-de-tiempo": "Línea de tiempo",
   trazabilidad: "Trazabilidad",
   correcciones: "Correcciones",
@@ -178,8 +181,8 @@ export const EMPTY_LOT_FILTERS: LotFilters = { stage: "ALL", productType: "ALL",
 export const hasLotFilters = (f: LotFilters) =>
   f.stage !== "ALL" || f.productType !== "ALL" || f.q.trim() !== "" || f.issuesOnly;
 
-/** Etapas que ofrece el filtro (sin `ANCHORED`, reservada para la Ola 3). */
-export const FILTER_STAGES: readonly LotStageCode[] = LOT_STAGE_CODES.filter((s) => s !== "ANCHORED");
+/** Etapas que ofrece el filtro: todas (`ANCHORED` es la etapa final desde la Ola 3). */
+export const FILTER_STAGES: readonly LotStageCode[] = LOT_STAGE_CODES;
 
 /** Filtros de la pantalla → parámetros de `GET /v1/lots` (el servidor filtra y pagina). */
 export function lotListQuery(f: LotFilters, page: { limit: number; offset: number }): LotQuery {
@@ -387,4 +390,31 @@ export function lotFieldErrors(error: unknown, prefix?: string): LotFormErrors {
     const key = own?.split(".")[0];
     return key && (LOT_FIELDS as readonly string[]).includes(key) ? (key as LotFormField) : undefined;
   }).fieldErrors;
+}
+
+// ---------------------------------------------------------------------------
+// Estimación de botellas
+// ---------------------------------------------------------------------------
+
+export type EstimateErrors = Partial<Record<"estimatedBottles" | "reason", string>>;
+type EstimateBody = Required<Pick<UpdateLotDto, "estimatedBottles" | "reason">>;
+
+/**
+ * Cambio de la estimación (`PATCH /v1/lots/{id}`, con motivo). Solo valida la forma; que no baje
+ * de los NFT emitidos lo comprueba el servidor (`TOK_ESTIMATE_BELOW_MINTED`, Ola 3 §5.2).
+ */
+export function estimateFormErrors(
+  bottles: string,
+  reason: string,
+): { ok: true; body: EstimateBody } | { ok: false; errors: EstimateErrors } {
+  const errors: EstimateErrors = {};
+  const value = parseDecimal(bottles);
+  const why = reason.trim();
+  if (value == null || !Number.isInteger(value) || value < 1 || value > 100_000) {
+    errors.estimatedBottles = "La estimación va de 1 a 100.000 botellas.";
+  }
+  if (why.length < 3) errors.reason = "Explica el motivo del cambio (al menos 3 caracteres).";
+  else if (why.length > 500) errors.reason = "El motivo admite hasta 500 caracteres.";
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+  return { ok: true, body: { estimatedBottles: value!, reason: why } };
 }

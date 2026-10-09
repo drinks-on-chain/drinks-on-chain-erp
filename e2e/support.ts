@@ -26,8 +26,14 @@ export function trackErrors(page: Page, expected: RegExp[] = []) {
   return errors;
 }
 
-export async function login(page: Page, email: string) {
+/**
+ * Entra por la interfaz. Con `manualChain`, la red simulada de los mocks queda en `manual` antes de
+ * la primera petición con sesión (la carga de `/login` reinicia los mocks y la deja en `auto`): así
+ * la prueba decide cuándo se confirma cada transacción.
+ */
+export async function login(page: Page, email: string, options: { manualChain?: boolean } = {}) {
   await page.goto("/login");
+  if (options.manualChain) await chainMode(page, "manual");
   await page.getByLabel("Correo electrónico").fill(email);
   await page.getByLabel("Contraseña").fill("demo1234");
   await page.getByRole("button", { name: "Entrar" }).click();
@@ -35,7 +41,18 @@ export async function login(page: Page, email: string) {
 }
 
 /** Escenarios de datos de los mocks 0.5 (Ola 2): en qué etapa está el lote de demostración. */
-export type DataScenario = "lote-en-reposo" | "lote-listo" | "lote-con-incidencia" | "laboratorio-no-conforme";
+export type DataScenario =
+  | "lote-en-reposo"
+  | "lote-listo"
+  | "lote-con-incidencia"
+  | "laboratorio-no-conforme"
+  // Ola 3 (mocks 0.6): red simulada y tokenización.
+  | "identidad-preparandose"
+  | "emision-en-curso"
+  | "emision-fallida"
+  | "anclaje-pendiente"
+  | "faltante-botellas"
+  | "cambios-pedidos";
 
 /**
  * Fija un escenario de datos de los mocks antes de entrar: queda en `localStorage`, así que
@@ -48,6 +65,40 @@ export async function setDataScenario(page: Page, scenario: DataScenario) {
     (name) => (window as unknown as { __docMocks: { setScenario: (n: string) => void } }).__docMocks.setScenario(name),
     scenario,
   );
+}
+
+type MockChainControl = {
+  settle: () => unknown;
+  advance: (ms?: number) => unknown;
+  failNext: (options?: { kind?: string; code?: string }) => unknown;
+  setMode: (mode: "auto" | "manual") => unknown;
+};
+type ChainWindow = { __docMocks: { chain: MockChainControl } };
+
+/**
+ * Red simulada de los mocks 0.6 (`window.__docMocks.chain`). En el navegador avanza sola con el
+ * tiempo real; las pruebas la ponen en `manual` para decidir cuándo confirma la red.
+ */
+export async function chainMode(page: Page, mode: "auto" | "manual") {
+  await page.waitForFunction(() => "__docMocks" in window);
+  await page.evaluate((m) => void (window as unknown as ChainWindow).__docMocks.chain.setMode(m), mode);
+}
+
+/** La red confirma todo lo que tiene en vuelo. */
+export async function settleChain(page: Page) {
+  await page.evaluate(() => void (window as unknown as ChainWindow).__docMocks.chain.settle());
+}
+
+/** Un paso de la red (`PENDING → BUILDING → SUBMITTED → CONFIRMED`). */
+export async function advanceChain(page: Page, steps = 1) {
+  await page.evaluate((n) => {
+    for (let i = 0; i < n; i++) (window as unknown as ChainWindow).__docMocks.chain.advance();
+  }, steps);
+}
+
+/** La siguiente transacción de ese tipo falla de forma definitiva (`CHN_AUTH_FAILED`). */
+export async function failNextChainTx(page: Page, kind: string) {
+  await page.evaluate((k) => void (window as unknown as ChainWindow).__docMocks.chain.failNext({ kind: k }), kind);
 }
 
 /** Espera a que la pantalla termine de cargar: un h1 visible y ningún Skeleton. */

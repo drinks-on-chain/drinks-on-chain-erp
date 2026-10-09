@@ -42,6 +42,7 @@ const EMPTY: TraceDashboard = {
   readyToClose: [],
   complianceIssuesOpen: 0,
   unassignedHarvestBatches: 0,
+  tokenization: { openRequests: 0, changesRequested: 0, collectionsPublished: 0 },
 };
 
 describe("panel de la bodega", () => {
@@ -167,5 +168,25 @@ describe("panel de la bodega", () => {
         urgent: false,
       },
     ]);
+  });
+
+  it("tokenización (Ola 3 §11): el bloque llega tal cual y los cambios pedidos son tarea del dueño", () => {
+    const data = { ...EMPTY, tokenization: { openRequests: 2, changesRequested: 1, collectionsPublished: 3 } };
+    const reader = dashboardView(data);
+    expect(reader.tokenization).toEqual({ openRequests: 2, changesRequested: 1, collectionsPublished: 3 });
+    expect(reader.tasks).toEqual([]);
+    const owner = dashboardView(data, { tokenizationTasks: true });
+    expect(owner.tasks).toEqual([
+      {
+        id: "tokenization-changes",
+        kind: "tokenization",
+        title: "Atender los cambios pedidos en la tokenización",
+        subject: "1 solicitud con cambios pedidos",
+        href: "/tokenizacion",
+        due: "Pendiente",
+        urgent: false,
+      },
+    ]);
+    expect(dashboardView(EMPTY, { tokenizationTasks: true }).tasks).toEqual([]);
   });
 });

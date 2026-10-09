@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
-import { logout, trackErrors } from "./support";
+import { chainMode, logout, settleChain, trackErrors } from "./support";
 
 // Recorrido H2 del contrato de la Ola 2 (§18) contra los mocks, con las personas de la Destilería
 // Cinti Viejo: del lote nuevo al expediente cerrado, pasando por el pesaje, el análisis, el
@@ -238,19 +238,18 @@ test("recorrido H2: del lote nuevo al expediente cerrado, con las reglas a la vi
   // Cierre del expediente: todos los requisitos cumplidos, huella fijada y JSON canónico descargable.
   await page.getByRole("tab", { name: "Expediente" }).click();
   await expect(page.getByText("5 de 5 requisitos cumplidos")).toBeVisible();
+  // La red simulada no avanza sola: la prueba decide cuándo se confirma el anclaje.
+  await chainMode(page, "manual");
   const provisional = (await page
-    .getByTitle(/^[0-9a-f]{64}$/)
-    .first()
+    .getByTestId("dossier-hash-preview")
+    .locator('[data-part="value"]')
     .textContent())!.trim();
   await page.getByRole("button", { name: "Cerrar el expediente" }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Sí, cerrar el expediente" }).click();
   await expect(page.getByText("Expediente cerrado", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Huella (SHA-256)")).toBeVisible();
   await expect(page.getByText(/Raíz Merkle de los 2\.950 códigos de botella/)).toBeVisible();
-  const hash = (await page
-    .getByTitle(/^[0-9a-f]{64}$/)
-    .first()
-    .textContent())!.trim();
+  const hash = (await page.getByTestId("dossier-hash").locator('[data-part="value"]').textContent())!.trim();
   expect(hash).toMatch(/^[0-9a-f]{64}$/);
   expect(provisional).toMatch(/^[0-9a-f]{64}$/);
   const [jsonDownload] = await Promise.all([
@@ -259,6 +258,20 @@ test("recorrido H2: del lote nuevo al expediente cerrado, con las reglas a la vi
   ]);
   const canonical = JSON.parse(await readFile((await jsonDownload.path())!, "utf8")) as Record<string, unknown>;
   expect(JSON.stringify(canonical)).toContain(lotCode);
+
+  // Anclaje (Ola 3 §7): queda pendiente al cerrar y, cuando la red lo confirma, el lote pasa a
+  // «Anclado en la red» con el enlace al explorador que da el servidor.
+  const anchor = page.getByRole("region", { name: "Anclaje en la red" });
+  await expect(anchor).toHaveAttribute("data-anchor", "PENDING");
+  await expect(anchor).toContainText("En cola");
+  await settleChain(page);
+  await expect(anchor).toHaveAttribute("data-anchor", "ANCHORED");
+  await expect(anchor).toContainText("Confirmada");
+  await expect(anchor.getByRole("link", { name: /Ver en el explorador/ })).toHaveAttribute(
+    "href",
+    /^https:\/\/\S+\/tx\/[0-9a-f]{64}$/,
+  );
+  await expect(page.getByRole("heading", { level: 1 }).locator("..")).toContainText("Anclado en la red");
 
   // Tras el cierre, una corrección ya no entra: el servidor la rechaza y el aviso lo explica.
   await page.getByRole("tab", { name: "Correcciones" }).click();
@@ -285,8 +298,8 @@ test("recorrido H2: del lote nuevo al expediente cerrado, con las reglas a la vi
   await expect(graph.locator('[data-stage="BOTTLING"]')).toContainText("2.950 botellas");
   await expect(graph.locator('[data-stage="LAB_ANALYSIS"]')).toContainText("Conforme");
 
-  // Y el lote figura con el expediente cerrado.
+  // Y el lote figura anclado: es su etapa final.
   await openLot(page);
-  await expect(page.getByText("Expediente cerrado").first()).toBeVisible();
+  await expect(page.getByText("Anclado en la red").first()).toBeVisible();
   expect(errors).toEqual([]);
 });

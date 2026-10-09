@@ -20,6 +20,7 @@ import { TASK_ACTION, dashboardView, type DashboardTask } from "@/features/dashb
 import { lockRuleText, lockStatusText } from "@/features/lotes/lot-model";
 import { errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
+import { env } from "@/lib/env";
 import { useTraceDashboard } from "@/lib/erp/hooks";
 import { LOT_STAGE_CODE } from "@/lib/erp/labels";
 import { can } from "@/lib/erp/permissions";
@@ -39,7 +40,13 @@ export default function DashboardPage() {
   const me = useMe();
   const canRead = can(me.data, "dashboard.read");
   const dashboard = useTraceDashboard(canRead);
-  const d = useMemo(() => (dashboard.data ? dashboardView(dashboard.data) : undefined), [dashboard.data]);
+  // Tokenización (1K, detrás de la bandera): el bloque lo ven quienes la leen; la tarea, el dueño.
+  const showTokenization = env.tokenization && can(me.data, "tokenization.read");
+  const tokenizationTasks = env.tokenization && can(me.data, "tokenization.manage");
+  const d = useMemo(
+    () => (dashboard.data ? dashboardView(dashboard.data, { tokenizationTasks }) : undefined),
+    [dashboard.data, tokenizationTasks],
+  );
   const firstName = me.data?.user.fullName.replace(/^(Lic\.|Ing\.|Dr\.|Dra\.)\s+/, "").split(" ")[0];
 
   return (
@@ -177,6 +184,39 @@ export default function DashboardPage() {
                   />
                 )}
               </Card>
+
+              {showTokenization && (
+                <Card className="p-5">
+                  <CardHeader
+                    title="Tokenización"
+                    className="mb-4"
+                    action={
+                      <Link href="/tokenizacion" className="text-sm font-medium text-accent-text hover:underline">
+                        Ver solicitudes
+                      </Link>
+                    }
+                  />
+                  {!d ? (
+                    <Skeleton className="h-24" />
+                  ) : (
+                    <ul aria-label="Tokenización de la bodega" className="m-0 grid list-none gap-0 p-0">
+                      {[
+                        { label: "Solicitudes abiertas", value: d.tokenization.openRequests },
+                        { label: "Con cambios pedidos", value: d.tokenization.changesRequested },
+                        { label: "Colecciones publicadas", value: d.tokenization.collectionsPublished },
+                      ].map((row) => (
+                        <li
+                          key={row.label}
+                          className="flex items-center justify-between gap-3 border-b border-border py-2 text-sm last:border-b-0"
+                        >
+                          <span>{row.label}</span>
+                          <span className="font-medium tabular-nums">{fmtNumber(row.value)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </Card>
+              )}
 
               <Card className="p-5">
                 <CardHeader title="Lotes por etapa" className="mb-4" />

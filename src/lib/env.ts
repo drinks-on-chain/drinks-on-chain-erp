@@ -8,7 +8,19 @@ const schema = z.object({
   urlBodegas: z.string().url().or(z.literal("")),
   urlApp: z.string().url().or(z.literal("")),
   turnstileSiteKey: z.string(),
+  tokenization: z.boolean(),
 });
+
+/**
+ * Bandera de la tokenización (1K, contrato de la Ola 3 §12.1): `NEXT_PUBLIC_ERP_TOKENIZATION=1` la
+ * activa y `=0` la apaga; sin definir, queda activa solo con mocks. Se retira al cierre de la ola.
+ */
+export function tokenizationEnabled(vars: { flag: string | undefined; mocks: boolean }): boolean {
+  const flag = vars.flag?.trim();
+  if (flag === "1") return true;
+  if (flag === "0") return false;
+  return vars.mocks;
+}
 
 export const env = schema.parse({
   mocks: process.env.NEXT_PUBLIC_MOCKS === "1",
@@ -16,6 +28,10 @@ export const env = schema.parse({
   urlBodegas: process.env.NEXT_PUBLIC_URL_BODEGAS ?? "",
   urlApp: process.env.NEXT_PUBLIC_URL_APP ?? "",
   turnstileSiteKey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "",
+  tokenization: tokenizationEnabled({
+    flag: process.env.NEXT_PUBLIC_ERP_TOKENIZATION,
+    mocks: process.env.NEXT_PUBLIC_MOCKS === "1",
+  }),
 });
 
 /** Clave de prueba pública de Cloudflare Turnstile: siempre valida (widget visible). */
