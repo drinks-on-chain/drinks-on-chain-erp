@@ -38,7 +38,7 @@ Detalle de `docs/03-roadmap-frontend.md` §4. Se marca con fecha cuando la sub-e
 ## 1F · Cuenta de la bodega
 
 - [x] Panel de solo lectura de la cuenta Stellar · 2026-09-25
-- [ ] Activos por lote (emitidas, en circulación, quemadas): pendiente de que el backend los exponga
+- [x] Activos por lote (emitidos, vendidos, quemados) con la cuenta real de la bodega: ver «Ola 3 · O3-ERP-1» · 2026-10-09
 
 ## 1G · Calidad
 
@@ -155,3 +155,28 @@ Contrato: `plan/contratos/o2-erp-confiable.md` del plan maestro (§2–§14, §1
 - [x] Crianza y destilación solo desde un tanque `COMPLETED`: los formularios ofrecen solo esos tanques, llevan a la ficha del tanque para completarlo y explican el 409 `TRC_TANK_NOT_COMPLETED` · 2026-10-02
 - [x] El panel vuelve al esquema de los mocks (`pendingPhyto[].intakeDate` como fecha) y se retira `src/lib/erp/schemas.ts`; fuera la regla `TRC_PRODUCT_TYPE_MISMATCH` y los alias `laboratoryReportPdfUrl`/`labelDesignUrl` · 2026-10-02
 - [x] Pruebas: elusiones `TRC_AGING_BELOW_MINIMUM` (Altos exige 6 meses) y `TRC_TANK_NOT_COMPLETED` desde la interfaz; estados vacíos del panel y del reporte con el escenario `empty` · 2026-10-02
+
+## Ola 3 · O3-ERP-1 (sub-etapas 1K y 1F real) · Tokenización y cuenta de la bodega
+
+Contrato: `plan/contratos/o3-tokenizacion.md` del plan maestro (§0, §2.3–§2.4, §3.4, §5, §6.1–§6.3, §7, §8.4, §9, §10, §13 y «Precisiones de la apertura») y `docs/CONTRATO.md` §13 de los mocks 0.6 (donde difieren, manda el OpenAPI). Se construye y se prueba contra mocks: el backend aún no tiene desplegada la apertura de la Ola 3.
+
+### Fase 1 · Versiones y cuenta de la bodega (1F)
+
+- [x] `@drinks-on-chain/mocks` 0.6.0-rc.1 y `@drinks-on-chain/ui` 0.4.0-rc.1: `LotSummary.tokenization` y `TraceDashboard.tokenization`, tipos nuevos de la línea de tiempo, lote nuevo de la demo (`CVJ-L2026-006`) · 2026-10-09
+- [x] `ANCHORED` («Anclado en la red») como etapa final visible del lote, también en el filtro de la lista; `CERTIFIED` es el paso intermedio mientras la red confirma · 2026-10-09
+- [x] Anclaje del expediente en su pestaña (`LotDossier.anchor`): estado, `TxStatusBadge`, enlace al explorador del backend, hash y cuenta de anclaje; se consulta cada 5 s solo mientras la transacción está en vuelo · 2026-10-09
+- [x] 1F «Cuenta de la bodega» con `GET /v1/organizations/current/chain-account`: identidad (sin cuenta, «Preparando tu cuenta en la red», activa, fallida, pausada), cuenta y contrato con `ChainAddress` y `ExplorerLink`, símbolo, NFT emitidos, vendidos y quemados por lote, anclajes y últimas transacciones; la leen todos los miembros · 2026-10-09
+- [x] Retirados «Identificador de productor», los helpers `explorerAccountUrl`/`explorerTxUrl` y todo host del explorador escrito en el código (`src/features/cuenta/stellar.tsx`), la tabla «Activos por lote» sin datos, la tarjeta «Billetera» del perfil (el personal ya no tiene billetera personal) y el texto que daba la cuenta por creada · 2026-10-09
+- [x] Pruebas: unitarias de `src/lib/erp/chain.ts` y de `IdentityCard`; e2e `cuenta-bodega.spec.ts` (identidad y enlaces, operario, identidad preparándose, anclaje pendiente → anclado) y el recorrido H2 hasta «Anclado en la red» · 2026-10-09
+
+### Fase 2 · Autorizar tokenización (1K), detrás de `NEXT_PUBLIC_ERP_TOKENIZATION`
+
+- [x] Bandera `NEXT_PUBLIC_ERP_TOKENIZATION` (`1` activa, `0` apaga; sin definir, activa solo con mocks): pestaña, rutas, menú, marca y bloque del panel · 2026-10-09
+- [x] Pestaña «Tokenización» de la ficha del lote (`GET /v1/lots/{id}/tokenization`): límite con su base («estimación» o «botellas»), bloqueos explicados con `RuleViolationNotice` (códigos `TOK_…`), solicitud abierta con su historial, colección con sus emisiones y solicitudes del lote · 2026-10-09
+- [x] «Autorizar tokenización» y «Ampliar cuota» (solo el dueño) en `/lotes/{id}/tokenizar` con `TokenizationRequestForm`: cuota con su máximo, nombre, descripción, notas de cata, maridaje, fotos con portada por `POST /v1/uploads`, notas, y diálogo de confirmación explícito; `Idempotency-Key` al enviar y al reenviar · 2026-10-09
+- [x] Cambios pedidos (mensaje y campos a la vista, editar y reenviar), retirar con motivo, emisión con `TxStatusBadge` (consulta cada 5 s solo con transacciones en curso) y emisión fallida explicada · 2026-10-09
+- [x] Solicitudes de la bodega (`/tokenizacion`, `/tokenizacion/{id}`), marca de tokenización en la lista de lotes (todos los roles), bloque `tokenization` del panel con la tarea de los cambios pedidos, y cierre con faltante en solo lectura (`GET /v1/collections/{id}/closure`) · 2026-10-09
+- [x] «Editar estimación» en la ficha del lote (`PATCH /v1/lots/{id}` con motivo), con el aviso de `TOK_ESTIMATE_BELOW_MINTED` · 2026-10-09
+- [x] Permisos del contrato §10: dirección autoriza; enología y contabilidad leen; agronomía y operación solo ven la marca · 2026-10-09
+- [x] Pruebas: unitarias del modelo (`tokenization-model.ts`), de los `TOK_…`, de la bandera y del panel; e2e `tokenizacion.spec.ts` (autorizar 100 → cambios pedidos → reenviar → aprobada y emitida con el reloj de la red → ampliar a 150 → cuenta de la bodega; cuota mayor que la estimación, enóloga sin botón, segunda solicitud abierta, emisión fallida, estimación bajo lo emitido, faltante) con axe · 2026-10-09
+- [ ] Contra el backend real (O3-ERP-2): cuando el backend despliegue la apertura de la Ola 3; al cierre (H3) se retira la bandera
