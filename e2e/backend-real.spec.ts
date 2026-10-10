@@ -1,6 +1,14 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { expect, test, type Browser, type Page, type Response } from "@playwright/test";
+import { z } from "zod";
+import {
+  LotDossierSchema,
+  LotSummarySchema,
+  LotTokenizationStatusSchema,
+  TokenizationRequestSummarySchema,
+  WineryChainAccountViewSchema,
+} from "@drinks-on-chain/mocks";
 import { hasMailbox, mailLink } from "./mailpit";
 import { trackErrors } from "./support";
 
@@ -949,6 +957,159 @@ test("Ola 2: recorrido de §18 por la interfaz, del lote nuevo al expediente cer
 });
 
 // ---------- Ola 1 · cuenta, invitaciones y equipo (O1-ERP-1 contra O1-BE-1) ----------
+
+// ---------------------------------------------------------------------------
+// Ola 3 · cotejo de solo lectura con el backend real (O3-ERP-1)
+// ---------------------------------------------------------------------------
+
+/** Respuesta 200 de un GET de la API cuya ruta cumple `path` (sin la consulta). */
+const apiGet = (page: Page, path: RegExp) =>
+  page.waitForResponse(
+    (r) => r.request().method() === "GET" && r.status() === 200 && path.test(new URL(r.url()).pathname),
+    { timeout: 30_000 },
+  );
+
+/** `data` de la respuesta, validada con el esquema de los mocks (el contrato que usa el ERP). */
+async function contractData<T>(response: Response, schema: z.ZodType<T>, what: string): Promise<T> {
+  const parsed = schema.safeParse((await response.json()).data);
+  expect(
+    parsed.success ? [] : parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`),
+    `${what}: la respuesta real no cumple el esquema de los mocks`,
+  ).toEqual([]);
+  return parsed.data as T;
+}
+
+const pageOf = <T>(item: z.ZodType<T>) =>
+  z.object({ items: z.array(item), total: z.number(), limit: z.number(), offset: z.number() });
+
+test("Ola 3: cuenta de la bodega, tokenización y anclaje en solo lectura cumplen el contrato", async ({ page }) => {
+  needsPassword();
+  test.setTimeout(240_000);
+  const errors = trackErrors(page);
+  await login(page, "admin@cintiviejo.test");
+  await expect(page.getByText("Tareas pendientes", { exact: true })).toBeVisible({ timeout: 20_000 });
+
+  await test.step("cuenta de la bodega: el estado de la identidad, dicho como es y sin error", async () => {
+    const [response] = await Promise.all([
+      apiGet(page, /\/api\/v1\/organizations\/current\/chain-account$/),
+      openModule(page, "Cuenta de la bodega", "Cuenta de la bodega"),
+    ]);
+    const account = await contractData(response, WineryChainAccountViewSchema, "chain-account");
+    console.log(
+      `[cadena] identidad=${account.identity.status} red=${account.identity.network} colecciones=${account.byLot.length} transacciones=${account.recentTransactions.length}`,
+    );
+    const identity = page.getByRole("group", { name: "Identidad en la red" });
+    await expect(identity).toHaveAttribute("data-identity", account.identity.status);
+    if (account.identity.status === "NOT_PROVISIONED") {
+      await expect(identity).toContainText("Tu bodega aún no tiene cuenta en la red");
+      await expect(identity.getByRole("link")).toHaveCount(0);
+    }
+    if (account.identity.account) await expect(identity).toContainText(account.identity.account.address);
+    if (account.byLot.length === 0) {
+      await expect(page.getByRole("heading", { name: "Aún no hay NFT emitidos" })).toBeVisible();
+    }
+    await expect(page.getByTestId("chain-account-unavailable")).toHaveCount(0);
+  });
+
+  const picked: { lot: { id: string; name: string } | null } = { lot: null };
+  await test.step("lista de lotes: la marca de tokenización viene en cada lote", async () => {
+    const [response] = await Promise.all([apiGet(page, /\/api\/v1\/lots$/), openModule(page, "Lotes", "Lotes")]);
+    const lots = await contractData(response, pageOf(LotSummarySchema), "lots");
+    expect(lots.items.length).toBeGreaterThan(0);
+    await expect(page.getByRole("columnheader", { name: "Tokenización" })).toBeVisible();
+    const marked = lots.items.filter((l) => l.tokenization.state !== "NONE");
+    console.log(`[lotes] ${lots.total} lotes; con marca de tokenización en la primera página: ${marked.length}`);
+    // Un lote aún sin cerrar, para leer su estado de tokenización.
+    const candidate = lots.items.find((l) => !["CERTIFIED", "ANCHORED", "REJECTED", "DISCARDED"].includes(l.stage));
+    picked.lot = candidate ? { id: candidate.id, name: candidate.name } : null;
+  });
+
+  await test.step("pestaña Tokenización de un lote existente: límites y estado de la identidad", async () => {
+    const openLot = picked.lot;
+    if (!openLot) {
+      test.info().annotations.push({ type: "omitido", description: "Sin lotes abiertos en la primera página." });
+      return;
+    }
+    await page.locator(`a[href="/lotes/${openLot.id}"]`).first().click();
+    await settled(page);
+    const [response] = await Promise.all([
+      apiGet(page, /\/api\/v1\/lots\/[\w-]+\/tokenization$/),
+      page.getByRole("tab", { name: "Tokenización" }).click(),
+    ]);
+    const status = await contractData(response, LotTokenizationStatusSchema, "lots/{id}/tokenization");
+    console.log(
+      `[tokenización] lote=${openLot.name} tokenizable=${status.tokenizable} base=${status.limits.basis} máximo=${status.limits.maxQuantity} identidad=${status.chainIdentity.status} bloqueos=${status.blockers.map((b) => b.code).join(",") || "ninguno"}`,
+    );
+    await settled(page);
+    const state = page.getByRole("group", { name: "Tokenización del lote" });
+    await expect(state.getByTestId("limits-summary")).toBeVisible();
+    if (status.chainIdentity.status !== "ACTIVE") {
+      await expect(state.getByText(/^Cuenta de la bodega en la red:/)).toBeVisible();
+    }
+    if (status.blockers.some((b) => b.code !== "TOK_REQUEST_ALREADY_OPEN")) {
+      await expect(state.getByTestId("rule-violation-notice")).toBeVisible();
+    }
+    if (!status.openRequest && status.requests.length === 0) {
+      await expect(page.getByRole("heading", { name: "Este lote aún no tiene solicitudes" })).toBeVisible();
+    }
+    await expect(page.getByText("No se pudo cargar")).toHaveCount(0);
+  });
+
+  await test.step("solicitudes de la bodega", async () => {
+    const [response] = await Promise.all([
+      apiGet(page, /\/api\/v1\/tokenization-requests$/),
+      openModule(page, "Tokenización", "Solicitudes de tokenización"),
+    ]);
+    const requests = await contractData(response, pageOf(TokenizationRequestSummarySchema), "tokenization-requests");
+    console.log(`[solicitudes] ${requests.total}`);
+    if (requests.total === 0) {
+      await expect(page.getByRole("heading", { name: "Aún no hay solicitudes de tokenización" })).toBeVisible();
+    }
+  });
+
+  await test.step("anclaje del expediente de un lote cerrado", async () => {
+    await openModule(page, "Lotes", "Lotes");
+    let found = false;
+    for (const stage of ["Anclado en la red", "Expediente cerrado"]) {
+      await page.getByRole("combobox", { name: "Filtrar por etapa" }).click();
+      await page.getByRole("option", { name: stage, exact: true }).click();
+      await settled(page);
+      const first = page.getByRole("table", { name: "Lotes de la bodega" }).locator("tbody a[href^='/lotes/']").first();
+      if ((await first.count()) > 0) {
+        await first.click();
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      test.info().annotations.push({ type: "omitido", description: "Sin lotes con el expediente cerrado." });
+      return;
+    }
+    await settled(page);
+    const [response] = await Promise.all([
+      apiGet(page, /\/api\/v1\/lots\/[\w-]+\/dossier$/),
+      page.getByRole("tab", { name: "Expediente" }).click(),
+    ]);
+    const dossier = await contractData(response, LotDossierSchema, "lots/{id}/dossier");
+    console.log(
+      `[anclaje] expediente=${dossier.status} anclaje=${dossier.anchor?.status ?? "sin registrar"} enlace=${dossier.anchor?.explorerUrl ? "sí" : "no"}`,
+    );
+    await settled(page);
+    const anchor = page.getByRole("region", { name: "Anclaje en la red" });
+    await expect(anchor).toBeVisible();
+    if (dossier.anchor) await expect(anchor).toHaveAttribute("data-anchor", dossier.anchor.status);
+    else await expect(anchor).toContainText("Todavía no se ha registrado");
+    if (dossier.anchor?.explorerUrl) {
+      await expect(anchor.getByRole("link", { name: /Ver en el explorador/ })).toHaveAttribute(
+        "href",
+        dossier.anchor.explorerUrl,
+      );
+    }
+    await expect(page.getByText("No se pudo cargar")).toHaveCount(0);
+  });
+
+  expect(errors).toEqual([]);
+});
 
 const nav = (page: Page, name: string) =>
   page.getByRole("navigation", { name: "Navegación principal" }).getByRole("link", { name, exact: true }).click();

@@ -55,6 +55,8 @@ export default defineConfig({
     env: REAL_API
       ? {
           NEXT_PUBLIC_MOCKS: "0",
+          // La tokenización (1K) sigue tras su bandera hasta el cierre de la ola: aquí se coteja.
+          NEXT_PUBLIC_ERP_TOKENIZATION: "1",
           API_ORIGIN: REAL_API,
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || TURNSTILE_TEST_SITE_KEY,
         }
