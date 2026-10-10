@@ -1,13 +1,12 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { expect, test, type Browser, type Page, type Response } from "@playwright/test";
-import { z } from "zod";
-import {
-  LotDossierSchema,
-  LotSummarySchema,
-  LotTokenizationStatusSchema,
-  TokenizationRequestSummarySchema,
-  WineryChainAccountViewSchema,
+import type {
+  LotDossier,
+  LotSummary,
+  LotTokenizationStatus,
+  TokenizationRequestSummary,
+  WineryChainAccountView,
 } from "@drinks-on-chain/mocks";
 import { hasMailbox, mailLink } from "./mailpit";
 import { trackErrors } from "./support";
@@ -969,18 +968,17 @@ const apiGet = (page: Page, path: RegExp) =>
     { timeout: 30_000 },
   );
 
-/** `data` de la respuesta, validada con el esquema de los mocks (el contrato que usa el ERP). */
-async function contractData<T>(response: Response, schema: z.ZodType<T>, what: string): Promise<T> {
-  const parsed = schema.safeParse((await response.json()).data);
-  expect(
-    parsed.success ? [] : parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`),
-    `${what}: la respuesta real no cumple el esquema de los mocks`,
-  ).toEqual([]);
-  return parsed.data as T;
+/**
+ * `data` de una respuesta real. El contrato lo comprueba la propia app: cada lectura pasa por el
+ * esquema de `@drinks-on-chain/mocks` de su recurso (`src/lib/erp/resources.ts`) y, si no lo cumple,
+ * la pantalla cae en ErrorState y deja en consola el campo que falla (lo recoge `trackErrors`). El
+ * paquete de los mocks es solo ESM y no se puede cargar desde el proceso de Playwright.
+ */
+async function realData<T>(response: Response): Promise<T> {
+  return (await response.json()).data as T;
 }
 
-const pageOf = <T>(item: z.ZodType<T>) =>
-  z.object({ items: z.array(item), total: z.number(), limit: z.number(), offset: z.number() });
+type PageOf<T> = { items: T[]; total: number };
 
 test("Ola 3: cuenta de la bodega, tokenización y anclaje en solo lectura cumplen el contrato", async ({ page }) => {
   needsPassword();
@@ -994,7 +992,7 @@ test("Ola 3: cuenta de la bodega, tokenización y anclaje en solo lectura cumple
       apiGet(page, /\/api\/v1\/organizations\/current\/chain-account$/),
       openModule(page, "Cuenta de la bodega", "Cuenta de la bodega"),
     ]);
-    const account = await contractData(response, WineryChainAccountViewSchema, "chain-account");
+    const account = await realData<WineryChainAccountView>(response);
     console.log(
       `[cadena] identidad=${account.identity.status} red=${account.identity.network} colecciones=${account.byLot.length} transacciones=${account.recentTransactions.length}`,
     );
@@ -1014,7 +1012,7 @@ test("Ola 3: cuenta de la bodega, tokenización y anclaje en solo lectura cumple
   const picked: { lot: { id: string; name: string } | null } = { lot: null };
   await test.step("lista de lotes: la marca de tokenización viene en cada lote", async () => {
     const [response] = await Promise.all([apiGet(page, /\/api\/v1\/lots$/), openModule(page, "Lotes", "Lotes")]);
-    const lots = await contractData(response, pageOf(LotSummarySchema), "lots");
+    const lots = await realData<PageOf<LotSummary>>(response);
     expect(lots.items.length).toBeGreaterThan(0);
     await expect(page.getByRole("columnheader", { name: "Tokenización" })).toBeVisible();
     const marked = lots.items.filter((l) => l.tokenization.state !== "NONE");
@@ -1036,7 +1034,7 @@ test("Ola 3: cuenta de la bodega, tokenización y anclaje en solo lectura cumple
       apiGet(page, /\/api\/v1\/lots\/[\w-]+\/tokenization$/),
       page.getByRole("tab", { name: "Tokenización" }).click(),
     ]);
-    const status = await contractData(response, LotTokenizationStatusSchema, "lots/{id}/tokenization");
+    const status = await realData<LotTokenizationStatus>(response);
     console.log(
       `[tokenización] lote=${openLot.name} tokenizable=${status.tokenizable} base=${status.limits.basis} máximo=${status.limits.maxQuantity} identidad=${status.chainIdentity.status} bloqueos=${status.blockers.map((b) => b.code).join(",") || "ninguno"}`,
     );
@@ -1060,11 +1058,12 @@ test("Ola 3: cuenta de la bodega, tokenización y anclaje en solo lectura cumple
       apiGet(page, /\/api\/v1\/tokenization-requests$/),
       openModule(page, "Tokenización", "Solicitudes de tokenización"),
     ]);
-    const requests = await contractData(response, pageOf(TokenizationRequestSummarySchema), "tokenization-requests");
+    const requests = await realData<PageOf<TokenizationRequestSummary>>(response);
     console.log(`[solicitudes] ${requests.total}`);
     if (requests.total === 0) {
       await expect(page.getByRole("heading", { name: "Aún no hay solicitudes de tokenización" })).toBeVisible();
     }
+    await expect(page.getByText("No se pudo cargar")).toHaveCount(0);
   });
 
   await test.step("anclaje del expediente de un lote cerrado", async () => {
@@ -1090,7 +1089,7 @@ test("Ola 3: cuenta de la bodega, tokenización y anclaje en solo lectura cumple
       apiGet(page, /\/api\/v1\/lots\/[\w-]+\/dossier$/),
       page.getByRole("tab", { name: "Expediente" }).click(),
     ]);
-    const dossier = await contractData(response, LotDossierSchema, "lots/{id}/dossier");
+    const dossier = await realData<LotDossier>(response);
     console.log(
       `[anclaje] expediente=${dossier.status} anclaje=${dossier.anchor?.status ?? "sin registrar"} enlace=${dossier.anchor?.explorerUrl ? "sí" : "no"}`,
     );
