@@ -1,5 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { TURNSTILE_TEST_SITE_KEY, captchaMode, resolveApiOrigin } from "./env";
+import { TURNSTILE_TEST_SITE_KEY, assertMocksAllowed, captchaMode, resolveApiOrigin } from "./env";
+
+describe("assertMocksAllowed (guardia de producción)", () => {
+  it("rechaza mocks en la producción de Vercel", () => {
+    expect(() => assertMocksAllowed({ NEXT_PUBLIC_MOCKS: "1", VERCEL_ENV: "production" })).toThrow(
+      /NEXT_PUBLIC_MOCKS=1/,
+    );
+  });
+
+  it("permite mocks en local, CI y previews, y sin mocks en producción", () => {
+    expect(() => assertMocksAllowed({ NEXT_PUBLIC_MOCKS: "1" })).not.toThrow();
+    expect(() => assertMocksAllowed({ NEXT_PUBLIC_MOCKS: "1", VERCEL_ENV: "preview" })).not.toThrow();
+    expect(() => assertMocksAllowed({ NEXT_PUBLIC_MOCKS: "0", VERCEL_ENV: "production" })).not.toThrow();
+  });
+
+  it("una demo pública lo declara con ALLOW_MOCKS_IN_PRODUCTION=1", () => {
+    expect(() =>
+      assertMocksAllowed({ NEXT_PUBLIC_MOCKS: "1", VERCEL_ENV: "production", ALLOW_MOCKS_IN_PRODUCTION: "1" }),
+    ).not.toThrow();
+  });
+});
 
 describe("resolveApiOrigin (API_ORIGIN, P-1)", () => {
   it("normaliza la barra y el /v1 finales", () => {

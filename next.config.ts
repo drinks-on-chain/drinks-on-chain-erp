@@ -1,5 +1,5 @@
 import type { NextConfig } from "next";
-import { API_BASE, resolveApiOrigin } from "./src/lib/env";
+import { API_BASE, assertMocksAllowed, resolveApiOrigin } from "./src/lib/env";
 
 // `next typegen` (pnpm typecheck) también carga la configuración; ahí no se exige API_ORIGIN,
 // porque no se sirve ni se despliega nada.
@@ -9,7 +9,10 @@ const typegenOnly = process.argv.includes("typegen");
 // lo reescribe a ${API_ORIGIN}/v1/* con la IP del cliente firmada (O1-OPS-1), así la cookie de
 // renovación `doc_rt` es de primera parte. API_ORIGIN se valida también al construir para que un
 // despliegue sin ella falle en el build y no en la primera petición.
-if (!typegenOnly) resolveApiOrigin();
+if (!typegenOnly) {
+  assertMocksAllowed();
+  resolveApiOrigin();
+}
 
 const nextConfig: NextConfig = {
   async headers() {

@@ -44,6 +44,29 @@ export function captchaMode(
   return { kind: "missing" };
 }
 
+type MocksGuardVars = { NEXT_PUBLIC_MOCKS?: string; VERCEL_ENV?: string; ALLOW_MOCKS_IN_PRODUCTION?: string };
+
+/**
+ * Guardia: los datos de prueba (MSW y `/__mocks`) no se publican en la producción de Vercel, donde
+ * los dominios oficiales sirven el backend real. `next.config.ts` la llama al construir, así que un
+ * despliegue de producción con `NEXT_PUBLIC_MOCKS=1` falla en el build. Una demo pública con mocks
+ * necesita declararlo con `ALLOW_MOCKS_IN_PRODUCTION=1` (variable de servidor).
+ */
+export function assertMocksAllowed(
+  vars: MocksGuardVars = {
+    NEXT_PUBLIC_MOCKS: process.env.NEXT_PUBLIC_MOCKS,
+    VERCEL_ENV: process.env.VERCEL_ENV,
+    ALLOW_MOCKS_IN_PRODUCTION: process.env.ALLOW_MOCKS_IN_PRODUCTION,
+  },
+): void {
+  if (vars.NEXT_PUBLIC_MOCKS !== "1" || vars.VERCEL_ENV !== "production") return;
+  if (vars.ALLOW_MOCKS_IN_PRODUCTION === "1") return;
+  throw new Error(
+    "NEXT_PUBLIC_MOCKS=1 en la producción de Vercel: los dominios oficiales usan el backend real. " +
+      "Quita la variable (y define API_ORIGIN) o, para una demo pública, ALLOW_MOCKS_IN_PRODUCTION=1.",
+  );
+}
+
 /** Las herramientas de desarrollo (/__mocks) existen en local y en demos con mocks. */
 export const devToolsEnabled = process.env.NODE_ENV !== "production" || env.mocks;
 
