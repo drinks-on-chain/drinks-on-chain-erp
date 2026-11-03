@@ -907,10 +907,9 @@ test("Ola 2: recorrido de §18 por la interfaz, del lote nuevo al expediente cer
     expect(closed.status()).toBeLessThan(300);
     await expect(page.getByText("Huella (SHA-256)")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText(/Raíz Merkle de los 2\.950 códigos de botella/)).toBeVisible();
-    const hash = (await page
-      .getByTitle(/^[0-9a-f]{64}$/)
-      .first()
-      .textContent())!.trim();
+    // La huella se pinta con ChainAddress (ui 0.4): el valor completo está en su parte `value`
+    const hash = (await page.getByTestId("dossier-hash").locator('[data-part="value"]').textContent())!.trim();
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
     const [canonicalResponse, json] = await Promise.all([
       page.waitForResponse((r) => r.url().endsWith("/dossier/canonical")),
       page.waitForEvent("download"),
@@ -947,10 +946,33 @@ test("Ola 2: recorrido de §18 por la interfaz, del lote nuevo al expediente cer
     await expect(graph.locator('[data-stage="BOTTLING"]')).toContainText("2.950 botellas");
     await side(page, "Lotes");
     await page.getByRole("searchbox", { name: "Buscar lote" }).fill(stamp);
-    await expect(page.getByRole("row", { name: new RegExp(escapeRe(LOT)) })).toContainText("Expediente cerrado", {
-      timeout: 20_000,
-    });
+    // `CERTIFIED` mientras el anclaje está pendiente; `ANCHORED` si el backend ya lo ancló
+    await expect(page.getByRole("row", { name: new RegExp(escapeRe(LOT)) })).toContainText(
+      /Expediente cerrado|Anclado en la red/,
+      { timeout: 20_000 },
+    );
   });
+
+  // Con el anclaje activo en el backend (ANCHOR_LEDGER=SIMULATED o Stellar habilitado):
+  // E2E_EXPECT_ANCHOR=1 exige que el lote llegue a «Anclado en la red» con la huella del expediente
+  if (process.env.E2E_EXPECT_ANCHOR === "1") {
+    await test.step("anclaje de la huella del expediente (E2E_EXPECT_ANCHOR=1)", async () => {
+      await expect(page.getByRole("row", { name: new RegExp(escapeRe(LOT)) })).toContainText("Anclado en la red", {
+        timeout: 60_000,
+      });
+      await page.getByRole("link", { name: LOT, exact: true }).click();
+      await expect(page.getByRole("heading", { name: LOT })).toBeVisible({ timeout: 20_000 });
+      await page.getByRole("tab", { name: "Expediente" }).click();
+      const dossierHash = (await page.getByTestId("dossier-hash").locator('[data-part="value"]').textContent())!.trim();
+      // El memo del anclaje es la huella del expediente (en hex y en base64)
+      await expect(page.getByText(/Anclad[oa]/).first()).toBeVisible({ timeout: 20_000 });
+      await page.getByRole("tab", { name: "Línea de tiempo" }).click();
+      await expect(page.getByRole("list", { name: "Línea de tiempo del lote" })).toContainText("Expediente anclado", {
+        timeout: 20_000,
+      });
+      expect(dossierHash).toMatch(/^[0-9a-f]{64}$/);
+    });
+  }
 
   expect(errors, "respuestas o errores inesperados").toEqual([]);
 });
