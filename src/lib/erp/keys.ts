@@ -39,4 +39,11 @@ export const erpKeys = {
   invitations: () => ["erp", "winery", "invitations"] as const,
   settings: () => ["erp", "winery", "settings"] as const,
   audit: (params?: object) => ["erp", "winery", "audit", params ?? {}] as const,
+  // Ola 3: cadena y tokenización
+  chainAccount: () => ["erp", "winery", "chain-account"] as const,
+  lotTokenization: (id: string) => ["erp", "lots", "detail", id, "tokenization"] as const,
+  tokenizationRequests: (params?: object) => ["erp", "tokenization-requests", params ?? {}] as const,
+  tokenizationRequest: (id: string) => ["erp", "tokenization-requests", "detail", id] as const,
+  collection: (id: string) => ["erp", "collections", "detail", id] as const,
+  collectionClosure: (id: string) => ["erp", "collections", "detail", id, "closure"] as const,
 };

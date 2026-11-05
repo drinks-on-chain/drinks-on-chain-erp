@@ -75,7 +75,7 @@ test("Singani Gran Reserva 2026: de la parcela al reposo de 180 días", async ({
   await page.getByRole("button", { name: "Llenar tanque" }).first().click();
   const tankHeading = page.getByRole("heading", { level: 1, name: /^TK-\d+$/ });
   await expect(tankHeading).toBeVisible();
-  await expect(page.getByRole("link", { name: /Singani Gran Reserva 2026 · CVJ-L2026-006/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Singani Gran Reserva 2026 · CVJ-L2026-007/ })).toBeVisible();
 
   // La bifurcación se decide al completar la fermentación: destino singani, con la D.O. comprobada.
   await page.getByRole("button", { name: "Completar fermentación" }).click();
@@ -111,7 +111,7 @@ test("Singani Gran Reserva 2026: de la parcela al reposo de 180 días", async ({
 
   // El lote del servidor (nació al llenar el tanque) está en reposo, con su candado.
   await nav(page, "Lotes");
-  const row = page.getByRole("row", { name: /CVJ-L2026-006/ });
+  const row = page.getByRole("row", { name: /CVJ-L2026-007/ });
   await expect(row).toContainText("Singani Gran Reserva 2026");
   await expect(row).toContainText("Reposo");
   await expect(row).toContainText("Singani");

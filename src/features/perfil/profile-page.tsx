@@ -27,7 +27,6 @@ import { useChangePassword, useMe, useUpdateMe } from "@/lib/auth/hooks";
 import { activeMembership } from "@/lib/auth/organization";
 import { roleLabel } from "@/lib/erp/permissions";
 import { fmtDate, fmtDateTime } from "@/lib/format";
-import { ExternalLink, HashText, explorerAccountUrl } from "@/features/cuenta/stellar";
 import {
   LOCALES,
   preferenceValues,
@@ -37,12 +36,6 @@ import {
   type ProfileErrors as Errors,
   type ProfileValues as Values,
 } from "./profile-model";
-
-const WALLET_TYPE: Record<string, string> = {
-  CUSTODIAL: "Custodiada por Drinks on Chain",
-  SELF_CUSTODY: "Autocustodia",
-};
-const WALLET_PURPOSE: Record<string, string> = { PRODUCER_SIGNING: "Firma de productor", CONSUMER_NFT: "Consumidor" };
 
 function ProfileForm({ me }: { me: MeUser }) {
   const update = useUpdateMe();
@@ -254,7 +247,6 @@ export function ProfilePage() {
     );
   }
   const u = me.data.user;
-  const wallet = u.primaryWallet;
   const active = activeMembership(me.data);
   const license = (organizationId: string) =>
     u.wineryMemberships.find((m) => m.wineryId === organizationId)?.professionalLicenseNumber;
@@ -318,36 +310,6 @@ export function ProfilePage() {
                   </li>
                 ))}
               </ul>
-            )}
-          </Card>
-          <Card className="grid grid-cols-1 gap-4">
-            <CardHeader
-              title="Billetera"
-              description="La crea Drinks on Chain al registrarte. No tienes que guardar ninguna clave."
-            />
-            {wallet ? (
-              <KeyValueList
-                layout="stacked"
-                items={[
-                  {
-                    term: "Dirección en Stellar (testnet)",
-                    value: (
-                      <span className="flex flex-wrap items-center gap-x-3">
-                        <HashText value={wallet.stellarPublicAddress} label="Copiar dirección" />
-                        <ExternalLink href={explorerAccountUrl(wallet.stellarPublicAddress)}>
-                          Ver en stellar.expert
-                        </ExternalLink>
-                      </span>
-                    ),
-                  },
-                  {
-                    term: "Tipo",
-                    value: `${WALLET_TYPE[wallet.walletType] ?? wallet.walletType} · ${WALLET_PURPOSE[wallet.walletPurpose] ?? wallet.walletPurpose}`,
-                  },
-                ]}
-              />
-            ) : (
-              <p className="text-fg-muted text-sm">Aún no tienes billetera asignada.</p>
             )}
           </Card>
         </div>

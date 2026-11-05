@@ -19,7 +19,7 @@ test("Lotes: filtros del servidor y ficha con candado, reglas, registros y líne
   await login(page, "enologa@cintiviejo.test");
   await nav(page, "Lotes");
   await expect(page.getByRole("heading", { name: "Lotes", exact: true })).toBeVisible();
-  await expect(page.getByRole("row", { name: /Singani Gran Reserva 2026/ })).toContainText("Expediente cerrado");
+  await expect(page.getByRole("row", { name: /Singani Gran Reserva 2026/ })).toContainText("Anclado en la red");
 
   await page.getByRole("combobox", { name: "Filtrar por etapa" }).click();
   await page.getByRole("option", { name: "Reposo" }).click();
@@ -117,7 +117,7 @@ test("Nuevo lote en origen: instantánea de reglas a la vista y D.O. comprobada 
   await page.getByRole("button", { name: "Crear lote" }).click();
 
   await expect(page.getByRole("heading", { name: "Singani Gran Reserva 2026" })).toBeVisible();
-  await expect(page.getByText("CVJ-L2026-006").first()).toBeVisible();
+  await expect(page.getByText("CVJ-L2026-007").first()).toBeVisible();
   await expect(page.getByText("Origen", { exact: true }).first()).toBeVisible();
   const rules = page.getByLabel("Instantánea de reglas del lote");
   await expect(rules).toContainText("1.600 m s. n. m.");
@@ -126,7 +126,7 @@ test("Nuevo lote en origen: instantánea de reglas a la vista y D.O. comprobada 
   await expect(page.getByText("Apto para D.O. Singani")).toBeVisible();
   // El siguiente paso de un lote en origen es pesar uva, con el lote ya elegido.
   await page.getByRole("link", { name: "Registrar pesaje" }).click();
-  await expect(page.getByRole("combobox", { name: "Lote" })).toContainText("Singani Gran Reserva 2026 · CVJ-L2026-006");
+  await expect(page.getByRole("combobox", { name: "Lote" })).toContainText("Singani Gran Reserva 2026 · CVJ-L2026-007");
   expect(errors).toEqual([]);
 });
 

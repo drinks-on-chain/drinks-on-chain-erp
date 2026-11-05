@@ -45,3 +45,6 @@ next-env.d.ts
 /playwright-report/
 /test-results/
 /blob-report/
+
+# capturas de la revisión visual (no se versionan)
+/capturas/

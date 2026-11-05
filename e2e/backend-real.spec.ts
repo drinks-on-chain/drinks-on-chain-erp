@@ -1,6 +1,13 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { expect, test, type Browser, type Page, type Response } from "@playwright/test";
+import type {
+  LotDossier,
+  LotSummary,
+  LotTokenizationStatus,
+  TokenizationRequestSummary,
+  WineryChainAccountView,
+} from "@drinks-on-chain/mocks";
 import { hasMailbox, mailLink } from "./mailpit";
 import { trackErrors } from "./support";
 
@@ -10,6 +17,16 @@ import { trackErrors } from "./support";
 //
 //   E2E_REAL_API=1 E2E_API_ORIGIN=https://136.243.223.39.sslip.io E2E_PASSWORD=… \
 //     E2E_PORT=3150 pnpm e2e --project=escritorio
+//
+// AVISO (04-11-2026). El recorrido de la Ola 2 de este archivo crea su lote DENTRO de Destilería
+// Cinti Viejo, que es una bodega de la semilla, y lo lleva hasta cerrar y anclar su expediente. Un
+// expediente cerrado es inmutable: la API no deja descartar ese lote y `pnpm cleanup` del repo de
+// pruebas lo deja a propósito. Resultado: **cada ejecución deja para siempre un lote visible en la
+// bodega de demostración** (hoy `CVJ-2026-SINGANI-005 · E2E Singani 202610161526-xguz`, del 16-10).
+// Contradice la regla del repo de pruebas ("Nada en las bodegas de demostración": un recorrido que
+// necesita lotes crea su propia bodega y la revoca al terminar).
+// No ejecutar contra el entorno compartido sin avisar a la coordinación. Arreglo pendiente: crear
+// aquí una bodega propia de la ejecución, como hace `drinks-on-chain-e2e/src/lib/run-winery.ts`.
 //
 // Personas de la semilla del backend (README del backend, "Datos de demostración"); su
 // contraseña es la de SEED_DEMO_PASSWORD y solo llega por E2E_PASSWORD (nunca en el repo).
@@ -152,8 +169,9 @@ test("dueña de Cinti Viejo: sesión por cookie, módulos, alta de parcela, 422 
       await expect(page.getByText(/datos inesperados/), `pestaña ${tab}: contrato`).toHaveCount(0);
     }
     await openModule(page, "Reportes", "Reportes de producción");
-    await openModule(page, "Cuenta Stellar", "Cuenta Stellar");
-    await expect(page.getByRole("link", { name: /Ver en stellar.expert/ })).toBeVisible();
+    // 1F con la cuenta real (Ola 3): la identidad la entrega `chain-account`.
+    await openModule(page, "Cuenta de la bodega", "Cuenta de la bodega");
+    await expect(page.getByRole("group", { name: "Identidad en la red" })).toBeVisible();
     await openModule(page, "Ajustes", "Ajustes de la bodega");
   });
 
@@ -271,7 +289,7 @@ test("operario de Cinti Viejo: lee parcelas y pesa; no crea parcelas ni ve crian
   await expect(shellUser(page)).toContainText("Destilería Cinti Viejo");
   await settled(page);
   const nav = page.getByRole("navigation").first();
-  for (const hidden of ["Crianza", "Destilación y reposo", "Envasado y QR", "Cuenta Stellar"]) {
+  for (const hidden of ["Crianza", "Destilación y reposo", "Envasado y QR"]) {
     await expect(nav.getByRole("link", { name: hidden, exact: true })).toHaveCount(0);
   }
 
@@ -899,10 +917,9 @@ test("Ola 2: recorrido de §18 por la interfaz, del lote nuevo al expediente cer
     expect(closed.status()).toBeLessThan(300);
     await expect(page.getByText("Huella (SHA-256)")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText(/Raíz Merkle de los 2\.950 códigos de botella/)).toBeVisible();
-    const hash = (await page
-      .getByTitle(/^[0-9a-f]{64}$/)
-      .first()
-      .textContent())!.trim();
+    // La huella se pinta con ChainAddress (ui 0.4): el valor completo está en su parte `value`
+    const hash = (await page.getByTestId("dossier-hash").locator('[data-part="value"]').textContent())!.trim();
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
     const [canonicalResponse, json] = await Promise.all([
       page.waitForResponse((r) => r.url().endsWith("/dossier/canonical")),
       page.waitForEvent("download"),
@@ -939,15 +956,191 @@ test("Ola 2: recorrido de §18 por la interfaz, del lote nuevo al expediente cer
     await expect(graph.locator('[data-stage="BOTTLING"]')).toContainText("2.950 botellas");
     await side(page, "Lotes");
     await page.getByRole("searchbox", { name: "Buscar lote" }).fill(stamp);
-    await expect(page.getByRole("row", { name: new RegExp(escapeRe(LOT)) })).toContainText("Expediente cerrado", {
-      timeout: 20_000,
-    });
+    // `CERTIFIED` mientras el anclaje está pendiente; `ANCHORED` si el backend ya lo ancló
+    await expect(page.getByRole("row", { name: new RegExp(escapeRe(LOT)) })).toContainText(
+      /Expediente cerrado|Anclado en la red/,
+      { timeout: 20_000 },
+    );
   });
+
+  // Con el anclaje activo en el backend (ANCHOR_LEDGER=SIMULATED o Stellar habilitado):
+  // E2E_EXPECT_ANCHOR=1 exige que el lote llegue a «Anclado en la red» con la huella del expediente
+  if (process.env.E2E_EXPECT_ANCHOR === "1") {
+    await test.step("anclaje de la huella del expediente (E2E_EXPECT_ANCHOR=1)", async () => {
+      await expect(page.getByRole("row", { name: new RegExp(escapeRe(LOT)) })).toContainText("Anclado en la red", {
+        timeout: 60_000,
+      });
+      await page.getByRole("link", { name: LOT, exact: true }).click();
+      await expect(page.getByRole("heading", { name: LOT })).toBeVisible({ timeout: 20_000 });
+      await page.getByRole("tab", { name: "Expediente" }).click();
+      const dossierHash = (await page.getByTestId("dossier-hash").locator('[data-part="value"]').textContent())!.trim();
+      // El memo del anclaje es la huella del expediente (en hex y en base64)
+      await expect(page.getByText(/Anclad[oa]/).first()).toBeVisible({ timeout: 20_000 });
+      await page.getByRole("tab", { name: "Línea de tiempo" }).click();
+      await expect(page.getByRole("list", { name: "Línea de tiempo del lote" })).toContainText("Expediente anclado", {
+        timeout: 20_000,
+      });
+      expect(dossierHash).toMatch(/^[0-9a-f]{64}$/);
+    });
+  }
 
   expect(errors, "respuestas o errores inesperados").toEqual([]);
 });
 
 // ---------- Ola 1 · cuenta, invitaciones y equipo (O1-ERP-1 contra O1-BE-1) ----------
+
+// ---------------------------------------------------------------------------
+// Ola 3 · cotejo de solo lectura con el backend real (O3-ERP-1)
+// ---------------------------------------------------------------------------
+
+/** Respuesta 200 de un GET de la API cuya ruta cumple `path` (sin la consulta). */
+const apiGet = (page: Page, path: RegExp) =>
+  page.waitForResponse(
+    (r) => r.request().method() === "GET" && r.status() === 200 && path.test(new URL(r.url()).pathname),
+    { timeout: 30_000 },
+  );
+
+/**
+ * `data` de una respuesta real. El contrato lo comprueba la propia app: cada lectura pasa por el
+ * esquema de `@drinks-on-chain/mocks` de su recurso (`src/lib/erp/resources.ts`) y, si no lo cumple,
+ * la pantalla cae en ErrorState y deja en consola el campo que falla (lo recoge `trackErrors`). El
+ * paquete de los mocks es solo ESM y no se puede cargar desde el proceso de Playwright.
+ */
+async function realData<T>(response: Response): Promise<T> {
+  return (await response.json()).data as T;
+}
+
+type PageOf<T> = { items: T[]; total: number };
+
+test("Ola 3: cuenta de la bodega, tokenización y anclaje en solo lectura cumplen el contrato", async ({ page }) => {
+  needsPassword();
+  test.setTimeout(240_000);
+  const errors = trackErrors(page);
+  await login(page, "admin@cintiviejo.test");
+  await expect(page.getByText("Tareas pendientes", { exact: true })).toBeVisible({ timeout: 20_000 });
+
+  await test.step("cuenta de la bodega: el estado de la identidad, dicho como es y sin error", async () => {
+    const [response] = await Promise.all([
+      apiGet(page, /\/api\/v1\/organizations\/current\/chain-account$/),
+      openModule(page, "Cuenta de la bodega", "Cuenta de la bodega"),
+    ]);
+    const account = await realData<WineryChainAccountView>(response);
+    console.log(
+      `[cadena] identidad=${account.identity.status} red=${account.identity.network} colecciones=${account.byLot.length} transacciones=${account.recentTransactions.length}`,
+    );
+    const identity = page.getByRole("group", { name: "Identidad en la red" });
+    await expect(identity).toHaveAttribute("data-identity", account.identity.status);
+    if (account.identity.status === "NOT_PROVISIONED") {
+      await expect(identity).toContainText("Tu bodega aún no tiene cuenta en la red");
+      await expect(identity.getByRole("link")).toHaveCount(0);
+    }
+    if (account.identity.account) await expect(identity).toContainText(account.identity.account.address);
+    if (account.byLot.length === 0) {
+      await expect(page.getByRole("heading", { name: "Aún no hay NFT emitidos" })).toBeVisible();
+    }
+    await expect(page.getByTestId("chain-account-unavailable")).toHaveCount(0);
+  });
+
+  const picked: { lot: { id: string; name: string } | null } = { lot: null };
+  await test.step("lista de lotes: la marca de tokenización viene en cada lote", async () => {
+    const [response] = await Promise.all([apiGet(page, /\/api\/v1\/lots$/), openModule(page, "Lotes", "Lotes")]);
+    const lots = await realData<PageOf<LotSummary>>(response);
+    expect(lots.items.length).toBeGreaterThan(0);
+    await expect(page.getByRole("columnheader", { name: "Tokenización" })).toBeVisible();
+    const marked = lots.items.filter((l) => l.tokenization.state !== "NONE");
+    console.log(`[lotes] ${lots.total} lotes; con marca de tokenización en la primera página: ${marked.length}`);
+    // Un lote aún sin cerrar, para leer su estado de tokenización.
+    const candidate = lots.items.find((l) => !["CERTIFIED", "ANCHORED", "REJECTED", "DISCARDED"].includes(l.stage));
+    picked.lot = candidate ? { id: candidate.id, name: candidate.name } : null;
+  });
+
+  await test.step("pestaña Tokenización de un lote existente: límites y estado de la identidad", async () => {
+    const openLot = picked.lot;
+    if (!openLot) {
+      test.info().annotations.push({ type: "omitido", description: "Sin lotes abiertos en la primera página." });
+      return;
+    }
+    await page.locator(`a[href="/lotes/${openLot.id}"]`).first().click();
+    await settled(page);
+    const [response] = await Promise.all([
+      apiGet(page, /\/api\/v1\/lots\/[\w-]+\/tokenization$/),
+      page.getByRole("tab", { name: "Tokenización" }).click(),
+    ]);
+    const status = await realData<LotTokenizationStatus>(response);
+    console.log(
+      `[tokenización] lote=${openLot.name} tokenizable=${status.tokenizable} base=${status.limits.basis} máximo=${status.limits.maxQuantity} identidad=${status.chainIdentity.status} bloqueos=${status.blockers.map((b) => b.code).join(",") || "ninguno"}`,
+    );
+    await settled(page);
+    const state = page.getByRole("group", { name: "Tokenización del lote" });
+    await expect(state.getByTestId("limits-summary")).toBeVisible();
+    if (status.chainIdentity.status !== "ACTIVE") {
+      await expect(state.getByText(/^Cuenta de la bodega en la red:/)).toBeVisible();
+    }
+    if (status.blockers.some((b) => b.code !== "TOK_REQUEST_ALREADY_OPEN")) {
+      await expect(state.getByTestId("rule-violation-notice")).toBeVisible();
+    }
+    if (!status.openRequest && status.requests.length === 0) {
+      await expect(page.getByRole("heading", { name: "Este lote aún no tiene solicitudes" })).toBeVisible();
+    }
+    await expect(page.getByText("No se pudo cargar")).toHaveCount(0);
+  });
+
+  await test.step("solicitudes de la bodega", async () => {
+    const [response] = await Promise.all([
+      apiGet(page, /\/api\/v1\/tokenization-requests$/),
+      openModule(page, "Tokenización", "Solicitudes de tokenización"),
+    ]);
+    const requests = await realData<PageOf<TokenizationRequestSummary>>(response);
+    console.log(`[solicitudes] ${requests.total}`);
+    if (requests.total === 0) {
+      await expect(page.getByRole("heading", { name: "Aún no hay solicitudes de tokenización" })).toBeVisible();
+    }
+    await expect(page.getByText("No se pudo cargar")).toHaveCount(0);
+  });
+
+  await test.step("anclaje del expediente de un lote cerrado", async () => {
+    await openModule(page, "Lotes", "Lotes");
+    let found = false;
+    for (const stage of ["Anclado en la red", "Expediente cerrado"]) {
+      await page.getByRole("combobox", { name: "Filtrar por etapa" }).click();
+      await page.getByRole("option", { name: stage, exact: true }).click();
+      await settled(page);
+      const first = page.getByRole("table", { name: "Lotes de la bodega" }).locator("tbody a[href^='/lotes/']").first();
+      if ((await first.count()) > 0) {
+        await first.click();
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      test.info().annotations.push({ type: "omitido", description: "Sin lotes con el expediente cerrado." });
+      return;
+    }
+    await settled(page);
+    const [response] = await Promise.all([
+      apiGet(page, /\/api\/v1\/lots\/[\w-]+\/dossier$/),
+      page.getByRole("tab", { name: "Expediente" }).click(),
+    ]);
+    const dossier = await realData<LotDossier>(response);
+    console.log(
+      `[anclaje] expediente=${dossier.status} anclaje=${dossier.anchor?.status ?? "sin registrar"} enlace=${dossier.anchor?.explorerUrl ? "sí" : "no"}`,
+    );
+    await settled(page);
+    const anchor = page.getByRole("region", { name: "Anclaje en la red" });
+    await expect(anchor).toBeVisible();
+    if (dossier.anchor) await expect(anchor).toHaveAttribute("data-anchor", dossier.anchor.status);
+    else await expect(anchor).toContainText("Todavía no se ha registrado");
+    if (dossier.anchor?.explorerUrl) {
+      await expect(anchor.getByRole("link", { name: /Ver en el explorador/ })).toHaveAttribute(
+        "href",
+        dossier.anchor.explorerUrl,
+      );
+    }
+    await expect(page.getByText("No se pudo cargar")).toHaveCount(0);
+  });
+
+  expect(errors).toEqual([]);
+});
 
 const nav = (page: Page, name: string) =>
   page.getByRole("navigation", { name: "Navegación principal" }).getByRole("link", { name, exact: true }).click();

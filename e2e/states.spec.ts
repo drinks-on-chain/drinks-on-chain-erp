@@ -36,7 +36,12 @@ const LISTS: { path: string; nav: string; empty: string[]; content: RegExp }[] =
   { path: "/destilacion", nav: "Destilación y reposo", empty: ["Ninguna destilación todavía"], content: /Alambique/ },
   { path: "/envasado", nav: "Envasado y QR", empty: ["Aún no hay embotellados"], content: /CVJ-2026-/ },
   { path: "/reportes", nav: "Reportes", empty: ["Aún no hay lotes"], content: /Singani/ },
-  { path: "/cuenta", nav: "Cuenta Stellar", empty: ["Aún no hay lotes embotellados"], content: /CVJ-2026-/ },
+  {
+    path: "/cuenta",
+    nav: "Cuenta de la bodega",
+    empty: ["Aún no hay NFT emitidos", "Ningún expediente anclado todavía", "Sin transacciones todavía"],
+    content: /Identidad en la red/,
+  },
   { path: "/equipo", nav: "Equipo", empty: ["Sin miembros"], content: /cintiviejo\.test/ },
 ];
 

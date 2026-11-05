@@ -1,7 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { Button, Card, CardHeader, EmptyState, ErrorState, KeyValueList, Skeleton } from "@drinks-on-chain/ui";
+import {
+  Button,
+  Card,
+  CardHeader,
+  ChainAddress,
+  EmptyState,
+  ErrorState,
+  KeyValueList,
+  Skeleton,
+} from "@drinks-on-chain/ui";
 import { StoredFileLink } from "@/components/stored-file-link";
 import { PageChrome } from "@/components/page-chrome";
 import { ScreenTitle } from "@/components/screen-title";
@@ -9,7 +18,6 @@ import { ApiError, errorMessage } from "@/lib/api/errors";
 import { useBottling } from "@/lib/erp/hooks";
 import { PRODUCT_TYPE } from "@/lib/erp/labels";
 import { fmtDate, fmtDateTime, fmtNumber } from "@/lib/format";
-import { ExternalLink, HashText, explorerTxUrl } from "@/features/cuenta/stellar";
 import { BottlingBalanceMeters } from "@/features/lotes/components/lot-balance-chart";
 import { AnchorBadge } from "./anchor-badge";
 
@@ -137,37 +145,42 @@ export function BottlingDetail({ id }: { id: string }) {
 
           <Card className="grid grid-cols-1 gap-4">
             <CardHeader
-              title="Identidad en cadena"
-              description="La huella de los datos del lote se ancla en Stellar (testnet)."
+              title="Anclaje en la red"
+              description="La huella del expediente del lote se publica en la red Stellar al cerrarlo."
               action={<AnchorBadge anchored={b.isAnchoredOnChain} />}
             />
             <KeyValueList
               layout="stacked"
               items={[
-                {
-                  term: "Huella de datos (SHA-256)",
-                  value: b.blockchainDataHash ? (
-                    <HashText value={b.blockchainDataHash} full label="Copiar huella" />
-                  ) : (
-                    <span className="text-fg-muted">
-                      Desde la Ola 2 la huella que se ancla es la del expediente del lote, al cerrarlo.
-                    </span>
-                  ),
-                },
+                ...(b.blockchainDataHash
+                  ? [
+                      {
+                        term: "Huella de datos (SHA-256)",
+                        value: <ChainAddress value={b.blockchainDataHash} truncate={false} />,
+                      },
+                    ]
+                  : []),
                 {
                   term: "Transacción de anclaje",
                   value: b.blockchainAnchorTxHash ? (
-                    <span className="flex flex-wrap items-center gap-x-3">
-                      <HashText value={b.blockchainAnchorTxHash} label="Copiar transacción" />
-                      <ExternalLink href={explorerTxUrl(b.blockchainAnchorTxHash)}>Ver en stellar.expert</ExternalLink>
-                    </span>
+                    <ChainAddress value={b.blockchainAnchorTxHash} label="Transacción de anclaje" />
                   ) : (
-                    <span className="text-fg-muted">Pendiente: el backend la anclará en la próxima tanda.</span>
+                    <span className="text-fg-muted">
+                      Todavía no hay: el anclaje se registra al cerrar el expediente del lote.
+                    </span>
                   ),
                 },
                 ...(b.anchoredAt ? [{ term: "Anclado", value: fmtDateTime(b.anchoredAt) }] : []),
               ]}
             />
+            {b.lotId && (
+              <Link
+                href={`/lotes/${b.lotId}?pestana=expediente`}
+                className="justify-self-start text-sm font-medium text-accent-text hover:underline"
+              >
+                Ver el anclaje en el expediente del lote
+              </Link>
+            )}
           </Card>
 
           {b.lotId && (

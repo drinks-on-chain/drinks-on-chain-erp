@@ -1,6 +1,6 @@
 import { ApiError } from "./errors";
 
-// Errores de reglas de la trazabilidad (contrato de la Ola 2 §0 y §13): el backend responde 409
+// Errores de reglas (contrato de la Ola 2 §0 y §13, y de la Ola 3 §9 para los `TOK_…`): el backend responde 409
 // (estado del recurso) o 422 (regla incumplida) con un código `TRC_…` estable y `details` ampliados
 // de forma aditiva con `code`, `rule`, `expected`, `actual` y `meta`. Aquí solo se leen; el texto
 // para la persona lo arma `src/lib/erp/rule-violations.ts`.
@@ -40,9 +40,12 @@ export function parseRuleViolations(details: unknown): RuleViolation[] {
   });
 }
 
-/** Códigos de reglas: los de la trazabilidad (`TRC_…`) y el único anterior a la Ola 2 que sigue vivo. */
+/**
+ * Códigos de reglas: los de la trazabilidad (`TRC_…`), los de la tokenización (`TOK_…`, Ola 3 §9) y
+ * el único anterior a la Ola 2 que sigue vivo.
+ */
 export const isRuleCode = (code: string | null | undefined): boolean =>
-  !!code && (code.startsWith("TRC_") || code === "FERMENTATION_TANK_ALREADY_TRANSFERRED");
+  !!code && (code.startsWith("TRC_") || code.startsWith("TOK_") || code === "FERMENTATION_TANK_ALREADY_TRANSFERRED");
 
 /** El error es una regla de la trazabilidad (por su código o por el de alguno de sus detalles). */
 export function isRuleError(error: unknown): error is ApiError {

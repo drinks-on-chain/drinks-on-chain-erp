@@ -7,7 +7,16 @@ import { fmtDate, fmtDateTime, fmtNumber } from "@/lib/format";
 // solo se ordena en cifras y tareas; ningún umbral se calcula en el cliente.
 
 export type TaskKind =
-  "phyto" | "quarantine" | "temperature" | "no-reading" | "bottle" | "lab" | "close" | "issues" | "unassigned";
+  | "tokenization"
+  | "phyto"
+  | "quarantine"
+  | "temperature"
+  | "no-reading"
+  | "bottle"
+  | "lab"
+  | "close"
+  | "issues"
+  | "unassigned";
 
 export type DashboardTask = {
   id: string;
@@ -30,6 +39,7 @@ export const TASK_ACTION: Record<TaskKind, string> = {
   close: "Cerrar",
   issues: "Ver",
   unassigned: "Ver",
+  tokenization: "Atender",
 };
 
 const ACTIVE: readonly LotStageCode[] = ["ORIGIN", "HARVEST", "FERMENTING", "AGING", "DISTILLING", "RESTING"];
@@ -46,6 +56,13 @@ export type DashboardView = {
   locks: TraceDashboard["locksDueSoon"];
   /** Etapas con algún lote, en el orden del proceso. */
   stages: { stage: LotStageCode; count: number }[];
+  /** Bloque de tokenización (Ola 3 §11): solicitudes abiertas, con cambios pedidos y colecciones publicadas. */
+  tokenization: TraceDashboard["tokenization"];
+};
+
+export type DashboardOptions = {
+  /** El dueño, con la tokenización activa: los cambios pedidos por Drinks on Chain son tarea suya. */
+  tokenizationTasks?: boolean;
 };
 
 const STAGE_ORDER: readonly LotStageCode[] = [
@@ -68,9 +85,22 @@ function lotSubject(lot: { name: string; lotCode: string | null; reference: stri
   return lot.name === code ? code : `${lot.name} · ${code}`;
 }
 
-export function dashboardView(d: TraceDashboard): DashboardView {
+export function dashboardView(d: TraceDashboard, options: DashboardOptions = {}): DashboardView {
   const sum = (stages: readonly LotStageCode[]) => stages.reduce((total, s) => total + d.lotsByStage[s], 0);
   const tasks: DashboardTask[] = [];
+
+  if (options.tokenizationTasks && d.tokenization.changesRequested > 0) {
+    const n = d.tokenization.changesRequested;
+    tasks.push({
+      id: "tokenization-changes",
+      kind: "tokenization",
+      title: "Atender los cambios pedidos en la tokenización",
+      subject: n === 1 ? "1 solicitud con cambios pedidos" : `${fmtNumber(n)} solicitudes con cambios pedidos`,
+      href: "/tokenizacion",
+      due: "Pendiente",
+      urgent: false,
+    });
+  }
 
   for (const a of d.fermentationAlerts) {
     if (a.kind === "HIGH_TEMPERATURE") {
@@ -200,5 +230,6 @@ export function dashboardView(d: TraceDashboard): DashboardView {
       (a, b) => Number(a.lock.released) - Number(b.lock.released) || a.lock.daysRemaining - b.lock.daysRemaining,
     ),
     stages: STAGE_ORDER.map((stage) => ({ stage, count: d.lotsByStage[stage] })).filter((s) => s.count > 0),
+    tokenization: d.tokenization,
   };
 }

@@ -10,9 +10,11 @@ import { errorMessage } from "@/lib/api/errors";
 import { useMe } from "@/lib/auth/hooks";
 import { useLots } from "@/lib/erp/hooks";
 import { LOT_LAB_STATUS, LOT_PRODUCT, LOT_STAGE_CODE } from "@/lib/erp/labels";
+import { env } from "@/lib/env";
 import { can } from "@/lib/erp/permissions";
 import { fmtNumber } from "@/lib/format";
 import { useDebounced } from "@/lib/use-debounced";
+import { TokenizationMark } from "@/features/tokenizacion/components/tokenization-mark";
 import { LotStageBadge } from "./components/lot-stage-badge";
 import {
   EMPTY_LOT_FILTERS,
@@ -162,6 +164,17 @@ export function LotList({ issuesOnly = false }: { issuesOnly?: boolean }) {
                   <Badge tone={l.nextLock.released ? "success" : "warning"}>{lockBadgeText(l.nextLock)}</Badge>
                 ),
             },
+            // Marca de tokenización (Ola 3 §5.3): no es una etapa; la ven todos los roles.
+            ...(env.tokenization
+              ? [
+                  {
+                    id: "tokenization",
+                    header: "Tokenización",
+                    hideBelow: "lg" as const,
+                    cell: (l: LotSummary) => <TokenizationMark mark={l.tokenization} />,
+                  },
+                ]
+              : []),
             {
               id: "bottles",
               header: "Botellas",

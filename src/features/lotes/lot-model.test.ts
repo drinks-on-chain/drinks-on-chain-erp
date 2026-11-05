@@ -4,6 +4,7 @@ import { erpFixtures as fx } from "@drinks-on-chain/mocks/fixtures";
 import { ApiError } from "@/lib/api/errors";
 import {
   EMPTY_LOT_FILTERS,
+  FILTER_STAGES,
   effectiveRuleItems,
   emptyLotForm,
   hasLotFilters,
@@ -44,8 +45,12 @@ describe("etapa del lote (contrato §16.3)", () => {
       strong: true,
     });
     expect(stageView(byRef("CVJ-L2026-001")).label).toBe("Reposo");
-    expect(stageView(byRef("CVJ-L2026-005")).label).toBe("Expediente cerrado");
+    // Desde la Ola 3 el expediente cerrado pasa a anclado: es la etapa final visible del lote.
+    expect(stageView(byRef("CVJ-L2026-005")).label).toBe("Anclado en la red");
+    expect(stageView({ ...byRef("CVJ-L2026-005"), stage: "CERTIFIED" }).label).toBe("Expediente cerrado");
     expect(isTerminalStage("CERTIFIED")).toBe(true);
+    expect(isTerminalStage("ANCHORED")).toBe(true);
+    expect(FILTER_STAGES).toContain("ANCHORED");
     expect(isTerminalStage("RESTING")).toBe(false);
   });
 });

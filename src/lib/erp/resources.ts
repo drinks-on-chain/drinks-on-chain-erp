@@ -6,6 +6,7 @@ import {
   BottleUnitSchema,
   BottlingBatchResponseSchema,
   BottlingPreviewSchema,
+  CollectionSchema,
   CorrectionSchema,
   DossierPreviewSchema,
   EnologicalTreatmentSchema,
@@ -21,11 +22,14 @@ import {
   LotSchema,
   LotSummarySchema,
   LotTimelineSchema,
+  LotTokenizationStatusSchema,
   MaturityAnalysisSchema,
   PhytoDecisionSchema,
   ProductionBatchResponseSchema,
   ProductionReportSchema,
   TerroirDetailSchema,
+  TokenizationRequestSchema,
+  TokenizationRequestSummarySchema,
   TraceDashboardSchema,
   TerroirResponseSchema,
   WineAgingResponseSchema,
@@ -33,6 +37,8 @@ import {
   EffectiveSettingSchema,
   InvitationSchema,
   MemberSchema,
+  WineryChainAccountViewSchema,
+  WineryLotClosureSchema,
   WineryResponseSchema,
   SignedUrlResponseSchema,
   UploadResponseSchema,
@@ -50,12 +56,16 @@ import {
   type CreateMaturityAnalysisDto,
   type CreatePhytoDecisionDto,
   type CreateTerroirCorrectionDto,
+  type CreateTokenizationRequest,
   type DiscardLotDto,
   type DiscardProductionBatchDto,
   type DiscardWineAgingDto,
   type LotProductType,
   type LotStageCode,
   type StartFermentationTankDto,
+  type TokenizationRequestKind,
+  type TokenizationRequestStatus,
+  type UpdateTokenizationRequest,
   type UpdateLotDto,
   type VoidBottleCodeDto,
   type CreateDistillationBatchDto,
@@ -134,7 +144,13 @@ export type ProductionReportQuery = {
 export type ProductionQuery = PageQuery & { restStatus?: string };
 /** Filtros de la bitácora propia (contrato de la Ola 1 §7): fechas `AAAA-MM-DD` y código de acción. */
 export type AuditQuery = { from?: string; to?: string; action?: string; limit: number; offset: number };
-export type UploadFolder = "certificates" | "inspections" | "labels" | "lab-reports";
+export type UploadFolder = "certificates" | "inspections" | "labels" | "lab-reports" | "collections";
+/** Filtros de `GET /v1/tokenization-requests` (contrato de la Ola 3 §5.3). */
+export type TokenizationRequestQuery = PageQuery & {
+  status?: TokenizationRequestStatus;
+  kind?: TokenizationRequestKind;
+  lotId?: string;
+};
 
 /** `stage=A,B` de las listas de lotes y del reporte. */
 const stageParam = (stage?: readonly LotStageCode[]) => (stage && stage.length > 0 ? stage.join(",") : undefined);
@@ -387,6 +403,45 @@ export const erpApi = {
   settings: (signal?: AbortSignal) =>
     api("/v1/organizations/current/settings", { schema: z.array(EffectiveSettingSchema), signal }),
   audit: (q: AuditQuery, signal?: AbortSignal) => page("/v1/organizations/current/audit", AuditEventSchema, q, signal),
+
+  // Cadena y tokenización (contrato de la Ola 3). El ERP solo lee la cuenta de la bodega: no guarda
+  // claves ni firma nada. Los enlaces al explorador vienen del backend (`explorerUrl`).
+  chainAccount: (signal?: AbortSignal) =>
+    api("/v1/organizations/current/chain-account", { schema: WineryChainAccountViewSchema, signal }),
+  lotTokenization: (lotId: string, signal?: AbortSignal) =>
+    api(`/v1/lots/${lotId}/tokenization`, { schema: LotTokenizationStatusSchema, signal }),
+  /** Autorizar tokenización o ampliar la cuota (el tipo lo deduce el servidor). `Idempotency-Key` obligatoria. */
+  createTokenizationRequest: (lotId: string, body: CreateTokenizationRequest, idempotencyKey: string) =>
+    api(`/v1/lots/${lotId}/tokenization-requests`, {
+      method: "POST",
+      body,
+      schema: TokenizationRequestSchema,
+      idempotencyKey,
+    }),
+  tokenizationRequests: (q: TokenizationRequestQuery, s?: AbortSignal) =>
+    list("/v1/tokenization-requests", TokenizationRequestSummarySchema, q, s),
+  tokenizationRequest: (id: string, signal?: AbortSignal) =>
+    api(`/v1/tokenization-requests/${id}`, { schema: TokenizationRequestSchema, signal }),
+  updateTokenizationRequest: (id: string, body: UpdateTokenizationRequest) =>
+    api(`/v1/tokenization-requests/${id}`, { method: "PATCH", body, schema: TokenizationRequestSchema }),
+  /** `CHANGES_REQUESTED → SUBMITTED`. `Idempotency-Key` obligatoria. */
+  resubmitTokenizationRequest: (id: string, body: { message?: string }, idempotencyKey: string) =>
+    api(`/v1/tokenization-requests/${id}/resubmit`, {
+      method: "POST",
+      body,
+      schema: TokenizationRequestSchema,
+      idempotencyKey,
+    }),
+  withdrawTokenizationRequest: (id: string, reason: string) =>
+    api(`/v1/tokenization-requests/${id}/withdraw`, {
+      method: "POST",
+      body: { reason },
+      schema: TokenizationRequestSchema,
+    }),
+  collection: (id: string, signal?: AbortSignal) => api(`/v1/collections/${id}`, { schema: CollectionSchema, signal }),
+  /** Cierre del lote con faltante, sin datos de pedidos (dirección y contabilidad). */
+  collectionClosure: (id: string, signal?: AbortSignal) =>
+    api(`/v1/collections/${id}/closure`, { schema: WineryLotClosureSchema, signal }),
 
   // Archivos privados: se guarda la `key` en los DTO (campos `*Url`) y la URL firmada, que
   // caduca a los 15 min, se pide al mostrar el archivo.

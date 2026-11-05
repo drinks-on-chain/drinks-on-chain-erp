@@ -12,6 +12,10 @@ on:
         description: Origen del backend
         required: true
         default: https://136.243.223.39.sslip.io
+      grep:
+        description: Solo las pruebas cuyo título contenga este texto (vacío = todas; el recorrido de la Ola 2 crea un lote)
+        required: false
+        default: ""
       with_429:
         description: Probar también el 429 del login (suma fallos al bloqueo por IP del runner)
         type: boolean
@@ -30,6 +34,7 @@ jobs:
       E2E_API_ORIGIN: ${{ inputs.api_origin }}
       E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
       E2E_REAL_429: ${{ inputs.with_429 && '1' || '' }}
+      E2E_GREP: ${{ inputs.grep }}
       HAS_MAILPIT_KEY: ${{ secrets.DEV_MAILPIT_SSH_KEY != '' }}
     steps:
       - uses: actions/checkout@v7
@@ -68,5 +73,11 @@ jobs:
           ssh e2e-mailpit "GET /api/v1/info" > /dev/null
           echo "E2E_MAILPIT_SSH=e2e-mailpit" >> "$GITHUB_ENV"
           echo "E2E_MAILPIT_SSH_MODE=api" >> "$GITHUB_ENV"
-      - run: pnpm e2e --project=escritorio
+      - name: Pruebas
+        run: |
+          if [ -n "$E2E_GREP" ]; then
+            pnpm e2e --project=escritorio --grep "$E2E_GREP"
+          else
+            pnpm e2e --project=escritorio
+          fi
       # Sin artefactos: el repo es público y las trazas o capturas podrían contener la contraseña.

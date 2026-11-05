@@ -68,6 +68,12 @@ const VALUE_LABELS: Record<string, string> = {
   CONFORMING: "Conforme",
   NON_CONFORMING: "No conforme",
   INCOMPLETE: "Incompleto",
+  SUBMITTED: "Enviada",
+  IN_REVIEW: "En revisión",
+  CHANGES_REQUESTED: "Cambios pedidos",
+  WITHDRAWN: "Retirada",
+  SUSPENDED: "Suspendida",
+  REVOKED: "Revocada",
 };
 
 const isDay = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}(T.*)?$/.test(v);
@@ -79,6 +85,7 @@ export function formatRuleValue(value: unknown, unit: string | null = null): str
   if (typeof value === "number") {
     const digits = Number.isInteger(value) ? 0 : Math.min(3, (String(value).split(".")[1] ?? "").length);
     const text = fmtNumber(value, digits);
+    if (unit === "botellas") return `${text} ${value === 1 ? "botella" : "botellas"}`;
     return unit ? (unit === "%" ? `${text} %` : `${text} ${unit}`) : text;
   }
   if (Array.isArray(value)) return value.map((v) => formatRuleValue(v)).join(", ");
@@ -336,6 +343,76 @@ const EXPLAINERS: Record<string, Explainer> = {
   TRC_PLATFORM_READ_ONLY: {
     title: "La plataforma solo lee la trazabilidad",
     hint: "Los registros los hace el equipo de la bodega.",
+  },
+
+  // Tokenización (contrato de la Ola 3 §9). La cuota y sus límites los decide el servidor.
+  TOK_REQUEST_NOT_FOUND: { title: "Solicitud no encontrada", hint: "No existe o pertenece a otra bodega." },
+  TOK_COLLECTION_NOT_FOUND: { title: "Colección no encontrada", hint: "No existe o pertenece a otra bodega." },
+  TOK_LOT_NOT_TOKENIZABLE: {
+    title: "El lote ya no se puede tokenizar",
+    facts: (v) => fact("Etapa del lote", v.meta.stage),
+    hint: "La tokenización se autoriza antes de cerrar el expediente: un lote certificado, anclado, rechazado o descartado ya no la admite.",
+  },
+  TOK_LOT_PRODUCT_UNDEFINED: {
+    title: "El lote aún no tiene tipo de producto",
+    hint: "El tipo (vino o singani) se declara al crear el lote o al completar la fermentación.",
+  },
+  TOK_LOT_ESTIMATE_MISSING: {
+    title: "Falta la estimación de botellas del lote",
+    hint: "Declara cuántas botellas esperas del lote (en «Datos del lote»): es el límite de la cuota hasta el embotellado.",
+  },
+  TOK_QUOTA_INVALID: {
+    title: "Cantidad no válida",
+    facts: (v) => fact("Cantidad indicada", v.actual),
+    hint: "Indica un número entero de botellas, a partir de 1.",
+  },
+  TOK_QUOTA_EXCEEDS_ESTIMATE: {
+    title: "La cuota supera la estimación del lote",
+    facts: (v) => [
+      ...fact("Estimación del lote", v.expected, "botellas"),
+      ...fact("Cuota que resultaría", v.actual, "botellas"),
+      ...fact("Puedes autorizar hasta", v.meta.maxQuantity, "botellas"),
+    ],
+    hint: "Pide una cantidad menor o sube antes la estimación de botellas del lote.",
+  },
+  TOK_QUOTA_EXCEEDS_BOTTLES: {
+    title: "La cuota supera las botellas del lote",
+    facts: (v) => [
+      ...fact("Botellas con código activo", v.expected, "botellas"),
+      ...fact("Cuota que resultaría", v.actual, "botellas"),
+      ...fact("Puedes autorizar hasta", v.meta.maxQuantity, "botellas"),
+    ],
+    hint: "Desde el embotellado el límite son las botellas reales del lote.",
+  },
+  TOK_ESTIMATE_BELOW_MINTED: {
+    title: "La estimación no puede bajar de los NFT ya emitidos",
+    facts: (v) => [
+      ...fact("NFT emitidos", v.expected, "botellas"),
+      ...fact("Estimación indicada", v.actual, "botellas"),
+    ],
+    hint: "Cada NFT emitido representa una botella: la estimación tiene que ser igual o mayor. Si al embotellar hay menos botellas, Drinks on Chain resuelve el faltante.",
+  },
+  TOK_REQUEST_ALREADY_OPEN: {
+    title: "El lote ya tiene una solicitud abierta",
+    hint: "Espera a que Drinks on Chain la resuelva, edítala si te pidieron cambios o retírala antes de enviar otra.",
+  },
+  TOK_REQUEST_INVALID_TRANSITION: {
+    title: "La solicitud ya no admite esta acción",
+    facts: (v) => fact("Estado de la solicitud", v.meta.from),
+    hint: "Su estado cambió mientras tanto: vuelve a abrirla para ver cómo está.",
+  },
+  TOK_WINERY_NOT_ACTIVE: {
+    title: "La bodega no está activa",
+    facts: (v) => fact("Estado de la bodega", v.meta.status),
+  },
+  TOK_WINERY_CHAIN_NOT_READY: {
+    title: "La cuenta de la bodega en la red aún no está lista",
+    hint: "Drinks on Chain la prepara al activar la bodega. Consulta su estado en «Cuenta de la bodega».",
+  },
+  TOK_CLOSURE_NOT_APPLICABLE: {
+    title: "El lote aún no tiene cierre",
+    facts: (v) => fact("Etapa del lote", v.meta.stage),
+    hint: "El cierre se calcula cuando el lote se embotella o se descarta.",
   },
 };
 
