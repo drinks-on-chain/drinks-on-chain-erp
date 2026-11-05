@@ -18,6 +18,16 @@ import { trackErrors } from "./support";
 //   E2E_REAL_API=1 E2E_API_ORIGIN=https://136.243.223.39.sslip.io E2E_PASSWORD=… \
 //     E2E_PORT=3150 pnpm e2e --project=escritorio
 //
+// AVISO (04-11-2026). El recorrido de la Ola 2 de este archivo crea su lote DENTRO de Destilería
+// Cinti Viejo, que es una bodega de la semilla, y lo lleva hasta cerrar y anclar su expediente. Un
+// expediente cerrado es inmutable: la API no deja descartar ese lote y `pnpm cleanup` del repo de
+// pruebas lo deja a propósito. Resultado: **cada ejecución deja para siempre un lote visible en la
+// bodega de demostración** (hoy `CVJ-2026-SINGANI-005 · E2E Singani 202610161526-xguz`, del 16-10).
+// Contradice la regla del repo de pruebas ("Nada en las bodegas de demostración": un recorrido que
+// necesita lotes crea su propia bodega y la revoca al terminar).
+// No ejecutar contra el entorno compartido sin avisar a la coordinación. Arreglo pendiente: crear
+// aquí una bodega propia de la ejecución, como hace `drinks-on-chain-e2e/src/lib/run-winery.ts`.
+//
 // Personas de la semilla del backend (README del backend, "Datos de demostración"); su
 // contraseña es la de SEED_DEMO_PASSWORD y solo llega por E2E_PASSWORD (nunca en el repo).
 // Lecturas y altas con el sufijo de la ejecución (`E2E-<fecha>-<azar>`: una parcela, un pesaje y el
